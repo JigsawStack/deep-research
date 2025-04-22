@@ -3,7 +3,7 @@ import createDeepResearch from '../..';
 // Basic usage example
 async function basicResearch() {
   const research = await createDeepResearch({
-    prompt: ['What is the impact of AI on healthcare?'],
+    prompt: ['Is michael jordan a good basketball player?'],
     // Using mostly default settings with slight modifications
     depth: {
       level: 2,  // Detailed analysis
@@ -11,7 +11,7 @@ async function basicResearch() {
     },
     breadth: {
       level: 2,  // Main topic + direct relationships
-      maxParallelTopics: 4
+      maxParallelTopics: 2
     }
   });
 }
