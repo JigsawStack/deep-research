@@ -1,10 +1,13 @@
-import { SubQuestion, SubQuestionGeneratorConfig, SubQuestionGeneratorResult } from '../types/generators';
+import {
+  SubQuestion,
+  SubQuestionGeneratorConfig,
+  SubQuestionGeneratorResult,
+} from '../types/generators';
 import { ResearchBreadthConfig } from '../types';
 import { OpenAIProvider } from '../provider/openai';
 import 'dotenv/config';
 import { GeminiProvider } from '../provider/gemini';
 export class SubQuestionGenerator {
-
   private openaiInstance: OpenAIProvider;
   private geminiInstance: GeminiProvider;
   constructor() {
@@ -12,10 +15,10 @@ export class SubQuestionGenerator {
     //   throw new Error('OPENAI_API_KEY is not set');
     // }
     this.openaiInstance = OpenAIProvider.getInstance({
-      apiKey: process.env.OPENAI_API_KEY || ''
+      apiKey: process.env.OPENAI_API_KEY || '',
     });
     this.geminiInstance = GeminiProvider.getInstance({
-      apiKey: process.env.GEMINI_API_KEY || ''
+      apiKey: process.env.GEMINI_API_KEY || '',
     });
   }
 
@@ -67,7 +70,10 @@ Generate ${targetQuestionCount} ranked sub-questions that will help explore this
 
     try {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await this.openaiInstance.generateText(combinedPrompt, 'gpt-4o');
+      const response = await this.openaiInstance.generateText(
+        combinedPrompt,
+        'gpt-4o'
+      );
 
       let parsedQuestions;
       try {
@@ -76,8 +82,11 @@ Generate ${targetQuestionCount} ranked sub-questions that will help explore this
         throw new Error(`Failed to parse response as JSON: ${parseError}`);
       }
 
-      // pick the questions equal to the breadthConfig.maxParallelTopics 
-      let questions: SubQuestion[] = parsedQuestions.slice(0, breadthConfig.maxParallelTopics);
+      // pick the questions equal to the breadthConfig.maxParallelTopics
+      let questions: SubQuestion[] = parsedQuestions.slice(
+        0,
+        breadthConfig.maxParallelTopics
+      );
 
       questions = await this.validateResponse(questions, mainPrompt);
 
@@ -85,16 +94,25 @@ Generate ${targetQuestionCount} ranked sub-questions that will help explore this
         questions,
         metadata: {
           totalGenerated: questions.length,
-          averageRelevanceScore: questions.reduce((acc, q) => acc + q.relevanceScore, 0) / questions.length,
-          generationTimestamp: new Date().toISOString()
-        }
+          averageRelevanceScore:
+            questions.reduce((acc, q) => acc + q.relevanceScore, 0) /
+            questions.length,
+          generationTimestamp: new Date().toISOString(),
+        },
       };
     } catch (error: unknown) {
-      throw new Error(`Failed to generate sub-questions: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to generate sub-questions: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
-  public async checkRelevance(question: string, mainPrompt: string[]): Promise<boolean> {
+  public async checkRelevance(
+    question: string,
+    mainPrompt: string[]
+  ): Promise<boolean> {
     const systemPrompt = `You are an expect research assistant. Your task it to check if the question is relevant to the main research topic or not.
     Return only a boolean value (true or false)`;
 
@@ -104,30 +122,80 @@ ${mainPrompt.join('\n')}
 Question: ${question}`;
 
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await this.geminiInstance.generateText(combinedPrompt, 'gemini-1.5-flash');
-    console.log(`Question: ${question} is relevant: ${response}`);
-    return response === 'true';
+    const response = await this.geminiInstance.generateText(
+      combinedPrompt,
+      'gemini-1.5-flash'
+    );
+
+    // Normalize the response to handle different formats
+    const normalizedResponse = response.trim().toLowerCase();
+    console.log(
+      `Question: ${question} is relevant: ${response} (normalized: ${normalizedResponse})`
+    );
+
+    // Check if it contains "true" anywhere in the response
+    return normalizedResponse.includes('true');
   }
 
-  private async validateResponse(questions: SubQuestion[], mainPrompt: string[]): Promise<SubQuestion[]> {
+  private async validateResponse(
+    questions: SubQuestion[],
+    mainPrompt: string[]
+  ): Promise<SubQuestion[]> {
     if (!Array.isArray(questions)) {
-      throw new Error('Invalid response format: expected an array of questions');
+      throw new Error(
+        'Invalid response format: expected an array of questions'
+      );
     }
 
-    questions.forEach(async (q) => {
-      if (!q.question || typeof q.relevanceScore !== 'number') {
-        q.relevanceScore = 0;
-      }
-      if (q.relevanceScore < 0 || q.relevanceScore > 1) {
-        q.relevanceScore = 0;
-      }
-      // Check if the question is relevant to the main research topic
-      const isRelevant = await this.checkRelevance(q.question, mainPrompt);
-      if (!isRelevant || q.relevanceScore === 0) {
-        // taking that question out of the array
-        questions = questions.filter(q => q.question !== q.question);
-      }
+    console.log('Before validation, questions:', JSON.stringify(questions));
+
+    const validatedQuestions = [...questions]; // Create a copy to avoid modifying during iteration
+
+    // Using Promise.all for proper handling of asynchronous operations
+    const relevanceChecks = await Promise.all(
+      validatedQuestions.map(async (q, idx) => {
+        console.log(
+          `Checking question ${idx}:`,
+          q.question,
+          'relevanceScore:',
+          q.relevanceScore
+        );
+
+        if (!q.question || typeof q.relevanceScore !== 'number') {
+          console.log(`Question ${idx} invalid format`);
+          q.relevanceScore = 0;
+          return false;
+        }
+        if (q.relevanceScore < 0 || q.relevanceScore > 1) {
+          console.log(`Question ${idx} invalid score range:`, q.relevanceScore);
+          q.relevanceScore = 0;
+          return false;
+        }
+
+        // Check if the question is relevant to the main research topic
+        const isRelevant = await this.checkRelevance(q.question, mainPrompt);
+        console.log(`Question ${idx} relevance check result:`, isRelevant);
+        return isRelevant;
+      })
+    );
+
+    console.log('Relevance checks results:', relevanceChecks);
+
+    // Filter out irrelevant questions
+    const result = validatedQuestions.filter((q, index) => {
+      const shouldKeep = relevanceChecks[index] && q.relevanceScore > 0;
+      console.log(
+        `Question ${index} should keep:`,
+        shouldKeep,
+        'relevanceCheck:',
+        relevanceChecks[index],
+        'score:',
+        q.relevanceScore
+      );
+      return shouldKeep;
     });
-    return questions;
+
+    console.log('After validation, questions:', JSON.stringify(result));
+    return result;
   }
-} 
+}
