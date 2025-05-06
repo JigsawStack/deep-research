@@ -29,19 +29,15 @@ export class JigsawProvider {
   public async fireWebSearches(
     subQuestions: SubQuestionGeneratorResult
   ): Promise<WebSearchResult[]> {
-    console.log('Subquestions', subQuestions);
     // Map each question to a promise that resolves to a search result
     const searchPromises = subQuestions.questions.map(async (question) => {
       try {
-        console.log('Sending query:', question.question);
         const results = await this.jigsawInstance.web.search({
           query: question.question,
           ai_overview: true,
           safe_search: 'moderate',
           spell_check: true,
         });
-
-        console.log('Raw response:', JSON.stringify(results));
 
         // Check if results has the expected structure
         if (!results || !results.results) {

@@ -129,9 +129,6 @@ Question: ${question}`;
 
     // Normalize the response to handle different formats
     const normalizedResponse = response.trim().toLowerCase();
-    console.log(
-      `Question: ${question} is relevant: ${response} (normalized: ${normalizedResponse})`
-    );
 
     // Check if it contains "true" anywhere in the response
     return normalizedResponse.includes('true');
@@ -147,55 +144,29 @@ Question: ${question}`;
       );
     }
 
-    console.log('Before validation, questions:', JSON.stringify(questions));
-
     const validatedQuestions = [...questions]; // Create a copy to avoid modifying during iteration
 
     // Using Promise.all for proper handling of asynchronous operations
     const relevanceChecks = await Promise.all(
-      validatedQuestions.map(async (q, idx) => {
-        console.log(
-          `Checking question ${idx}:`,
-          q.question,
-          'relevanceScore:',
-          q.relevanceScore
-        );
-
+      validatedQuestions.map(async (q) => {
         if (!q.question || typeof q.relevanceScore !== 'number') {
-          console.log(`Question ${idx} invalid format`);
           q.relevanceScore = 0;
           return false;
         }
         if (q.relevanceScore < 0 || q.relevanceScore > 1) {
-          console.log(`Question ${idx} invalid score range:`, q.relevanceScore);
           q.relevanceScore = 0;
           return false;
         }
 
         // Check if the question is relevant to the main research topic
-        const isRelevant = await this.checkRelevance(q.question, mainPrompt);
-        console.log(`Question ${idx} relevance check result:`, isRelevant);
-        return isRelevant;
+        return await this.checkRelevance(q.question, mainPrompt);
       })
     );
 
-    console.log('Relevance checks results:', relevanceChecks);
-
     // Filter out irrelevant questions
-    const result = validatedQuestions.filter((q, index) => {
-      const shouldKeep = relevanceChecks[index] && q.relevanceScore > 0;
-      console.log(
-        `Question ${index} should keep:`,
-        shouldKeep,
-        'relevanceCheck:',
-        relevanceChecks[index],
-        'score:',
-        q.relevanceScore
-      );
-      return shouldKeep;
-    });
-
-    console.log('After validation, questions:', JSON.stringify(result));
-    return result;
+    return validatedQuestions.filter(
+      (_, index) =>
+        relevanceChecks[index] && validatedQuestions[index].relevanceScore > 0
+    );
   }
 }
