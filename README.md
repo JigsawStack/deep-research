@@ -29,9 +29,27 @@ const research = await createDeepResearch({
   breadth: {
     maxParallelTopics: 4, // How many sub-questions to explore
   },
+  models: {
+    reasoning: 'deepseek-r1', // Use DeepSeek for detailed reasoning steps
+  },
+  memory: {
+    maxContextTokens: 16000, // Maximum tokens to store in context
+    pruningStrategy: 'least-relevant', // Prune least relevant content when needed
+  },
+  response: {
+    maxTokens: 4000, // Maximum size of the final response
+    includeThinkingProcess: true, // Show the reasoning steps in the response
+  },
 });
 
-// More implementation examples coming soon...
+// Get the research results
+const results = await research.execute();
+console.log(results.answer);
+
+// Alternatively, stream the results as they come in
+research.executeStream((update) => {
+  console.log(`New data from depth ${update.depth}: ${update.summary}`);
+});
 ```
 
 ## 🧩 How It Works
@@ -62,16 +80,20 @@ The deep research process works as follows:
 7. **Synthesis**: All gathered information is synthesized into a comprehensive answer.
 8. **Citation**: Claims are linked to their source material with proper citations.
 
-## 📏 Recursion Control
+## 📏 Recursion and Context Management
 
-The system implements the following controls to manage recursive sub-searches:
+The system implements the following controls to manage recursive sub-searches and memory:
 
-| Control               | Purpose                         | Implementation                                       |
-| --------------------- | ------------------------------- | ---------------------------------------------------- |
-| **Max Depth**         | Prevent infinite recursion      | Tracking a depth variable (0=main, 1=sub, 2=sub-sub) |
-| **Relevance Check**   | Keep sub-queries on topic       | Using LLM to verify relevance to the main question   |
-| **Context Retention** | Maintain focus on main question | Including main question context in all sub-searches  |
-| **Deduplication**     | Avoid redundant searches        | Tracking previously searched queries                 |
+| Control                | Purpose                                | Implementation                                                  |
+| ---------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| **Max Depth**          | Prevent infinite recursion             | Tracking a depth variable (0=main, 1=sub, 2=sub-sub)            |
+| **Relevance Check**    | Keep sub-queries on topic              | Using LLM to verify relevance to the main question              |
+| **Context Retention**  | Maintain focus on main question        | Including main question context in all sub-searches             |
+| **Deduplication**      | Avoid redundant searches               | Tracking previously searched queries                            |
+| **Token Management**   | Prevent context bloat                  | Tracking token usage and applying pruning strategies            |
+| **Context Hierarchy**  | Organize research data                 | Storing research context in a tree structure that mirrors depth |
+| **Memory Pruning**     | Manage memory constraints              | Automatically remove least relevant information when needed     |
+| **Persistent Context** | Save context for long-running research | Option to save context to disk for later resumption (optional)  |
 
 ## 📚 Architecture
 
@@ -81,17 +103,45 @@ The library is built with a modular architecture:
 - **Providers**: Interface with different LLM and search APIs
 - **Preparation**: Clean and process web content
 - **Synthesis**: Combine multiple sources into coherent answers
+- **Memory**: Manage context and token usage throughout the research process
+- **Reasoning**: Handle multi-step thinking and decision-making
 
 ## 🔧 Configuration Options
 
-| Option                      | Description                                     | Default        |
-| --------------------------- | ----------------------------------------------- | -------------- |
-| `depth.level`               | Recursion depth (1-5)                           | 3              |
-| `breadth.maxParallelTopics` | Number of sub-questions to explore              | 3              |
-| `breadth.minRelevanceScore` | Minimum relevance score (0-1) for sub-questions | 0.7            |
-| `models.default`            | Default LLM for general tasks                   | gpt-4.1        |
-| `models.quick`              | Faster LLM for simpler tasks                    | gemini-2-flash |
-| `models.reasoning`          | LLM optimized for complex reasoning             | deepseek-r1    |
+| Option                            | Description                                     | Default          |
+| --------------------------------- | ----------------------------------------------- | ---------------- |
+| `depth.level`                     | Recursion depth (1-5)                           | 3                |
+| `breadth.maxParallelTopics`       | Number of sub-questions to explore              | 3                |
+| `breadth.minRelevanceScore`       | Minimum relevance score (0-1) for sub-questions | 0.7              |
+| `models.default`                  | Default LLM for general tasks                   | gpt-4.1          |
+| `models.quick`                    | Faster LLM for simpler tasks                    | gemini-2-flash   |
+| `models.reasoning`                | LLM optimized for complex reasoning             | deepseek-r1      |
+| `memory.maxContextTokens`         | Maximum tokens to store in context              | 16000            |
+| `memory.pruningStrategy`          | How to manage context when limit reached        | 'least-relevant' |
+| `memory.persistToFile`            | Save context to disk for later use              | false            |
+| `response.maxTokens`              | Maximum tokens in the final response            | 4000             |
+| `response.includeThinkingProcess` | Show reasoning steps in the output              | false            |
+| `response.streamResults`          | Stream intermediate results during research     | false            |
+
+## 🧠 Reasoning Process
+
+The library uses DeepSeek R1 with thinking capabilities to provide transparent reasoning:
+
+1. **Initial Analysis**: Break down complex questions and identify key components
+2. **Step-by-Step Reasoning**: Show the thought process for evaluating information
+3. **Source Evaluation**: Analyze the credibility and relevance of different sources
+4. **Conflict Resolution**: Identify and resolve contradictions between sources
+5. **Conclusion Formation**: Show the reasoning path to the final answer
+
+**Example thinking process output:**
+
+1. The question asks about quantum computing advancements.
+2. From source A, we know about quantum supremacy demonstrations.
+3. Source B mentions error correction improvements.
+4. Source C discusses topological qubits.
+5. Sources A and B are academic papers while C is a news article.
+6. The academic sources provide more technical depth, suggesting...
+7. Therefore, the most significant recent advancements appear to be...
 
 ## 🛠️ Implementation Guide (For Contributors)
 
@@ -116,9 +166,16 @@ To implement the deep research functionality:
    - Weight information by source credibility and relevance
 
 4. **Add citation tracking**:
+
    - Track the source of each piece of information
    - Generate properly formatted citations
    - Link assertions in the final answer to specific sources
 
+5. **Implement memory management**:
+   - Track token usage throughout the research process
+   - Apply pruning strategies to manage context size
+   - Implement hierarchical storage for context data
+
 ## 📄 License
+
 Will have to add something here. (TODO)
