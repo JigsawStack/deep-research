@@ -11,7 +11,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "npm run build",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "tsc && ts-node examples/basic/simple-research.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.2",

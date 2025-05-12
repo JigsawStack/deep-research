@@ -20,36 +20,36 @@ npm install open-deep-research
 ```typescript
 import { createDeepResearch } from 'open-deep-research';
 
-// Create a deep research instance
+// Simplest usage with a single API key
 const research = await createDeepResearch({
   prompt: ['What are the latest advancements in quantum computing?'],
-  depth: {
-    level: 3, // How deep to go with recursive searches
-  },
-  breadth: {
-    maxParallelTopics: 4, // How many sub-questions to explore
+  apiKey: 'your-deepseek-api-key', // Single API key for default model
+  model: 'deepseek-r1', // Specify single model directly
+  depth: { level: 3 },
+  breadth: { maxParallelTopics: 4 },
+});
+
+// OR advanced usage with multiple models
+const research = await createDeepResearch({
+  prompt: ['What are the latest advancements in quantum computing?'],
+  apiKeys: {
+    deepseek: 'your-deepseek-api-key',
+    openai: 'your-openai-api-key',
+    gemini: 'your-gemini-api-key',
   },
   models: {
-    reasoning: 'deepseek-r1', // Use DeepSeek for detailed reasoning steps
+    subQuestionGeneration: 'gemini-1.5-flash',
+    webSearchAnalysis: 'deepseek-r1',
+    finalSynthesis: 'gpt-4o',
   },
-  memory: {
-    maxContextTokens: 16000, // Maximum tokens to store in context
-    pruningStrategy: 'least-relevant', // Prune least relevant content when needed
-  },
-  response: {
-    maxTokens: 4000, // Maximum size of the final response
-    includeThinkingProcess: true, // Show the reasoning steps in the response
-  },
+  depth: { level: 3 },
+  breadth: { maxParallelTopics: 4 },
 });
 
 // Get the research results
 const results = await research.execute();
 console.log(results.answer);
 
-// Alternatively, stream the results as they come in
-research.executeStream((update) => {
-  console.log(`New data from depth ${update.depth}: ${update.summary}`);
-});
 ```
 
 ## 🧩 How It Works
@@ -175,6 +175,10 @@ To implement the deep research functionality:
    - Track token usage throughout the research process
    - Apply pruning strategies to manage context size
    - Implement hierarchical storage for context data
+
+   - 1.	Keep context in memory during a single run (tree structure)
+	- 2.	Persist to disk at regular intervals or per depth (for crash recovery + debugging)
+	- 3.	Pass context around functions to keep it functional and testable
 
 ## 📄 License
 

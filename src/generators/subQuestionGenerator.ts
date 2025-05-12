@@ -70,9 +70,13 @@ Generate ${targetQuestionCount} ranked sub-questions that will help explore this
 
     try {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await this.openaiInstance.generateText(
+      // const response = await this.openaiInstance.generateText(
+      //   combinedPrompt,
+      //   'gpt-4o'
+      // );
+      const response = await this.geminiInstance.generateText(
         combinedPrompt,
-        'gpt-4o'
+        'gemini-2.0-flash'
       );
 
       let parsedQuestions;
