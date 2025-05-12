@@ -1,5 +1,9 @@
 import GeminiProvider from '../provider/gemini';
-import { SynthesisInput, SynthesisOutput } from '../types/synthesis';
+import {
+  FinalSynthesisInput,
+  SynthesisInput,
+  SynthesisOutput,
+} from '../types/synthesis';
 import { WebSearchResult } from '../types';
 import { cleanJsonResponse } from '../utils/utils';
 import 'dotenv/config';
@@ -124,7 +128,7 @@ Please synthesize this information according to the instructions.`;
   }
 
   async generateFinalSynthesis(
-    input: SynthesisInput
+    input: FinalSynthesisInput
   ): Promise<SynthesisOutput> {
     const { mainPrompt, allSyntheses = [], maxOutputTokens } = input;
 

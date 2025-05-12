@@ -1,5 +1,10 @@
 import { WebSearchResult } from '.';
 
+export interface FinalSynthesisInput {
+  mainPrompt: string[];
+  allSyntheses: SynthesisOutput[];
+  maxOutputTokens?: number;
+}
 export interface SynthesisInput {
   mainPrompt: string[];
   results: WebSearchResult[];

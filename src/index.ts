@@ -6,7 +6,7 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_DEPTH_CONFIG,
   DEFAULT_BREADTH_CONFIG,
-  DEFAULT_SYNTHESIS_CONFIG
+  DEFAULT_SYNTHESIS_CONFIG,
 } from './config/defaults';
 import { SubQuestionGenerator } from './generators/subQuestionGenerator';
 import { SubQuestionGeneratorResult } from './types/generators';
@@ -51,6 +51,10 @@ export class DeepResearch implements DeepResearchInstance {
       models: {
         ...DEFAULT_CONFIG.models,
         ...config.models,
+      },
+      synthesis: {
+        ...DEFAULT_SYNTHESIS_CONFIG,
+        ...config.synthesis,
       },
     };
   }
@@ -160,15 +164,12 @@ export class DeepResearch implements DeepResearchInstance {
       allSyntheses.push(...syntheses);
     });
 
-    // Create a combined synthesis of all depth levels
-    const finalSynthesis = await this.synthesizer.synthesizeResults({
+    // Use the synthesizer's generateFinalSynthesis method
+    return this.synthesizer.generateFinalSynthesis({
       mainPrompt: this.config.prompt,
-      results: [], // No direct results, using syntheses instead
-      currentDepth: 0, // 0 indicates final synthesis
-      parentSynthesis: undefined,
+      allSyntheses: allSyntheses,
+      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
     });
-
-    return finalSynthesis;
   }
 }
 

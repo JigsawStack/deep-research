@@ -1,4 +1,5 @@
 import { SubQuestion, SubQuestionGeneratorResult } from './generators';
+import { SynthesisConfig } from './synthesis';
 
 export interface ResearchProvider {
   analyze(text: string): Promise<ResearchResult>;
@@ -40,6 +41,7 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
   models?: Partial<ModelConfig>;
+  synthesis?: Partial<SynthesisConfig>;
 }
 
 export interface DeepResearchInstance {
@@ -55,14 +57,6 @@ export interface WebSearchResultItem {
   url: string;
   content: string;
 }
-
-export interface JigsawSearchResult {
-  url: string;
-  content: string;
-  title?: string;
-  snippet?: string;
-}
-
 
 export interface ResearchSource {
   url: string;
