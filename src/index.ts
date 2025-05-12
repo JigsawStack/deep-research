@@ -1,5 +1,7 @@
 import { DeepResearchConfig, DeepResearchInstance } from './types';
 import { FollowupQuestionGenerator } from './generators/followupQuestionGenerator';
+import { Synthesizer } from './synthesis/synthesizer';
+
 import {
   DEFAULT_CONFIG,
   DEFAULT_DEPTH_CONFIG,
@@ -10,16 +12,21 @@ import { SubQuestionGeneratorResult } from './types/generators';
 import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
+import { SynthesisOutput } from './types/synthesis';
 
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
   private questionGenerator: SubQuestionGenerator;
   private followupGenerator: FollowupQuestionGenerator;
+  private synthesizer: Synthesizer;
+  private depthSynthesis: Map<number, SynthesisOutput[]>;
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
     this.questionGenerator = new SubQuestionGenerator();
     this.followupGenerator = new FollowupQuestionGenerator();
+    this.synthesizer = new Synthesizer();
+    this.depthSynthesis = new Map();
   }
 
   private validateAndMergeConfig(
@@ -64,7 +71,8 @@ export class DeepResearch implements DeepResearchInstance {
 
   public async performRecursiveResearch(
     initialResults: WebSearchResult[],
-    currentDepth: number = 1
+    currentDepth: number = 1,
+    parentSynthesis?: SynthesisOutput
   ): Promise<WebSearchResult[]> {
     // If we've reached the max depth level, return the current results
     if (
@@ -75,6 +83,26 @@ export class DeepResearch implements DeepResearchInstance {
 
     console.log(`Performing research at depth level: ${currentDepth}`);
     let allResults = [...initialResults];
+
+    // First, synthesize the current level results
+    const synthesis = await this.synthesizer.synthesizeResults({
+      mainPrompt: this.config.prompt,
+      results: initialResults,
+      currentDepth,
+      parentSynthesis,
+    });
+
+    // Store the synthesis for this depth level
+    if (!this.depthSynthesis.has(currentDepth)) {
+      this.depthSynthesis.set(currentDepth, []);
+    }
+    this.depthSynthesis.get(currentDepth)?.push(synthesis);
+
+    console.log(`Synthesis at depth ${currentDepth}:`, {
+      summary: synthesis.summary,
+      keyThemes: synthesis.keyThemes,
+      confidence: synthesis.confidence,
+    });
 
     // For each search result, generate follow-up questions
     for (const result of initialResults) {
@@ -105,10 +133,11 @@ export class DeepResearch implements DeepResearchInstance {
         // Fire web searches for the follow-up questions
         const followupResults = await this.fireWebSearches(subQuestions);
 
-        // Recursively get deeper results
+        // Recursively get deeper results, passing the current synthesis
         const deeperResults = await this.performRecursiveResearch(
           followupResults,
-          currentDepth + 1
+          currentDepth + 1,
+          synthesis
         );
 
         // Add all results to our collection
@@ -117,6 +146,28 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     return allResults;
+  }
+
+  public getSynthesis(): Map<number, SynthesisOutput[]> {
+    return this.depthSynthesis;
+  }
+
+  public async generateFinalSynthesis(): Promise<SynthesisOutput> {
+    // Get all the syntheses from all depth levels
+    const allSyntheses: SynthesisOutput[] = [];
+    this.depthSynthesis.forEach((syntheses) => {
+      allSyntheses.push(...syntheses);
+    });
+
+    // Create a combined synthesis of all depth levels
+    const finalSynthesis = await this.synthesizer.synthesizeResults({
+      mainPrompt: this.config.prompt,
+      results: [], // No direct results, using syntheses instead
+      currentDepth: 0, // 0 indicates final synthesis
+      parentSynthesis: undefined,
+    });
+
+    return finalSynthesis;
   }
 }
 
@@ -131,6 +182,15 @@ export async function createDeepResearch(
   const allResults = await deepResearch.performRecursiveResearch(initialSearch);
 
   console.log(`Total results after recursive research: ${allResults.length}`);
+
+  // Generate final synthesis
+  const finalSynthesis = await deepResearch.generateFinalSynthesis();
+  console.log('Final Synthesis:', {
+    summary: finalSynthesis.summary,
+    keyThemes: finalSynthesis.keyThemes,
+    insights: finalSynthesis.insights,
+    confidence: finalSynthesis.confidence,
+  });
 
   return deepResearch;
 }

@@ -2,6 +2,7 @@ import { OpenAIProvider } from '../provider/openai';
 import GeminiProvider from '../provider/gemini';
 import { WebSearchResult } from '../types';
 import 'dotenv/config';
+import { cleanJsonResponse } from '../utils';
 
 export class FollowupQuestionGenerator {
   // private openaiInstance: OpenAIProvider;
@@ -66,7 +67,7 @@ Based on this information, what are ${maxQuestions} important follow-up question
           );
 
           // Clean the response to handle markdown-formatted JSON
-          const cleanedResponse = this.cleanJsonResponse(response);
+          const cleanedResponse = cleanJsonResponse(response);
           console.log('Cleaned response:', cleanedResponse);
 
           // Try to parse the JSON
@@ -114,31 +115,6 @@ Based on this information, what are ${maxQuestions} important follow-up question
         maxQuestions
       );
     }
-  }
-
-  // Helper method to clean markdown-formatted JSON responses
-  private cleanJsonResponse(response: string): string {
-    // Remove markdown code block markers if present
-    let cleaned = response
-      .replace(/```(json|javascript)?\s*/g, '')
-      .replace(/\s*```\s*$/g, '');
-
-    // Trim whitespace
-    cleaned = cleaned.trim();
-
-    // If the response starts with a bracket, assume it's JSON
-    if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
-      return cleaned;
-    }
-
-    // Try to extract JSON array from text
-    const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return jsonMatch[0];
-    }
-
-    // If we can't find a JSON array, return the cleaned string
-    return cleaned;
   }
 
   // Generate default follow-up questions as a fallback
