@@ -1,12 +1,7 @@
 import { JigsawStack } from 'jigsawstack';
 import 'dotenv/config';
 import { SubQuestionGeneratorResult, SubQuestion } from '../types/generators';
-import {
-  WebSearchResult,
-  JigsawSearchResponse,
-  ResearchSource,
-  CleanedSearchResult,
-} from '../types';
+import { WebSearchResult, ResearchSource, CleanedSearchResult } from '../types';
 import { ContentCleaner } from '../preparation/contentCleaner';
 
 export class JigsawProvider {

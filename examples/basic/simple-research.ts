@@ -6,7 +6,7 @@ async function basicResearch() {
     prompt: ['What is the impact of AI on Food?'],
     // Using mostly default settings with slight modifications
     depth: {
-      level: 2, // Detailed analysis
+      level: 3, // Detailed analysis
       includeReferences: true,
     },
     breadth: {

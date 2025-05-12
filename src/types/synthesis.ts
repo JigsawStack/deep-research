@@ -8,7 +8,7 @@ export interface SynthesisInput {
 }
 
 export interface SynthesisOutput {
-  summary: string;
+  analysis: string;
   keyThemes: string[];
   insights: string[];
   knowledgeGaps: string[];
@@ -23,6 +23,12 @@ export interface SynthesisOutput {
   confidence: number;
   depth: number;
   relatedQuestions: string[];
+}
+
+export interface SynthesisConfig {
+  maxOutputTokens: number;
+  includeAllSources: boolean;
+  formatAsMarkdown: boolean;
 }
 
 export interface SynthesisResult {

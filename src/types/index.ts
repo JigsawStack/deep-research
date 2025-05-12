@@ -63,10 +63,6 @@ export interface JigsawSearchResult {
   snippet?: string;
 }
 
-export interface JigsawSearchResponse {
-  ai_overview: string;
-  results: JigsawSearchResult[];
-}
 
 export interface ResearchSource {
   url: string;

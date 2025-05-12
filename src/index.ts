@@ -6,6 +6,7 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_DEPTH_CONFIG,
   DEFAULT_BREADTH_CONFIG,
+  DEFAULT_SYNTHESIS_CONFIG
 } from './config/defaults';
 import { SubQuestionGenerator } from './generators/subQuestionGenerator';
 import { SubQuestionGeneratorResult } from './types/generators';
@@ -99,7 +100,7 @@ export class DeepResearch implements DeepResearchInstance {
     this.depthSynthesis.get(currentDepth)?.push(synthesis);
 
     console.log(`Synthesis at depth ${currentDepth}:`, {
-      summary: synthesis.summary,
+      analysis: synthesis.analysis,
       keyThemes: synthesis.keyThemes,
       confidence: synthesis.confidence,
     });
@@ -186,7 +187,7 @@ export async function createDeepResearch(
   // Generate final synthesis
   const finalSynthesis = await deepResearch.generateFinalSynthesis();
   console.log('Final Synthesis:', {
-    summary: finalSynthesis.summary,
+    analysis: finalSynthesis.analysis,
     keyThemes: finalSynthesis.keyThemes,
     insights: finalSynthesis.insights,
     confidence: finalSynthesis.confidence,

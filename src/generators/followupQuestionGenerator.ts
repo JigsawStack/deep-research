@@ -2,7 +2,7 @@ import { OpenAIProvider } from '../provider/openai';
 import GeminiProvider from '../provider/gemini';
 import { WebSearchResult } from '../types';
 import 'dotenv/config';
-import { cleanJsonResponse } from '../utils';
+import { cleanJsonResponse } from '../utils/utils';
 
 export class FollowupQuestionGenerator {
   // private openaiInstance: OpenAIProvider;
@@ -68,7 +68,6 @@ Based on this information, what are ${maxQuestions} important follow-up question
 
           // Clean the response to handle markdown-formatted JSON
           const cleanedResponse = cleanJsonResponse(response);
-          console.log('Cleaned response:', cleanedResponse);
 
           // Try to parse the JSON
           const parsedQuestions = JSON.parse(cleanedResponse);
