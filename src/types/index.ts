@@ -45,6 +45,7 @@ export interface DeepResearchConfig {
 export interface DeepResearchInstance {
   config: DeepResearchConfig;
   generateSubQuestions(): Promise<SubQuestionGeneratorResult>;
+
   // Will add more methods here as we develop
 }
 

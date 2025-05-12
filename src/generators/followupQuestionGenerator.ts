@@ -1,13 +1,19 @@
 import { OpenAIProvider } from '../provider/openai';
+import GeminiProvider from '../provider/gemini';
 import { WebSearchResult } from '../types';
 import 'dotenv/config';
 
 export class FollowupQuestionGenerator {
-  private openaiInstance: OpenAIProvider;
+  // private openaiInstance: OpenAIProvider;
+  private geminiInstance: GeminiProvider;
 
   constructor() {
-    this.openaiInstance = OpenAIProvider.getInstance({
-      apiKey: process.env.OPENAI_API_KEY || '',
+    // this.openaiInstance = OpenAIProvider.getInstance({
+    //   apiKey: process.env.OPENAI_API_KEY || '',
+    // });
+
+    this.geminiInstance = GeminiProvider.getInstance({
+      apiKey: process.env.GEMINI_API_KEY || '',
     });
   }
 
@@ -26,8 +32,8 @@ Your task is to:
    - Helps deepen understanding of the main research topic
    - Focuses on filling knowledge gaps
 
-IMPORTANT: Return ONLY a JSON array of strings with your questions. Do not include any explanation, scores, or extra text.
-Example format: ["What are the environmental impacts of large language models?", "How do quantum computing advancements affect cryptography?"]`;
+IMPORTANT: Return ONLY a JSON array of strings with your questions. Format your response as a valid JSON array with no additional text, markdown formatting, or explanation.
+Example: ["What are the environmental impacts of large language models?", "How do quantum computing advancements affect cryptography?"]`;
 
     const content =
       searchResult.searchResults.ai_overview ||
@@ -46,26 +52,107 @@ Based on this information, what are ${maxQuestions} important follow-up question
 
     try {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await this.openaiInstance.generateText(
-        combinedPrompt,
-        'gpt-4o'
-      );
 
-      let parsedQuestions;
-      try {
-        parsedQuestions = JSON.parse(response);
-        if (!Array.isArray(parsedQuestions)) {
-          throw new Error('Response is not an array');
+      // Try up to 3 times to get a valid response
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          const response = await this.geminiInstance.generateText(
+            combinedPrompt,
+            'gemini-2.0-flash'
+          );
+
+          // Clean the response to handle markdown-formatted JSON
+          const cleanedResponse = this.cleanJsonResponse(response);
+          console.log('Cleaned response:', cleanedResponse);
+
+          // Try to parse the JSON
+          const parsedQuestions = JSON.parse(cleanedResponse);
+
+          // Validate the response format
+          if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
+            // Return only the requested number of questions
+            return parsedQuestions.slice(0, maxQuestions);
+          } else {
+            console.warn(
+              `Attempt ${attempts}: Response is not a valid array or is empty`
+            );
+            if (attempts >= maxAttempts) {
+              // If we've reached max attempts, return default questions
+              return this.generateDefaultQuestions(
+                searchResult.question.question,
+                maxQuestions
+              );
+            }
+          }
+        } catch (parseError) {
+          console.warn(
+            `Attempt ${attempts}: Failed to parse response: ${parseError}`
+          );
+          if (attempts >= maxAttempts) {
+            // If we've reached max attempts, return default questions
+            return this.generateDefaultQuestions(
+              searchResult.question.question,
+              maxQuestions
+            );
+          }
         }
-      } catch (parseError) {
-        console.error('Raw response:', response);
-        throw new Error(`Failed to parse response as JSON: ${parseError}`);
       }
 
-      return parsedQuestions;
+      // Fallback if all attempts fail
+      return this.generateDefaultQuestions(
+        searchResult.question.question,
+        maxQuestions
+      );
     } catch (error) {
       console.error('Error generating follow-up questions:', error);
-      return [];
+      return this.generateDefaultQuestions(
+        searchResult.question.question,
+        maxQuestions
+      );
     }
+  }
+
+  // Helper method to clean markdown-formatted JSON responses
+  private cleanJsonResponse(response: string): string {
+    // Remove markdown code block markers if present
+    let cleaned = response
+      .replace(/```(json|javascript)?\s*/g, '')
+      .replace(/\s*```\s*$/g, '');
+
+    // Trim whitespace
+    cleaned = cleaned.trim();
+
+    // If the response starts with a bracket, assume it's JSON
+    if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+      return cleaned;
+    }
+
+    // Try to extract JSON array from text
+    const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return jsonMatch[0];
+    }
+
+    // If we can't find a JSON array, return the cleaned string
+    return cleaned;
+  }
+
+  // Generate default follow-up questions as a fallback
+  private generateDefaultQuestions(
+    originalQuestion: string,
+    count: number
+  ): string[] {
+    const defaultQuestions = [
+      `What are the limitations or challenges related to ${originalQuestion}?`,
+      `How might future developments impact ${originalQuestion}?`,
+      `What are the ethical considerations surrounding ${originalQuestion}?`,
+      `How does ${originalQuestion} vary across different contexts or regions?`,
+    ];
+
+    return defaultQuestions.slice(0, count);
   }
 }
