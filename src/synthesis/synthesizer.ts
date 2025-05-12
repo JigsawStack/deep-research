@@ -196,7 +196,7 @@ Please create a final comprehensive synthesis according to the instructions.`;
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
       const response = await this.geminiInstance.generateText(
         combinedPrompt,
-        'gemini-2.0-pro'
+        'gemini-2.0-flash'
       );
 
       let synthesis: SynthesisOutput;
