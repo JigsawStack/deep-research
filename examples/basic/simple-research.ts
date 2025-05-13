@@ -8,7 +8,7 @@ async function basicResearch() {
     ],
     // Using mostly default settings with slight modifications
     depth: {
-      level: 3, // Detailed analysis
+      level: 2, // Detailed analysis
       includeReferences: true,
     },
     breadth: {

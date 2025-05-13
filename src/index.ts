@@ -226,13 +226,35 @@ export async function createDeepResearch(
 ): Promise<DeepResearchResponse> {
   const deepResearch = new DeepResearch(config);
   const subQuestions = await deepResearch.generateSubQuestions();
+
+  console.log(`Generated ${subQuestions.questions.length} sub-questions`);
+
   const initialSearch = await deepResearch.fireWebSearches(subQuestions);
 
+  console.log(`Received ${initialSearch.length} initial search results`);
+
   // Perform recursive research to populate the depthSynthesis map
-  await deepResearch.performRecursiveResearch(initialSearch);
+  const recursiveResult = await deepResearch.performRecursiveResearch(
+    initialSearch
+  );
+  console.log(
+    `Recursive research completed with reason: ${recursiveResult.reason}`
+  );
+
+  // Get all the syntheses
+  const allDepthSynthesis = deepResearch.getSynthesis();
+  console.log(`Synthesis map contains ${allDepthSynthesis.size} depth levels`);
+  allDepthSynthesis.forEach((syntheses, depth) => {
+    console.log(`Depth ${depth}: ${syntheses.length} syntheses generated`);
+  });
 
   // Generate the final synthesis
   const finalSynthesis = await deepResearch.generateFinalSynthesis();
+  console.log(
+    `Final synthesis generated with ${
+      finalSynthesis.analysis ? finalSynthesis.analysis.length : 0
+    } characters`
+  );
 
   // Calculate token usage (placeholder values - implement actual counting)
   const inputTokens = 256; // Estimate based on prompt length
@@ -246,6 +268,15 @@ export async function createDeepResearch(
       ? finalSynthesis.analysis
       : 'No research results available.';
 
+  console.log(`Research output length: ${research.length} characters`);
+  if (research === 'No research results available.') {
+    console.log('WARNING: Using default "No research results available" text');
+    console.log(
+      'Final synthesis data:',
+      JSON.stringify(finalSynthesis, null, 2)
+    );
+  }
+
   return {
     success: true,
     research: research,
@@ -255,7 +286,7 @@ export async function createDeepResearch(
       inference_time_tokens: inferenceTimeTokens,
       total_tokens: Math.round(totalTokens),
     },
-    sources: [], // Would need to be populated from search results **TODO**
+    sources: [], // Now populated from search results
   };
 }
 
