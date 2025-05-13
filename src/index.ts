@@ -1,4 +1,9 @@
-import { DeepResearchConfig, DeepResearchInstance } from './types';
+import {
+  DeepResearchConfig,
+  DeepResearchInstance,
+  DeepResearchResponse,
+  RecursiveResearchResult,
+} from './types';
 import { FollowupQuestionGenerator } from './generators/followupQuestionGenerator';
 import { Synthesizer } from './synthesis/synthesizer';
 
@@ -78,23 +83,14 @@ export class DeepResearch implements DeepResearchInstance {
     initialResults: WebSearchResult[],
     currentDepth: number = 1,
     parentSynthesis?: SynthesisOutput
-  ): Promise<SynthesisOutput> {
-    // If we've reached the max depth level, return final synthesis
-    if (
-      currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level)
-    ) {
-      return this.synthesizer.generateFinalSynthesis({
-        mainPrompt: this.config.prompt,
-        allSyntheses: this.depthSynthesis.get(currentDepth) || [],
-        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-        targetOutputLength:
-          this.config.synthesis?.targetOutputLength,
-      });
-    }
+  ): Promise<RecursiveResearchResult> {
+    // Store conditions in variables
+    const isMaxDepthReached =
+      currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level);
 
     console.log(`Performing research at depth level: ${currentDepth}`);
 
-    // Check if we already have sufficient information to generate a final synthesis
+    // Check if we already have sufficient information
     const hasSufficientInfo = await this.synthesizer.hasSufficientInformation(
       {
         mainPrompt: this.config.prompt,
@@ -106,21 +102,22 @@ export class DeepResearch implements DeepResearchInstance {
         DEFAULT_DEPTH_CONFIG.confidenceThreshold
     );
 
-    if (hasSufficientInfo) {
-      console.log(
-        `Sufficient information found at depth ${currentDepth}. Generating final synthesis.`
-      );
-      return this.synthesizer.generateFinalSynthesis({
-        mainPrompt: this.config.prompt,
-        allSyntheses: this.depthSynthesis.get(currentDepth) || [],
-        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-        targetOutputLength:
-          this.config.synthesis?.targetOutputLength || 'standard', // Provide default value to satisfy non-optional requirement
-      });
+    // Early return conditions - but don't generate final synthesis yet
+    if (isMaxDepthReached) {
+      console.log(`Maximum depth level ${currentDepth} reached.`);
+      return {
+        isComplete: true,
+        reason: 'max_depth_reached',
+      };
     }
 
-    // Otherwise, continue with the recursive process
-    let allResults = [...initialResults];
+    if (hasSufficientInfo) {
+      console.log(`Sufficient information found at depth ${currentDepth}.`);
+      return {
+        isComplete: true,
+        reason: 'sufficient_info',
+      };
+    }
 
     // First, synthesize the current level results
     const synthesis = await this.synthesizer.synthesizeResults({
@@ -173,40 +170,32 @@ export class DeepResearch implements DeepResearchInstance {
           const followupResults = await this.fireWebSearches(subQuestions);
 
           // Recursively process deeper results with the current synthesis
-          const finalSynthesis = await this.performRecursiveResearch(
+          const deeperResult = await this.performRecursiveResearch(
             followupResults,
             currentDepth + 1,
             synthesis
           );
 
-          // We got a final synthesis from a deeper level, return it
-          return finalSynthesis;
+          // If we got a result from deeper level (null means we should stop), return it
+          if (deeperResult !== null) {
+            return deeperResult;
+          }
+          // Otherwise we continue with the next result
         } catch (error) {
           console.error(
             `Error processing follow-up at depth ${currentDepth}:`,
             error
           );
-          // If we encounter an error, we can still use what we have
-          return this.synthesizer.generateFinalSynthesis({
-            mainPrompt: this.config.prompt,
-            allSyntheses: [synthesis],
-            maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-            targetOutputLength:
-              this.config.synthesis?.targetOutputLength || 'standard',
-          });
+          // If we encounter an error, we can still continue with other results
         }
       }
     }
 
     // If we get here, we've completed this depth but haven't triggered early termination
-    // Generate a comprehensive synthesis with what we have
-    return this.synthesizer.generateFinalSynthesis({
-      mainPrompt: this.config.prompt,
-      allSyntheses: [synthesis],
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength:
-        this.config.synthesis?.targetOutputLength || 'standard',
-    });
+    return {
+      isComplete: true,
+      reason: 'research_complete',
+    }; // Signal that we're done with research
   }
 
   public getSynthesis(): Map<number, SynthesisOutput[]> {
@@ -234,7 +223,7 @@ export class DeepResearch implements DeepResearchInstance {
 
 export async function createDeepResearch(
   config: Partial<DeepResearchConfig>
-): Promise<DeepResearchInstance> {
+): Promise<DeepResearchResponse> {
   const deepResearch = new DeepResearch(config);
   const subQuestions = await deepResearch.generateSubQuestions();
   const initialSearch = await deepResearch.fireWebSearches(subQuestions);
@@ -242,17 +231,34 @@ export async function createDeepResearch(
   // Perform recursive research to populate the depthSynthesis map
   await deepResearch.performRecursiveResearch(initialSearch);
 
-  // Now explicitly call generateFinalSynthesis
+  // Generate the final synthesis
   const finalSynthesis = await deepResearch.generateFinalSynthesis();
 
-  console.log('Final Synthesis:', {
-    analysis: finalSynthesis.analysis,
-    keyThemes: finalSynthesis.keyThemes,
-    insights: finalSynthesis.insights,
-    confidence: finalSynthesis.confidence,
-  });
+  // Calculate token usage (placeholder values - implement actual counting)
+  const inputTokens = 256; // Estimate based on prompt length
+  const outputTokens = finalSynthesis.analysis.length / 4; // Rough estimate
+  const inferenceTimeTokens = 975; // Placeholder
+  const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
 
-  return deepResearch;
+  // Extract summary points from the analysis
+  const summaryPoints =
+    finalSynthesis.keyThemes.length > 0
+      ? finalSynthesis.keyThemes
+      : finalSynthesis.analysis.split('\n\n').slice(0, 3);
+
+  return {
+    success: true,
+    summary: summaryPoints,
+    _usage: {
+      input_tokens: Math.round(inputTokens),
+      output_tokens: Math.round(outputTokens),
+      inference_time_tokens: inferenceTimeTokens,
+      total_tokens: Math.round(totalTokens),
+    },
+    // Keep these for backward compatibility
+    instance: deepResearch,
+    finalSynthesis,
+  };
 }
 
 // Default export

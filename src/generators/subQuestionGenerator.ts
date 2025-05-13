@@ -1,10 +1,5 @@
-import {
-  SubQuestion,
-  SubQuestionGeneratorConfig,
-  SubQuestionGeneratorResult,
-} from '../types/generators';
+import { SubQuestion } from '../types/generators';
 import { ResearchBreadthConfig } from '../types';
-import { OpenAIProvider } from '../provider/openai';
 import 'dotenv/config';
 import { GeminiProvider } from '../provider/gemini';
 import {
@@ -13,15 +8,11 @@ import {
 } from '../prompts/generators';
 
 export class SubQuestionGenerator {
-  private openaiInstance: OpenAIProvider;
   private geminiInstance: GeminiProvider;
   constructor() {
     // if(!process.env.OPENAI_API_KEY) {
     //   throw new Error('OPENAI_API_KEY is not set');
     // }
-    this.openaiInstance = OpenAIProvider.getInstance({
-      apiKey: process.env.OPENAI_API_KEY || '',
-    });
     this.geminiInstance = GeminiProvider.getInstance({
       apiKey: process.env.GEMINI_API_KEY || '',
     });

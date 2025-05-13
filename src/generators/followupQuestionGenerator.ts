@@ -1,4 +1,3 @@
-import { OpenAIProvider } from '../provider/openai';
 import GeminiProvider from '../provider/gemini';
 import { WebSearchResult } from '../types';
 import 'dotenv/config';
