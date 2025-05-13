@@ -137,11 +137,6 @@ Please synthesize this information according to the instructions.`;
       targetOutputLength,
     } = input;
 
-    // Log the targetOutputLength
-    console.log(
-      `Synthesizer received targetOutputLength: ${targetOutputLength}`
-    );
-
     // Convert targetLength to specific instructions
     let lengthGuidance = '';
     if (targetOutputLength) {
