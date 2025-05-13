@@ -66,15 +66,14 @@ export interface DeepResearchInstance {
 
 export interface DeepResearchResponse {
   success: boolean;
-  summary: string[];
+  research: string;
   _usage: {
     input_tokens: number;
     output_tokens: number;
     inference_time_tokens: number;
     total_tokens: number;
   };
-  instance?: DeepResearchInstance;
-  finalSynthesis?: SynthesisOutput;
+  sources: ResearchSource[];
 }
 
 export interface WebSearchResultItem {

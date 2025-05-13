@@ -236,28 +236,26 @@ export async function createDeepResearch(
 
   // Calculate token usage (placeholder values - implement actual counting)
   const inputTokens = 256; // Estimate based on prompt length
-  const outputTokens = finalSynthesis.analysis.length / 4; // Rough estimate
+  const outputTokens = 500; // Rough estimate
   const inferenceTimeTokens = 975; // Placeholder
   const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
 
-  // Extract summary points from the analysis
-  const summaryPoints =
-    finalSynthesis.keyThemes.length > 0
-      ? finalSynthesis.keyThemes
-      : finalSynthesis.analysis.split('\n\n').slice(0, 3);
+  // Ensure we have a valid research output
+  const research =
+    finalSynthesis && finalSynthesis.analysis
+      ? finalSynthesis.analysis
+      : 'No research results available.';
 
   return {
     success: true,
-    summary: summaryPoints,
+    research: research,
     _usage: {
       input_tokens: Math.round(inputTokens),
       output_tokens: Math.round(outputTokens),
       inference_time_tokens: inferenceTimeTokens,
       total_tokens: Math.round(totalTokens),
     },
-    // Keep these for backward compatibility
-    instance: deepResearch,
-    finalSynthesis,
+    sources: [], // Would need to be populated from search results **TODO**
   };
 }
 

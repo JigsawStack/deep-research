@@ -130,15 +130,18 @@ export class Synthesizer {
     input: SynthesisInput,
     confidenceThreshold: number = 0.85
   ): Promise<boolean> {
-    // If we have parent synthesis with high confidence, we might have enough info
+    // If we have a parent synthesis with high confidence, we might have enough info
     if (
       input.parentSynthesis &&
       input.parentSynthesis.confidence >= confidenceThreshold
     ) {
       // Check if we have a good variety of themes and insights
       const hasSubstantiveContent =
+        input.parentSynthesis.keyThemes &&
         input.parentSynthesis.keyThemes.length >= 3 &&
+        input.parentSynthesis.insights &&
         input.parentSynthesis.insights.length >= 3 &&
+        input.parentSynthesis.knowledgeGaps &&
         input.parentSynthesis.knowledgeGaps.length <= 2; // Not too many knowledge gaps
 
       if (hasSubstantiveContent) {
