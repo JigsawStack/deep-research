@@ -2,7 +2,6 @@ import createDeepResearch from '../..';
 
 // Basic usage example
 async function basicResearch() {
-  console.log('Starting basic research with debug logging...');
   const research = await createDeepResearch({
     prompt: [
       'Could you write a research paper on AI impacts on food with consumer side?',

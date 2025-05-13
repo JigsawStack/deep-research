@@ -112,15 +112,13 @@ export class DeepResearch implements DeepResearchInstance {
       console.log(
         `Sufficient information found at depth ${currentDepth}. Generating final synthesis.`
       );
-      return this.synthesizer.generateComprehensiveSynthesis(
-        {
-          mainPrompt: this.config.prompt,
-          results: initialResults,
-          currentDepth,
-          parentSynthesis,
-        },
-        this.config.synthesis?.maxOutputTokens
-      );
+      return this.synthesizer.generateFinalSynthesis({
+        mainPrompt: this.config.prompt,
+        allSyntheses: this.depthSynthesis.get(currentDepth) || [],
+        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+        targetOutputLength:
+          this.config.synthesis?.targetOutputLength,
+      });
     }
 
     // Otherwise, continue with the recursive process
