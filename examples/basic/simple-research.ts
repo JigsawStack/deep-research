@@ -2,13 +2,13 @@ import createDeepResearch from '../..';
 
 // Basic usage example
 async function basicResearch() {
-  const research = await createDeepResearch({
+  const result = await createDeepResearch({
     prompt: [
-      'Could you write a research paper on AI impacts on food with consumer side?',
+      'Could you tell me what the best area to live in SF?',
     ],
     // Using mostly default settings with slight modifications
     depth: {
-      level: 3, // Detailed analysis
+      level: 2, // Detailed analysis
       includeReferences: true,
     },
     breadth: {
@@ -20,7 +20,24 @@ async function basicResearch() {
       targetOutputLength: 5000,
       formatAsMarkdown: true,
     },
+    format: 'json',
   });
+
+  // Log research results
+  console.log('\n=== RESEARCH SUMMARY ===');
+  console.log(`Research completed successfully: ${result.success}`);
+  console.log('\n=== RESEARCH ===');
+  console.log(result.research);
+
+  // Log token usage
+  console.log('\n=== TOKEN USAGE ===');
+  console.log(result._usage);
+
+  // Log sources
+  console.log('\n=== SOURCES ===');
+  console.log(result.sources);
+
+  return result;
 }
 
 basicResearch().catch(console.error);

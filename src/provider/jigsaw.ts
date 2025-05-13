@@ -1,6 +1,6 @@
 import { JigsawStack } from 'jigsawstack';
 import 'dotenv/config';
-import { SubQuestionGeneratorResult, SubQuestion } from '../types/generators';
+import { SubQuestionGeneratorResult } from '../types/generators';
 import { WebSearchResult, ResearchSource, CleanedSearchResult } from '../types';
 import { ContentCleaner } from '../preparation/contentCleaner';
 
@@ -27,12 +27,37 @@ export class JigsawProvider {
     // Map each question to a promise that resolves to a search result
     const searchPromises = subQuestions.questions.map(async (question) => {
       try {
-        const results = await this.jigsawInstance.web.search({
-          query: question.question,
-          ai_overview: true,
-          safe_search: 'moderate',
-          spell_check: true,
-        });
+        // Add retry logic for API requests
+        const maxRetries = 3;
+        let retryCount = 0;
+        let results;
+
+        while (retryCount < maxRetries) {
+          try {
+            results = await this.jigsawInstance.web.search({
+              query: question.question,
+              ai_overview: true,
+            });
+
+            // If we get here, the request succeeded
+            break;
+          } catch (apiError) {
+            retryCount++;
+            console.warn(
+              `API request failed (attempt ${retryCount}/${maxRetries}):`,
+              (apiError as Error).message
+            );
+
+            if (retryCount >= maxRetries) {
+              throw apiError; // Rethrow after max retries
+            }
+
+            // Wait before retrying (exponential backoff)
+            await new Promise((resolve) =>
+              setTimeout(resolve, 1000 * Math.pow(2, retryCount))
+            );
+          }
+        }
 
         // Check if results has the expected structure
         if (!results || !results.results) {
@@ -45,7 +70,7 @@ export class JigsawProvider {
           const source: ResearchSource = {
             url: result.url || '',
             content: result.content || '',
-            title: result.title,
+            title: result.title || '',
             ai_overview: results.ai_overview || '',
           };
           const cleaned = ContentCleaner.cleanContent(source);

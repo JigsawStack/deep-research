@@ -1,4 +1,4 @@
-import { GoogleGenerativeAIProvider, GoogleGenerativeAIProviderSettings, createGoogleGenerativeAI, google } from "@ai-sdk/google";
+import { GoogleGenerativeAIProvider, GoogleGenerativeAIProviderSettings, createGoogleGenerativeAI} from "@ai-sdk/google";
 import { generateText } from "ai";
 
 export class GeminiProvider {

@@ -1,22 +1,18 @@
-import {
-  SubQuestion,
-  SubQuestionGeneratorConfig,
-  SubQuestionGeneratorResult,
-} from '../types/generators';
+import { SubQuestion } from '../types/generators';
 import { ResearchBreadthConfig } from '../types';
-import { OpenAIProvider } from '../provider/openai';
 import 'dotenv/config';
 import { GeminiProvider } from '../provider/gemini';
+import {
+  generateSubQuestionsPrompt,
+  checkRelevancePrompt,
+} from '../prompts/generators';
+
 export class SubQuestionGenerator {
-  private openaiInstance: OpenAIProvider;
   private geminiInstance: GeminiProvider;
   constructor() {
     // if(!process.env.OPENAI_API_KEY) {
     //   throw new Error('OPENAI_API_KEY is not set');
     // }
-    this.openaiInstance = OpenAIProvider.getInstance({
-      apiKey: process.env.OPENAI_API_KEY || '',
-    });
     this.geminiInstance = GeminiProvider.getInstance({
       apiKey: process.env.GEMINI_API_KEY || '',
     });
@@ -28,45 +24,10 @@ export class SubQuestionGenerator {
   ): Promise<any> {
     const targetQuestionCount = breadthConfig.maxParallelTopics + 2;
 
-    const systemPrompt = `You are an expert research assistant specializing in generating highly relevant and focused sub-questions. Your task is to:
-
-1. Generate exactly ${targetQuestionCount} sub-questions that are STRICTLY related to the main topic
-2. Rank these questions by relevance (1.0 being most relevant, 0.0 being least relevant)
-3. Ensure each question:
-   - Directly connects to the main topic
-   - Is specific and answerable
-   - Helps deepen understanding of the core topic
-   - Doesn't drift into tangential or loosely related areas
-4. Return ONLY raw JSON array of objects with 'question' and 'relevanceScore' fields
-
-TOPIC RELEVANCE GUIDELINES:
-- Stay within the immediate scope of the main topic
-- Avoid questions that require external context not mentioned in the main topic
-- Focus on depth rather than breadth
-- Ensure each question could help answer or understand the main topic
-
-EXAMPLES:
-
-If main topic is "Impact of AI on Healthcare":
-
-GOOD questions (high relevance score 0.8-1.0):
-- "What specific AI algorithms are currently being used in medical diagnosis?"
-- "How has machine learning improved the accuracy of disease prediction?"
-- "What are the primary challenges in implementing AI systems in hospitals?"
-
-BAD questions (low relevance score 0.0-0.4):
-- "How do computers work?" (too general, not focused on AI or healthcare)
-- "What is the history of hospitals?" (not focused on AI)
-- "Can AI be conscious?" (philosophical, not healthcare-focused)
-
-IMPORTANT: Return ONLY the raw JSON array. Do not wrap it in code blocks or add any other text.
-Example format:
-[{"question": "What specific AI algorithms are currently being used in medical diagnosis?", "relevanceScore": 0.95}, {"question": "How has machine learning improved the accuracy of disease prediction?", "relevanceScore": 0.85}]`;
-
-    const userPrompt = `Main Research Topic(s):
-${mainPrompt.join('\n')}
-
-Generate ${targetQuestionCount} ranked sub-questions that will help explore this topic deeply.`;
+    const { systemPrompt, userPrompt } = generateSubQuestionsPrompt({
+      mainPrompt,
+      targetQuestionCount,
+    });
 
     try {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
@@ -117,13 +78,10 @@ Generate ${targetQuestionCount} ranked sub-questions that will help explore this
     question: string,
     mainPrompt: string[]
   ): Promise<boolean> {
-    const systemPrompt = `You are an expect research assistant. Your task it to check if the question is relevant to the main research topic or not.
-    Return only a boolean value (true or false)`;
-
-    const userPrompt = `Main Research Topic(s):
-${mainPrompt.join('\n')}
-
-Question: ${question}`;
+    const { systemPrompt, userPrompt } = checkRelevancePrompt({
+      question,
+      mainPrompt,
+    });
 
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const response = await this.geminiInstance.generateText(

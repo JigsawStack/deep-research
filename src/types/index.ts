@@ -1,6 +1,11 @@
 import { SubQuestion, SubQuestionGeneratorResult } from './generators';
-import { SynthesisConfig } from './synthesis';
+import { SynthesisConfig, SynthesisOutput } from './synthesis';
 
+export interface RecursiveResearchResult {
+  isComplete: boolean;
+  synthesis?: SynthesisOutput;
+  reason?: 'max_depth_reached' | 'sufficient_info' | 'research_complete';
+}
 export interface ResearchProvider {
   analyze(text: string): Promise<ResearchResult>;
   summarize(text: string): Promise<string>;
@@ -41,17 +46,35 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
   models?: Partial<ModelConfig>;
-  synthesis?: Partial<SynthesisConfig>;
+  synthesis: SynthesisConfig;
 }
 
 export interface DeepResearchInstance {
   config: DeepResearchConfig;
   generateSubQuestions(): Promise<SubQuestionGeneratorResult>;
-
-  // Will add more methods here as we develop
+  fireWebSearches(
+    subQuestions: SubQuestionGeneratorResult
+  ): Promise<WebSearchResult[]>;
+  performRecursiveResearch(
+    initialResults: WebSearchResult[],
+    currentDepth?: number,
+    parentSynthesis?: SynthesisOutput
+  ): Promise<RecursiveResearchResult>;
+  getSynthesis(): Map<number, SynthesisOutput[]>;
+  generateFinalSynthesis(): Promise<SynthesisOutput>;
 }
 
-// Moving DEFAULT_MODEL_CONFIG to config/defaults.ts
+export interface DeepResearchResponse {
+  success: boolean;
+  research: string;
+  _usage: {
+    input_tokens: number;
+    output_tokens: number;
+    inference_time_tokens: number;
+    total_tokens: number;
+  };
+  sources: ResearchSource[];
+}
 
 export interface WebSearchResultItem {
   url: string;
