@@ -104,6 +104,8 @@ export class Synthesizer {
         'gemini-2.0-flash'
       );
 
+      console.log(`Raw synthesis response: ${response.substring(0, 200)}...`);
+
       let synthesis: SynthesisOutput;
       try {
         // Clean the response to handle markdown-formatted JSON
@@ -111,9 +113,16 @@ export class Synthesizer {
         console.log(`Final synthesis completed`);
 
         synthesis = JSON.parse(cleanedResponse);
+
+        // If we're getting a JSON metadata object without an analysis field,
+        // use the full markdown article as the analysis
+        if (!synthesis.analysis && response.length > 0) {
+          synthesis.analysis = response;
+        }
+
         synthesis.depth = 0; // 0 represents final synthesis
       } catch (parseError) {
-        console.error('Raw synthesis response:', response);
+        console.error('Error generating final synthesis:', parseError);
         throw new Error(
           `Failed to parse final synthesis response as JSON: ${parseError}`
         );

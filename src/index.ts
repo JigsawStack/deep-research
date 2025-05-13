@@ -263,10 +263,102 @@ export async function createDeepResearch(
   const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
 
   // Ensure we have a valid research output
-  const research =
-    finalSynthesis && finalSynthesis.analysis
-      ? finalSynthesis.analysis
-      : 'No research results available.';
+  let research = 'No research results available.';
+
+  if (finalSynthesis) {
+    if (finalSynthesis.analysis) {
+      // If analysis field exists, use it
+      research = finalSynthesis.analysis;
+    } else if (
+      config.format === 'json' &&
+      Object.keys(finalSynthesis).length > 0
+    ) {
+      // If we're in JSON format and have synthesis data but no analysis field,
+      // generate a formatted research output from the available fields
+      try {
+        const sections = [];
+
+        // Add title based on the prompt
+        sections.push(
+          `# Research on ${config.prompt?.[0] || 'Requested Topic'}\n`
+        );
+
+        // Add key themes section
+        if (finalSynthesis.keyThemes && finalSynthesis.keyThemes.length > 0) {
+          sections.push('## Key Themes\n');
+          finalSynthesis.keyThemes.forEach((theme) => {
+            sections.push(`- ${theme}`);
+          });
+          sections.push('\n');
+        }
+
+        // Add insights section
+        if (finalSynthesis.insights && finalSynthesis.insights.length > 0) {
+          sections.push('## Key Insights\n');
+          finalSynthesis.insights.forEach((insight) => {
+            sections.push(`- ${insight}`);
+          });
+          sections.push('\n');
+        }
+
+        // Add knowledge gaps section
+        if (
+          finalSynthesis.knowledgeGaps &&
+          finalSynthesis.knowledgeGaps.length > 0
+        ) {
+          sections.push('## Knowledge Gaps\n');
+          finalSynthesis.knowledgeGaps.forEach((gap) => {
+            sections.push(`- ${gap}`);
+          });
+          sections.push('\n');
+        }
+
+        // Add conflicting information section
+        if (
+          finalSynthesis.conflictingInformation &&
+          finalSynthesis.conflictingInformation.length > 0
+        ) {
+          sections.push('## Conflicting Information\n');
+          finalSynthesis.conflictingInformation.forEach((conflict) => {
+            sections.push(`### ${conflict.topic}\n`);
+            conflict.conflicts.forEach((item) => {
+              sections.push(`- **Claim 1**: ${item.claim1}`);
+              sections.push(`- **Claim 2**: ${item.claim2}`);
+              sections.push(
+                `- **Resolution**: ${
+                  item.resolution || 'No resolution provided'
+                }\n`
+              );
+            });
+          });
+          sections.push('\n');
+        }
+
+        // Add related questions section
+        if (
+          finalSynthesis.relatedQuestions &&
+          finalSynthesis.relatedQuestions.length > 0
+        ) {
+          sections.push('## Related Questions\n');
+          finalSynthesis.relatedQuestions.forEach((question) => {
+            sections.push(`- ${question}`);
+          });
+          sections.push('\n');
+        }
+
+        // Add confidence score
+        if (finalSynthesis.confidence !== undefined) {
+          sections.push(
+            `## Confidence Score\n${finalSynthesis.confidence * 100}%\n`
+          );
+        }
+
+        research = sections.join('\n');
+      } catch (error) {
+        console.error('Error formatting research output:', error);
+      }
+    }
+  }
 
   console.log(`Research output length: ${research.length} characters`);
   if (research === 'No research results available.') {
