@@ -130,7 +130,35 @@ Please synthesize this information according to the instructions.`;
   async generateFinalSynthesis(
     input: FinalSynthesisInput
   ): Promise<SynthesisOutput> {
-    const { mainPrompt, allSyntheses = [], maxOutputTokens } = input;
+    const {
+      mainPrompt,
+      allSyntheses = [],
+      maxOutputTokens,
+      targetOutputLength,
+    } = input;
+
+    // Convert targetLength to specific instructions
+    let lengthGuidance = '';
+    if (targetOutputLength) {
+      if (typeof targetOutputLength === 'number') {
+        lengthGuidance = `IMPORTANT: Your response MUST be at least ${targetOutputLength} tokens long. Please provide comprehensive details and elaborate on all aspects of the topic to reach this length.`;
+      } else {
+        switch (targetOutputLength) {
+          case 'concise':
+            lengthGuidance =
+              'Please be very concise, focusing only on the most essential information.';
+            break;
+          case 'standard':
+            lengthGuidance =
+              'Please provide a balanced synthesis with moderate detail.';
+            break;
+          case 'detailed':
+            lengthGuidance =
+              'Please provide a comprehensive analysis with substantial detail.';
+            break;
+        }
+      }
+    }
 
     // Combine all syntheses
     const combinedSyntheses = allSyntheses
@@ -181,9 +209,11 @@ Format your response as a valid JSON object with the following structure:
     const userPrompt = `Main Research Topic(s):
 ${mainPrompt.join('\n')}
 
+${lengthGuidance}
+
 ${
   maxOutputTokens
-    ? `Please limit your analysis to approximately ${maxOutputTokens} tokens.`
+    ? `Your response must not exceed ${maxOutputTokens} tokens.`
     : ''
 }
 

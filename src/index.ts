@@ -90,8 +90,7 @@ export class DeepResearch implements DeepResearchInstance {
           currentDepth,
           parentSynthesis,
         },
-        this.config.synthesis?.maxOutputTokens,
-        this.config.synthesis?.targetOutputLength
+        this.config.synthesis?.maxOutputTokens
       );
     }
 
@@ -234,6 +233,8 @@ export class DeepResearch implements DeepResearchInstance {
       mainPrompt: this.config.prompt,
       allSyntheses: allSyntheses,
       maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+      targetOutputLength:
+        this.config.synthesis?.targetOutputLength ?? 'standard',
     });
   }
 }

@@ -4,6 +4,7 @@ export interface FinalSynthesisInput {
   mainPrompt: string[];
   allSyntheses: SynthesisOutput[];
   maxOutputTokens?: number;
+  targetOutputLength: 'concise' | 'standard' | 'detailed' | number;
 }
 export interface SynthesisInput {
   mainPrompt: string[];
@@ -32,7 +33,7 @@ export interface SynthesisOutput {
 
 export interface SynthesisConfig {
   maxOutputTokens: number;
-  targetOutputLength?: 'concise' | 'standard' | 'detailed' | number; // Desired length
+  targetOutputLength?: FinalSynthesisInput['targetOutputLength'];
   includeAllSources: boolean;
   formatAsMarkdown: boolean;
 }
