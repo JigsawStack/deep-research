@@ -47,14 +47,14 @@ export class DeepResearch implements DeepResearchInstance {
         ...DEFAULT_BREADTH_CONFIG,
         ...config.breadth,
       },
+      synthesis: {
+        ...DEFAULT_SYNTHESIS_CONFIG,
+        ...config.synthesis,
+      },
       format: config.format || DEFAULT_CONFIG.format,
       models: {
         ...DEFAULT_CONFIG.models,
         ...config.models,
-      },
-      synthesis: {
-        ...DEFAULT_SYNTHESIS_CONFIG,
-        ...config.synthesis,
       },
     };
   }
@@ -78,15 +78,52 @@ export class DeepResearch implements DeepResearchInstance {
     initialResults: WebSearchResult[],
     currentDepth: number = 1,
     parentSynthesis?: SynthesisOutput
-  ): Promise<WebSearchResult[]> {
-    // If we've reached the max depth level, return the current results
+  ): Promise<SynthesisOutput> {
+    // If we've reached the max depth level, return final synthesis
     if (
       currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level)
     ) {
-      return initialResults;
+      return this.synthesizer.generateComprehensiveSynthesis(
+        {
+          mainPrompt: this.config.prompt,
+          results: initialResults,
+          currentDepth,
+          parentSynthesis,
+        },
+        this.config.synthesis?.maxOutputTokens
+      );
     }
 
     console.log(`Performing research at depth level: ${currentDepth}`);
+
+    // Check if we already have sufficient information to generate a final synthesis
+    const hasSufficientInfo = await this.synthesizer.hasSufficientInformation(
+      {
+        mainPrompt: this.config.prompt,
+        results: initialResults,
+        currentDepth,
+        parentSynthesis,
+      },
+      this.config.depth?.confidenceThreshold ||
+        DEFAULT_DEPTH_CONFIG.confidenceThreshold
+    );
+
+    if (hasSufficientInfo) {
+      console.log(
+        `Sufficient information found at depth ${currentDepth}. Generating final synthesis.`
+      );
+      return this.synthesizer.generateComprehensiveSynthesis(
+        {
+          mainPrompt: this.config.prompt,
+          results: initialResults,
+          currentDepth,
+          parentSynthesis,
+        },
+        this.config.synthesis?.maxOutputTokens
+      );
+    }
+
+    // Otherwise, continue with the recursive process
     let allResults = [...initialResults];
 
     // First, synthesize the current level results
@@ -104,7 +141,7 @@ export class DeepResearch implements DeepResearchInstance {
     this.depthSynthesis.get(currentDepth)?.push(synthesis);
 
     console.log(`Synthesis at depth ${currentDepth}:`, {
-      analysis: synthesis.analysis,
+      analysis: synthesis.analysis.substring(0, 100) + '...',
       keyThemes: synthesis.keyThemes,
       confidence: synthesis.confidence,
     });
@@ -135,22 +172,49 @@ export class DeepResearch implements DeepResearchInstance {
           },
         };
 
-        // Fire web searches for the follow-up questions
-        const followupResults = await this.fireWebSearches(subQuestions);
+        try {
+          // Fire web searches for the follow-up questions
+          const followupResults = await this.fireWebSearches(subQuestions);
 
-        // Recursively get deeper results, passing the current synthesis
-        const deeperResults = await this.performRecursiveResearch(
-          followupResults,
-          currentDepth + 1,
-          synthesis
-        );
+          // Recursively process deeper results with the current synthesis
+          const finalSynthesis = await this.performRecursiveResearch(
+            followupResults,
+            currentDepth + 1,
+            synthesis
+          );
 
-        // Add all results to our collection
-        allResults = [...allResults, ...deeperResults];
+          // We got a final synthesis from a deeper level, return it
+          return finalSynthesis;
+        } catch (error) {
+          console.error(
+            `Error processing follow-up at depth ${currentDepth}:`,
+            error
+          );
+          // If we encounter an error, we can still use what we have
+          return this.synthesizer.generateComprehensiveSynthesis(
+            {
+              mainPrompt: this.config.prompt,
+              results: allResults,
+              currentDepth,
+              parentSynthesis: synthesis,
+            },
+            this.config.synthesis?.maxOutputTokens
+          );
+        }
       }
     }
 
-    return allResults;
+    // If we get here, we've completed this depth but haven't triggered early termination
+    // Generate a comprehensive synthesis with what we have
+    return this.synthesizer.generateComprehensiveSynthesis(
+      {
+        mainPrompt: this.config.prompt,
+        results: allResults,
+        currentDepth,
+        parentSynthesis: synthesis,
+      },
+      this.config.synthesis?.maxOutputTokens
+    );
   }
 
   public getSynthesis(): Map<number, SynthesisOutput[]> {
@@ -181,12 +245,10 @@ export async function createDeepResearch(
   const initialSearch = await deepResearch.fireWebSearches(subQuestions);
   console.log('Init Results', initialSearch);
 
-  const allResults = await deepResearch.performRecursiveResearch(initialSearch);
+  const finalSynthesis = await deepResearch.performRecursiveResearch(
+    initialSearch
+  );
 
-  console.log(`Total results after recursive research: ${allResults.length}`);
-
-  // Generate final synthesis
-  const finalSynthesis = await deepResearch.generateFinalSynthesis();
   console.log('Final Synthesis:', {
     analysis: finalSynthesis.analysis,
     keyThemes: finalSynthesis.keyThemes,
