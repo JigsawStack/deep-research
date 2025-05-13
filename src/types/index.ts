@@ -41,7 +41,7 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
   models?: Partial<ModelConfig>;
-  synthesis?: Partial<SynthesisConfig>;
+  synthesis: SynthesisConfig;
 }
 
 export interface DeepResearchInstance {

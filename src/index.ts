@@ -83,15 +83,13 @@ export class DeepResearch implements DeepResearchInstance {
     if (
       currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level)
     ) {
-      return this.synthesizer.generateComprehensiveSynthesis(
-        {
-          mainPrompt: this.config.prompt,
-          results: initialResults,
-          currentDepth,
-          parentSynthesis,
-        },
-        this.config.synthesis?.maxOutputTokens
-      );
+      return this.synthesizer.generateFinalSynthesis({
+        mainPrompt: this.config.prompt,
+        allSyntheses: this.depthSynthesis.get(currentDepth) || [],
+        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+        targetOutputLength:
+          this.config.synthesis?.targetOutputLength,
+      });
     }
 
     console.log(`Performing research at depth level: ${currentDepth}`);
@@ -117,7 +115,7 @@ export class DeepResearch implements DeepResearchInstance {
         allSyntheses: this.depthSynthesis.get(currentDepth) || [],
         maxOutputTokens: this.config.synthesis?.maxOutputTokens,
         targetOutputLength:
-          this.config.synthesis?.targetOutputLength,
+          this.config.synthesis?.targetOutputLength || 'standard', // Provide default value to satisfy non-optional requirement
       });
     }
 
@@ -189,30 +187,26 @@ export class DeepResearch implements DeepResearchInstance {
             error
           );
           // If we encounter an error, we can still use what we have
-          return this.synthesizer.generateComprehensiveSynthesis(
-            {
-              mainPrompt: this.config.prompt,
-              results: allResults,
-              currentDepth,
-              parentSynthesis: synthesis,
-            },
-            this.config.synthesis?.maxOutputTokens
-          );
+          return this.synthesizer.generateFinalSynthesis({
+            mainPrompt: this.config.prompt,
+            allSyntheses: [synthesis],
+            maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+            targetOutputLength:
+              this.config.synthesis?.targetOutputLength || 'standard',
+          });
         }
       }
     }
 
     // If we get here, we've completed this depth but haven't triggered early termination
     // Generate a comprehensive synthesis with what we have
-    return this.synthesizer.generateComprehensiveSynthesis(
-      {
-        mainPrompt: this.config.prompt,
-        results: allResults,
-        currentDepth,
-        parentSynthesis: synthesis,
-      },
-      this.config.synthesis?.maxOutputTokens
-    );
+    return this.synthesizer.generateFinalSynthesis({
+      mainPrompt: this.config.prompt,
+      allSyntheses: [synthesis],
+      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+      targetOutputLength:
+        this.config.synthesis?.targetOutputLength || 'standard',
+    });
   }
 
   public getSynthesis(): Map<number, SynthesisOutput[]> {

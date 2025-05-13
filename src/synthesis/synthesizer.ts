@@ -7,6 +7,10 @@ import {
 import { WebSearchResult } from '../types';
 import { cleanJsonResponse } from '../utils/utils';
 import 'dotenv/config';
+import {
+  generateSynthesisPrompt,
+  generateFinalSynthesisPrompt,
+} from '../prompts/synthesis';
 
 export class Synthesizer {
   private geminiInstance: GeminiProvider;
