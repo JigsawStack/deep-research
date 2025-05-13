@@ -90,7 +90,8 @@ export class DeepResearch implements DeepResearchInstance {
           currentDepth,
           parentSynthesis,
         },
-        this.config.synthesis?.maxOutputTokens
+        this.config.synthesis?.maxOutputTokens,
+        this.config.synthesis?.targetOutputLength
       );
     }
 

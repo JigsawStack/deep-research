@@ -251,8 +251,42 @@ Please create a final comprehensive synthesis according to the instructions.`;
 
   async generateComprehensiveSynthesis(
     input: SynthesisInput,
-    maxOutputTokens?: number
+    maxOutputTokens?: number,
+    targetLength?: 'concise' | 'standard' | 'detailed' | number
   ): Promise<SynthesisOutput> {
+    // Convert targetLength to specific instructions
+    let lengthGuidance = '';
+    if (targetLength) {
+      if (typeof targetLength === 'number') {
+        lengthGuidance = `Please aim for approximately ${targetLength} tokens in your response.`;
+      } else {
+        switch (targetLength) {
+          case 'concise':
+            lengthGuidance =
+              'Please be very concise, focusing only on the most essential information.';
+            break;
+          case 'standard':
+            lengthGuidance =
+              'Please provide a balanced synthesis with moderate detail.';
+            break;
+          case 'detailed':
+            lengthGuidance =
+              'Please provide a comprehensive analysis with substantial detail.';
+            break;
+        }
+      }
+    }
+
+    // Add both constraints to the prompt
+    const outputConstraints = `
+${
+  maxOutputTokens
+    ? `IMPORTANT: Your response must not exceed ${maxOutputTokens} tokens.`
+    : ''
+}
+${lengthGuidance}
+    `.trim();
+
     // Combine all results and parent synthesis (if available)
     const combinedContent = input.results
       .map((result) => {
@@ -307,11 +341,7 @@ Format your response as a valid JSON object with the following structure:
     const userPrompt = `Main Research Topic(s):
 ${input.mainPrompt.join('\n')}
 
-${
-  maxOutputTokens
-    ? `Please limit your analysis to approximately ${maxOutputTokens} tokens.`
-    : ''
-}
+${outputConstraints}
 
 ${parentContent}
 
