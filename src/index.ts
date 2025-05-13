@@ -234,7 +234,8 @@ export class DeepResearch implements DeepResearchInstance {
       allSyntheses: allSyntheses,
       maxOutputTokens: this.config.synthesis?.maxOutputTokens,
       targetOutputLength:
-        this.config.synthesis?.targetOutputLength ?? 'standard',
+        this.config.synthesis?.targetOutputLength ??
+        DEFAULT_SYNTHESIS_CONFIG.targetOutputLength,
     });
   }
 }
@@ -245,11 +246,12 @@ export async function createDeepResearch(
   const deepResearch = new DeepResearch(config);
   const subQuestions = await deepResearch.generateSubQuestions();
   const initialSearch = await deepResearch.fireWebSearches(subQuestions);
-  console.log('Init Results', initialSearch);
 
-  const finalSynthesis = await deepResearch.performRecursiveResearch(
-    initialSearch
-  );
+  // Perform recursive research to populate the depthSynthesis map
+  await deepResearch.performRecursiveResearch(initialSearch);
+
+  // Now explicitly call generateFinalSynthesis
+  const finalSynthesis = await deepResearch.generateFinalSynthesis();
 
   console.log('Final Synthesis:', {
     analysis: finalSynthesis.analysis,

@@ -137,12 +137,19 @@ Please synthesize this information according to the instructions.`;
       targetOutputLength,
     } = input;
 
+    // Log the targetOutputLength
+    console.log(
+      `Synthesizer received targetOutputLength: ${targetOutputLength}`
+    );
+
     // Convert targetLength to specific instructions
     let lengthGuidance = '';
     if (targetOutputLength) {
       if (typeof targetOutputLength === 'number') {
-        lengthGuidance = `IMPORTANT: Your response MUST be at least ${targetOutputLength} tokens long. Please provide comprehensive details and elaborate on all aspects of the topic to reach this length.`;
+        console.log(`Setting length guidance for ${targetOutputLength} tokens`);
+        lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
       } else {
+        console.log(`Setting length guidance for ${targetOutputLength} mode`);
         switch (targetOutputLength) {
           case 'concise':
             lengthGuidance =

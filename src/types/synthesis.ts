@@ -33,7 +33,7 @@ export interface SynthesisOutput {
 
 export interface SynthesisConfig {
   maxOutputTokens: number;
-  targetOutputLength?: FinalSynthesisInput['targetOutputLength'];
+  targetOutputLength: FinalSynthesisInput['targetOutputLength'];
   includeAllSources: boolean;
   formatAsMarkdown: boolean;
 }
