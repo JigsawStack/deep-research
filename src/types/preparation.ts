@@ -1,4 +1,4 @@
-import { SubQuestion } from "../types/generators";
+import { SubQuestion } from '../types/generators';
 
 export interface ResearchSource {
   url: string;
@@ -39,8 +39,8 @@ export interface PreparedResearchData {
     processingDuration: number;
   };
   qualityMetrics: {
-    contentDiversity: number;  // 0-1 score based on content similarity
-    sourceQuality: number;     // 0-1 score based on domain reputation
+    contentDiversity: number; // 0-1 score based on content similarity
+    sourceQuality: number; // 0-1 score based on domain reputation
     informationDensity: number; // 0-1 score based on meaningful content ratio
   };
-} 
+}

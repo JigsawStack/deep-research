@@ -1,4 +1,5 @@
 import { SubQuestion, SubQuestionGeneratorResult } from './generators';
+import { SynthesisConfig } from './synthesis';
 
 export interface ResearchProvider {
   analyze(text: string): Promise<ResearchResult>;
@@ -40,11 +41,13 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
   models?: Partial<ModelConfig>;
+  synthesis?: Partial<SynthesisConfig>;
 }
 
 export interface DeepResearchInstance {
   config: DeepResearchConfig;
   generateSubQuestions(): Promise<SubQuestionGeneratorResult>;
+
   // Will add more methods here as we develop
 }
 
@@ -53,18 +56,6 @@ export interface DeepResearchInstance {
 export interface WebSearchResultItem {
   url: string;
   content: string;
-}
-
-export interface JigsawSearchResult {
-  url: string;
-  content: string;
-  title?: string;
-  snippet?: string;
-}
-
-export interface JigsawSearchResponse {
-  ai_overview: string;
-  results: JigsawSearchResult[];
 }
 
 export interface ResearchSource {
@@ -76,7 +67,8 @@ export interface ResearchSource {
   isAcademic?: boolean;
 }
 
-export interface CleanedSearchResult extends Omit<ResearchSource, 'domain' | 'isAcademic'> {
+export interface CleanedSearchResult
+  extends Omit<ResearchSource, 'domain' | 'isAcademic'> {
   domain: string;
   isAcademic: boolean;
 }
@@ -87,4 +79,36 @@ export interface WebSearchResult {
     ai_overview: string;
     results: CleanedSearchResult[];
   };
+}
+
+// Recursive search context to track states between recursion levels
+export interface RecursiveSearchContext {
+  mainQuestion: string[];
+  parentQuestions: string[];
+  currentDepth: number;
+  searchPath: string[];
+  previousResults: WebSearchResult[];
+  exploredQuestions: Set<string>;
+}
+
+// Final deep research results with aggregated findings
+export interface DeepResearchResult {
+  answer: string;
+  confidence: number;
+  sources: {
+    url: string;
+    title: string;
+    relevance: number;
+    extractedInfo: string[];
+  }[];
+  citations: {
+    id: string;
+    text: string;
+    sourceIndex: number;
+  }[];
+  searchPath: {
+    question: string;
+    depth: number;
+    parent?: string;
+  }[];
 }
