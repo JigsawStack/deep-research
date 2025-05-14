@@ -18,38 +18,124 @@ npm install open-deep-research
 ## 📝 Usage
 
 ```typescript
-import { createDeepResearch } from 'open-deep-research';
+import createDeepResearch from 'open-deep-research';
 
-// Simplest usage with a single API key
-const research = await createDeepResearch({
-  prompt: ['What are the latest advancements in quantum computing?'],
-  apiKey: 'your-deepseek-api-key', // Single API key for default model
-  model: 'deepseek-r1', // Specify single model directly
-  depth: { level: 3 },
-  breadth: { maxParallelTopics: 4 },
-});
-
-// OR advanced usage with multiple models
-const research = await createDeepResearch({
-  prompt: ['What are the latest advancements in quantum computing?'],
-  apiKeys: {
-    deepseek: 'your-deepseek-api-key',
-    openai: 'your-openai-api-key',
-    gemini: 'your-gemini-api-key',
+// Create instance using the factory function
+const deepResearch = await createDeepResearch({
+  depth: {
+    level: 3, // Detailed analysis
+    includeReferences: true,
+  },
+  breadth: {
+    level: 2, // Main topic + direct relationships
+    maxParallelTopics: 3,
+  },
+  synthesis: {
+    maxOutputTokens: 8000, // Hard upper limit of tokens
+    targetOutputLength: 5000,
+    formatAsMarkdown: true,
   },
   models: {
-    subQuestionGeneration: 'gemini-1.5-flash',
-    webSearchAnalysis: 'deepseek-r1',
-    finalSynthesis: 'gpt-4o',
+    default: 'gpt-4o', // Default model
+    reasoning: 'gemini-1.5-pro', // Reasoning model
   },
-  depth: { level: 3 },
-  breadth: { maxParallelTopics: 4 },
+  jigsawApiKey: 'your-jigsaw-api-key',
 });
 
-// Get the research results
-const results = await research.execute();
-console.log(results.answer);
+// Need to provide prompts array as required by generate method
+const prompts = [
+  'What are the recent developments in quantum computing?',
+  // Add more related prompts if needed
+];
 
+const result = await deepResearch.generate(prompts, 'markdown');
+```
+
+### Using String Model Names
+
+```typescript
+import createDeepResearch from 'open-deep-research';
+
+// Create instance using the factory function with string model names
+const deepResearch = await createDeepResearch({
+  depth: {
+    level: 3, // Detailed analysis
+    includeReferences: true,
+  },
+  breadth: {
+    level: 2, // Main topic + direct relationships
+    maxParallelTopics: 3,
+  },
+  synthesis: {
+    maxOutputTokens: 8000, // Hard upper limit of tokens
+    targetOutputLength: 5000,
+    formatAsMarkdown: true,
+  },
+  models: {
+    default: 'gpt-4o', // Default model
+    reasoning: 'gemini-1.5-pro', // Reasoning model
+  },
+  jigsawApiKey: 'your-jigsaw-api-key',
+});
+
+// Need to provide prompts array as required by generate method
+const prompts = [
+  'What are the recent developments in quantum computing?',
+  // Add more related prompts if needed
+];
+
+const result = await deepResearch.generate(prompts, 'markdown');
+```
+
+### Using Direct Model Instances
+
+You can also pass model instances directly, which gives you more control over model configuration:
+
+```typescript
+import createDeepResearch from 'open-deep-research';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+
+// Create model instances directly
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  // Add custom settings as needed
+  compatibility: 'strict',
+});
+
+const gemini = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
+
+// Get model instances
+const openaiModel = openai.languageModel('gpt-4o');
+const geminiModel = gemini.languageModel('gemini-1.5-pro');
+
+// Create instance using the factory function with direct model instances
+const deepResearch = await createDeepResearch({
+  depth: {
+    level: 3,
+    includeReferences: true,
+  },
+  breadth: {
+    level: 2,
+    maxParallelTopics: 3,
+  },
+  synthesis: {
+    maxOutputTokens: 8000,
+    targetOutputLength: 5000,
+    formatAsMarkdown: true,
+  },
+  models: {
+    default: openaiModel, // Pass the model instance directly
+    reasoning: geminiModel, // Pass the model instance directly
+  },
+  jigsawApiKey: 'your-jigsaw-api-key',
+});
+
+const prompts = ['What are the recent developments in quantum computing?'];
+
+const result = await deepResearch.generate(prompts, 'markdown');
 ```
 
 ## 🧩 How It Works
@@ -172,13 +258,14 @@ To implement the deep research functionality:
    - Link assertions in the final answer to specific sources
 
 5. **Implement memory management**:
+
    - Track token usage throughout the research process
    - Apply pruning strategies to manage context size
    - Implement hierarchical storage for context data
 
-   - 1.	Keep context in memory during a single run (tree structure)
-	- 2.	Persist to disk at regular intervals or per depth (for crash recovery + debugging)
-	- 3.	Pass context around functions to keep it functional and testable
+   - 1. Keep context in memory during a single run (tree structure)
+   - 2. Persist to disk at regular intervals or per depth (for crash recovery + debugging)
+   - 3. Pass context around functions to keep it functional and testable
 
 ## 📄 License
 

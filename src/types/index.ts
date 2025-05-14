@@ -1,6 +1,6 @@
 import { SubQuestion } from './generators';
 import { ReportConfig, SynthesisOutput } from './synthesis';
-import { ProviderV1 } from '@ai-sdk/provider';
+import { LanguageModelV1 } from '@ai-sdk/provider';
 
 export interface RecursiveResearchResult {
   isComplete: boolean;
@@ -22,9 +22,11 @@ export interface ResearchResult {
 export type ModelType = 'default' | 'quick' | 'reasoning';
 
 export interface ModelConfig {
-  default: string | ProviderV1;
-  output?: string | ProviderV1;
-  reasoning?: string | ProviderV1;
+  default?: string | LanguageModelV1;
+  quick?: string | LanguageModelV1;
+  reasoning?: string | LanguageModelV1;
+  output?: string | LanguageModelV1;
+  [key: string]: string | LanguageModelV1 | undefined;
 }
 
 export interface ResearchDepthConfig {

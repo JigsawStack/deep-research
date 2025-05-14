@@ -38,20 +38,14 @@ export class DeepResearch implements DeepResearchInstance {
     // Initialize AIProvider
     this.aiProvider = new AIProvider();
 
-    // Add providers from config.models if available
+    // Add models from config.models if available
     if (config.models) {
       // For each model type (default, quick, reasoning, etc.)
       Object.entries(config.models).forEach(([modelType, modelValue]) => {
         if (modelValue) {
           if (typeof modelValue !== 'string') {
-            // Check if it's a LanguageModelV1 or a ProviderV1
-            if ('languageModel' in modelValue) {
-              // It's a ProviderV1, add it as a provider
-              this.aiProvider.addProvider(modelType, modelValue);
-            } else {
-              // It's likely a LanguageModelV1, add it as a direct model
-              this.aiProvider.addDirectProvider(modelType, modelValue);
-            }
+            // It's a LanguageModelV1 instance, add it as a direct model
+            this.aiProvider.addDirectProvider(modelType, modelValue);
           }
           // If it's a string, it will be handled by the generateText method
         }
@@ -64,7 +58,17 @@ export class DeepResearch implements DeepResearchInstance {
   private validateAndMergeConfig(
     config: Partial<DeepResearchConfig>
   ): DeepResearchConfig {
-    // No need to validate prompt anymore
+    // Merge models carefully to handle both string and LanguageModelV1 instances
+    const mergedModels = { ...DEFAULT_CONFIG.models };
+
+    if (config.models) {
+      Object.entries(config.models).forEach(([key, value]) => {
+        if (value !== undefined) {
+          mergedModels[key] = value;
+        }
+      });
+    }
+
     return {
       depth: {
         ...DEFAULT_DEPTH_CONFIG,
@@ -78,10 +82,7 @@ export class DeepResearch implements DeepResearchInstance {
         ...DEFAULT_SYNTHESIS_CONFIG,
         ...config.synthesis,
       },
-      models: {
-        ...DEFAULT_CONFIG.models,
-        ...config.models,
-      },
+      models: mergedModels,
       jigsawApiKey:
         config.jigsawApiKey ||
         (() => {

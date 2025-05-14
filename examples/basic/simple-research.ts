@@ -1,9 +1,30 @@
 import createDeepResearch from '../..';
 import 'dotenv/config';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createDeepInfra } from '@ai-sdk/deepinfra';
 
 // Basic usage example
 async function basicResearch() {
-  // Create instance using the factory function
+  // Create model instances directly
+  const openai = createOpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  const gemini = createGoogleGenerativeAI({
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+
+  const deepinfra = createDeepInfra({
+    apiKey: process.env.DEEPINFRA_API_KEY,
+  });
+
+  // Get model instances
+  const openaiModel = openai.languageModel('gpt-4o');
+  const geminiModel = gemini.languageModel('gemini-2.0-flash');
+  const deepseekModel = deepinfra.languageModel('deepseek-ai/DeepSeek-R1');
+
+  // Create instance using the factory function with direct model instances
   const deepResearch = await createDeepResearch({
     depth: {
       level: 3, // Detailed analysis
@@ -22,16 +43,16 @@ async function basicResearch() {
       formatAsMarkdown: true,
     },
     models: {
-      default: 'gpt-4o', // Default model
-      reasoning: 'deepseek-ai/DeepSeek-R1', // Reasoning model
-      output: 'gemini-2.0-flash', // Output model - using the same model for consistency
+      default: openaiModel, // Pass the model instance directly
+      reasoning: deepseekModel, // Pass the model instance directly
+      output: geminiModel, // Pass the model instance directly
     },
     jigsawApiKey: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method
   const prompts = [
-    'what is the meaning of life?'
+    'what is the meaning of life?',
     // Add more related prompts if needed
   ];
 
