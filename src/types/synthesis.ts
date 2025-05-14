@@ -1,9 +1,9 @@
 import { WebSearchResult } from '.';
 
 export interface FinalSynthesisInput {
+  maxOutputTokens: number;
   mainPrompt: string[];
   allSyntheses: SynthesisOutput[];
-  maxOutputTokens?: number;
   targetOutputLength: 'concise' | 'standard' | 'detailed' | number;
 }
 export interface SynthesisInput {
@@ -32,7 +32,6 @@ export interface SynthesisOutput {
 }
 
 export interface SynthesisConfig {
-  maxOutputTokens: number;
   targetOutputLength: FinalSynthesisInput['targetOutputLength'];
   formatAsMarkdown: boolean;
 }

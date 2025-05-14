@@ -1,3 +1,4 @@
+import AIProvider from './provider/aiProvider';
 import {
   DeepResearchConfig,
   DeepResearchInstance,
@@ -26,6 +27,7 @@ export class DeepResearch implements DeepResearchInstance {
   private followupGenerator: FollowupQuestionGenerator;
   private synthesizer: Synthesizer;
   private depthSynthesis: Map<number, SynthesisOutput[]>;
+  private aiProvider: AIProvider;
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
@@ -33,6 +35,18 @@ export class DeepResearch implements DeepResearchInstance {
     this.followupGenerator = new FollowupQuestionGenerator();
     this.synthesizer = new Synthesizer();
     this.depthSynthesis = new Map();
+    // Initialize AIProvider with providers from config
+    this.aiProvider = new AIProvider();
+
+    // Add providers from config if available
+    if (config.models?.providers) {
+      // Add each provider to the AIProvider
+      Object.entries(config.models.providers).forEach(([name, provider]) => {
+        if (provider) {
+          this.aiProvider.addProvider(name, provider);
+        }
+      });
+    }
   }
 
   private validateAndMergeConfig(

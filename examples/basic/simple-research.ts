@@ -1,14 +1,15 @@
-import createDeepResearch from '../..';
+import createDeepResearch, { DeepResearch } from '../..';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+
+const geminiInstance = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY
+})
 
 // Basic usage example
 async function basicResearch() {
-  const result = await createDeepResearch({
-    prompt: [
-      'Could you tell me what the best area to live in SF?',
-    ],
-    // Using mostly default settings with slight modifications
+  const deepResearch = new DeepResearch({
     depth: {
-      level: 2, // Detailed analysis
+      level: 3, // Detailed analysis
       includeReferences: true,
     },
     breadth: {
@@ -20,8 +21,14 @@ async function basicResearch() {
       targetOutputLength: 5000,
       formatAsMarkdown: true,
     },
+    models : {
+      output: geminiInstance
+
+    }
     format: 'json',
   });
+
+  const result = deepResearch.generate()
 
   // Log research results
   console.log('\n=== RESEARCH SUMMARY ===');

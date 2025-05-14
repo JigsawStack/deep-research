@@ -26,7 +26,6 @@ export const DEFAULT_BREADTH_CONFIG: ResearchBreadthConfig = {
 };
 
 export const DEFAULT_SYNTHESIS_CONFIG: SynthesisConfig = {
-  maxOutputTokens: 4000,
   targetOutputLength: 'standard',
   formatAsMarkdown: true,
 };

@@ -21,9 +21,10 @@ export interface ResearchResult {
 export type ModelType = 'default' | 'quick' | 'reasoning';
 
 export interface ModelConfig {
-  default: string;
-  quick: string;
-  reasoning: string;
+  default: string | any; // Can be a model name string or a provider instance
+  reasoning: string | any;
+  output: string | any; // Adding output as you mentioned
+  // No need for separate providers object
 }
 
 export interface ResearchDepthConfig {
@@ -41,7 +42,6 @@ export interface ResearchBreadthConfig {
 }
 
 export interface DeepResearchConfig {
-  prompt: string[];
   depth?: Partial<ResearchDepthConfig>;
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
