@@ -34,6 +34,12 @@ export interface SynthesisOutput {
   confidence: number;
   depth: number;
   relatedQuestions: string[];
+  sources?: Array<{
+    index: number;
+    url: string;
+    title: string;
+    domain: string;
+  }>;
 }
 
 // Configuration for report generation

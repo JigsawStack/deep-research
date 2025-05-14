@@ -59,6 +59,7 @@ export interface DeepResearchInstance {
   config: DeepResearchConfig;
   getSynthesis(): Map<number, SynthesisOutput[]>;
   generate(prompt: string[]): Promise<DeepResearchResponse>;
+  generateLogs(): Promise<void>;
 }
 
 export interface DeepResearchResponse {

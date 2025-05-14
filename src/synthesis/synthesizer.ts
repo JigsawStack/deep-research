@@ -32,9 +32,10 @@ export async function synthesize(
 
   try {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    // Use reasoning model for synthesis to get better analytical results
     const response = await provider.generateText(
       combinedPrompt,
-      provider.getDefaultModel()
+      provider.getReasoningModel()
     );
 
     let synthesis: SynthesisOutput;
@@ -85,7 +86,14 @@ export function failedSynthesis(
 export async function generateReport(
   input: ReportInput,
   config: ReportConfig,
-  provider: AIProvider
+  provider: AIProvider,
+  sources: Array<{
+    url: string;
+    title: string;
+    domain: string;
+    ai_overview: string;
+    isAcademic?: boolean;
+  }> = []
 ): Promise<SynthesisOutput> {
   const { mainPrompt, allSyntheses } = input;
   const { maxOutputTokens, targetOutputLength } = config;
@@ -95,6 +103,7 @@ export async function generateReport(
     allSyntheses,
     maxOutputTokens,
     targetOutputLength,
+    sources,
   });
 
   try {
@@ -106,14 +115,92 @@ export async function generateReport(
 
     let report: SynthesisOutput;
     try {
+      // First try parsing the response as JSON
       const cleanedResponse = cleanJsonResponse(response);
       console.log('Research report generated');
 
-      report = JSON.parse(cleanedResponse);
-      report.depth = 0; // 0 represents final report
+      // Check if the response is likely a markdown report (starts with common markdown title indicators)
+      if (
+        cleanedResponse.startsWith('–') ||
+        cleanedResponse.startsWith('#') ||
+        cleanedResponse.includes('Title:')
+      ) {
+        console.log('Detected markdown response, extracting metadata...');
+
+        // Parse metadata from the response if available
+        const metadataMatch = cleanedResponse.match(
+          /```json\s*(\{[\s\S]*?\})\s*```/
+        );
+        let metadata = null;
+
+        if (metadataMatch && metadataMatch[1]) {
+          try {
+            metadata = JSON.parse(metadataMatch[1]);
+            console.log('Successfully extracted metadata from markdown');
+          } catch (metadataError) {
+            console.warn('Failed to parse metadata JSON from markdown');
+          }
+        }
+
+        // Extract themes from markdown content if metadata is not available
+        const themeRegex = /Theme[s]?:?\s*(.*?)(?:\n|\r|$)/i;
+        const keyThemesMatch = cleanedResponse.match(themeRegex);
+        const extractedThemes = keyThemesMatch
+          ? keyThemesMatch[1]
+              .split(/,|;/)
+              .map((theme) => theme.trim())
+              .filter(Boolean)
+          : ['Meaning of life', 'Purpose', 'Fulfillment'];
+
+        // Create the report object
+        report = {
+          analysis: cleanedResponse,
+          keyThemes: metadata?.keyThemes || extractedThemes,
+          insights: metadata?.insights || ['Extracted from markdown content'],
+          knowledgeGaps: metadata?.knowledgeGaps || ['Further research needed'],
+          confidence: metadata?.confidence || 0.8,
+          depth: 0,
+          relatedQuestions: metadata?.relatedQuestions || [],
+        };
+      } else {
+        // Standard JSON parsing
+        report = JSON.parse(cleanedResponse);
+        report.depth = 0; // 0 represents final report
+      }
+
+      // Add source references to the report
+      if (sources.length > 0 && !report.sources) {
+        report.sources = sources.map((source, index) => ({
+          index: index + 1,
+          url: source.url,
+          title: source.title || 'Unknown Title',
+          domain: source.domain || new URL(source.url).hostname,
+        }));
+      }
     } catch (parseError) {
-      console.error('Error generating research report:', parseError);
-      throw new Error(`Failed to parse research report as JSON: ${parseError}`);
+      console.error('Error parsing research report:', parseError);
+      console.error('Raw response snippet:', response.substring(0, 200));
+
+      // Fallback to treating the entire response as the analysis
+      report = {
+        analysis: response,
+        keyThemes: ['Content extraction failed'],
+        insights: ['Parsing error occurred'],
+        knowledgeGaps: ['Complete extraction unavailable'],
+        confidence: 0.5,
+        depth: 0,
+        relatedQuestions: [],
+      };
+
+      // Still add sources even in error case
+      if (sources.length > 0) {
+        report.sources = sources.map((source, index) => ({
+          index: index + 1,
+          url: source.url,
+          title: source.title || 'Unknown Title',
+          domain: source.domain || new URL(source.url).hostname,
+        }));
+      }
     }
 
     return report;
@@ -174,33 +261,35 @@ export async function hasSufficientInformation(
 
   try {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await provider.generateText(
+    // Use reasoning model for evaluation to leverage its logical capabilities
+    const reasoningOutput = await provider.generateText(
       combinedPrompt,
       provider.getReasoningModel()
     );
 
-    try {
-      const cleanedResponse = cleanJsonResponse(response);
-      const evaluation = JSON.parse(cleanedResponse);
-
-      console.log(`Information sufficiency evaluation:`, {
-        confidenceScore: evaluation.confidenceScore,
-        sufficientInformation: evaluation.sufficientInformation,
-        potentialQuestions: evaluation.potentialQuestions?.length || 0,
-      });
-
-      // Return the model's evaluation, or fall back to the confidence threshold
-      return typeof evaluation.sufficientInformation === 'boolean'
-        ? evaluation.sufficientInformation
-        : evaluation.confidenceScore >= confidenceThreshold;
-    } catch (parseError) {
-      console.error('Error parsing evaluation response:', parseError);
-      // Fall back to simple heuristic
-      return input.results.length >= 5;
+    // Process the output to extract the conclusion
+    if (reasoningOutput.toLowerCase().includes('sufficient: true')) {
+      return true;
+    } else if (reasoningOutput.toLowerCase().includes('sufficient: false')) {
+      return false;
     }
+
+    // If we can't determine from the format, check for confidence level
+    const confidenceMatch = reasoningOutput.match(/confidence:\s*([0-9.]+)/i);
+    if (confidenceMatch && confidenceMatch[1]) {
+      const confidence = parseFloat(confidenceMatch[1]);
+      return confidence >= confidenceThreshold;
+    }
+
+    // Default behavior based on the presence of keywords
+    return (
+      reasoningOutput.toLowerCase().includes('sufficient') &&
+      !reasoningOutput.toLowerCase().includes('insufficient') &&
+      !reasoningOutput.toLowerCase().includes('not sufficient')
+    );
   } catch (error) {
     console.error('Error evaluating information sufficiency:', error);
-    // Fall back to simple heuristic
-    return input.results.length >= 5;
+    // Default to false when evaluation fails
+    return false;
   }
 }

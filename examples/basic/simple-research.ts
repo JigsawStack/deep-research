@@ -78,22 +78,6 @@ async function basicResearch() {
     console.log('\n=== RESEARCH SUMMARY ===');
     console.log(`Research completed successfully: ${result.success}`);
 
-    console.log('\n=== RESEARCH ===');
-    console.log(result.research);
-
-    // Log token usage
-    console.log('\n=== TOKEN USAGE ===');
-    console.log({
-      inputTokens: result._usage.input_tokens,
-      outputTokens: result._usage.output_tokens,
-      inferenceTimeTokens: result._usage.inference_time_tokens,
-      totalTokens: result._usage.total_tokens,
-    });
-
-    // Log sources (currently empty array, but will be populated in future)
-    console.log('\n=== SOURCES ===');
-    console.log(result.sources);
-
     return result;
   } catch (error) {
     console.error('Research failed with error:', error);

@@ -132,6 +132,7 @@ export class AIProvider {
 
   /**
    * Generate text using a specified model
+   * For reasoning models, this will extract the reasoning property or <thinking> content if available
    */
   async generateText(
     prompt: string,
@@ -142,6 +143,21 @@ export class AIProvider {
         model,
         prompt,
       });
+
+      // First check if reasoning property exists (for models like deepseek-reasoner)
+      if ('reasoning' in result && result.reasoning) {
+        return result.reasoning;
+      }
+
+      // Then check for <thinking> tags in the text output
+      if (result.text && result.text.includes('<thinking>')) {
+        const thinkingMatch = result.text.match(/<thinking>(.*?)<\/thinking>/s);
+        if (thinkingMatch && thinkingMatch[1]) {
+          return thinkingMatch[1].trim();
+        }
+      }
+
+      // Default fallback to regular text output
       return result.text;
     } catch (error) {
       throw new Error(

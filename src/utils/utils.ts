@@ -1,4 +1,45 @@
 export function cleanJsonResponse(response: string): string {
+  // First check if this is a markdown article with a report format starting with '–' (em dash)
+  if (
+    response.startsWith('–') ||
+    response.startsWith('#') ||
+    response.includes('Title:')
+  ) {
+    // This is likely a markdown report without proper JSON
+    console.log('Detected markdown report format');
+
+    // Check if there's a JSON metadata block at the end
+    const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch) {
+      console.log('Found JSON metadata block in markdown report');
+      try {
+        // Extract and validate the JSON block
+        const jsonContent = jsonBlockMatch[1].trim();
+        const parsedJson = JSON.parse(jsonContent);
+
+        // Add the full report content as the analysis
+        if (!parsedJson.analysis) {
+          // Extract the markdown content before the JSON block
+          const markdownContent = response
+            .substring(0, response.indexOf('```json'))
+            .trim();
+
+          parsedJson.analysis = markdownContent;
+          return JSON.stringify(parsedJson);
+        }
+
+        return JSON.stringify(parsedJson);
+      } catch (e) {
+        console.log('Failed to parse JSON metadata in markdown report');
+        // If JSON parsing fails, return the whole response as a markdown document
+        return response;
+      }
+    }
+
+    // No JSON metadata block, just return the markdown response as is
+    return response;
+  }
+
   // Check if this is a markdown article with JSON metadata at the end
   const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
   if (jsonBlockMatch) {

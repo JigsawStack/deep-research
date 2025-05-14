@@ -113,6 +113,88 @@ export class DeepResearch implements DeepResearchInstance {
     return this.depthSynthesis;
   }
 
+  public async generateLogs(finalReport?: any) {
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync('logs')) {
+      fs.mkdirSync('logs');
+    }
+
+    // Write config
+    fs.writeFileSync('logs/config.json', JSON.stringify(this.config, null, 2));
+
+    // Write synthesis map with detailed information
+    const synthesisMap: Record<number, SynthesisOutput[]> = {};
+    this.depthSynthesis.forEach((value, key) => {
+      synthesisMap[key] = value;
+    });
+    fs.writeFileSync(
+      'logs/synthesis_by_depth.json',
+      JSON.stringify(synthesisMap, null, 2)
+    );
+
+    // Create source reference file to help match references in final report
+    try {
+      const sourcesPath = 'logs/sources.json';
+      if (fs.existsSync(sourcesPath)) {
+        const sources = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
+
+        if (Array.isArray(sources) && sources.length > 0) {
+          // Check if the final report has proper citation mapping
+          const citationMapping: Record<string, string> = {};
+          if (finalReport && finalReport.citationMapping) {
+            // Convert number keys to strings for safer access
+            Object.entries(finalReport.citationMapping).forEach(
+              ([key, value]) => {
+                citationMapping[key] = value as string;
+              }
+            );
+            console.log('Using citation mapping from final report');
+          }
+
+          // Generate source reference lookup
+          const sourcesLookup = sources.map((source, index) => {
+            const refNum = index + 1;
+            const refKey = refNum.toString();
+            return {
+              reference_number: refNum,
+              url: source.url,
+              title: source.title || 'Unknown Title',
+              domain: source.domain || new URL(source.url).hostname,
+              citation_key: citationMapping[refKey] ? `[${refNum}]` : null,
+            };
+          });
+
+          fs.writeFileSync(
+            'logs/source_references.json',
+            JSON.stringify(sourcesLookup, null, 2)
+          );
+
+          // Create a markdown version of source references for easy lookup
+          let sourcesMd = '# Source References\n\n';
+          sourcesMd +=
+            'This file provides a mapping between reference numbers in the final report and their corresponding sources.\n\n';
+
+          sourcesLookup.forEach((source) => {
+            const citationTag = source.citation_key
+              ? ` ${source.citation_key}`
+              : '';
+            sourcesMd += `## [${source.reference_number}]${citationTag} ${source.title}\n\n`;
+            sourcesMd += `- URL: ${source.url}\n`;
+            sourcesMd += `- Domain: ${source.domain}\n\n`;
+          });
+
+          fs.writeFileSync('logs/source_references.md', sourcesMd);
+
+          console.log(
+            `Generated source reference files to help match references in the final report`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error generating source reference files:', error);
+    }
+  }
+
   public async generate(prompt: string[]): Promise<DeepResearchResponse> {
     if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
       throw new Error('Prompt must be provided as a non-empty array');
@@ -157,6 +239,41 @@ export class DeepResearch implements DeepResearchInstance {
       allSyntheses.push(...syntheses);
     });
 
+    // Collect sources from all search results
+    const sources: ResearchSource[] = [];
+
+    // Extract unique sources from initial search results
+    initialSearch.forEach((result) => {
+      if (result.searchResults && result.searchResults.results) {
+        result.searchResults.results.forEach((source) => {
+          // Only add unique URLs
+          if (source.url && !sources.some((s) => s.url === source.url)) {
+            // Create a source object with only properties from the ResearchSource interface
+            const researchSource: ResearchSource = {
+              url: source.url,
+              content: source.content || '',
+              ai_overview: source.ai_overview || '',
+              title: source.title || 'Unknown Title',
+              domain: source.domain || '',
+              isAcademic: source.isAcademic,
+            };
+
+            // Add domain if not present but URL is valid
+            if (!researchSource.domain && researchSource.url) {
+              try {
+                researchSource.domain = new URL(researchSource.url).hostname;
+              } catch (e) {
+                // Invalid URL, keep domain empty
+              }
+            }
+
+            sources.push(researchSource);
+          }
+        });
+      }
+    });
+
+    // Generate the final report with collected sources
     const finalReport = await generateReport(
       {
         mainPrompt: this.prompts,
@@ -168,11 +285,16 @@ export class DeepResearch implements DeepResearchInstance {
           this.config.synthesis?.targetOutputLength ?? 'standard',
         formatAsMarkdown: true,
       },
-      this.aiProvider
+      this.aiProvider,
+      // Convert ResearchSource[] to the expected format
+      sources.map((source) => ({
+        url: source.url,
+        title: source.title || 'Unknown Title',
+        domain: source.domain || '',
+        ai_overview: source.ai_overview || '',
+        isAcademic: source.isAcademic,
+      }))
     );
-
-    fs.writeFileSync('test.json', JSON.stringify(finalReport, null, 2));
-    fs.writeFileSync('test.md', finalReport.analysis);
 
     console.log(
       `Final research report generated with ${
@@ -210,40 +332,6 @@ export class DeepResearch implements DeepResearchInstance {
     // Ensure we have a valid research output
     let research = finalReport.analysis || 'No research results available.';
 
-    // Collect sources from all search results
-    const sources: ResearchSource[] = [];
-
-    // Extract unique sources from initial search results
-    initialSearch.forEach((result) => {
-      if (result.searchResults && result.searchResults.results) {
-        result.searchResults.results.forEach((source) => {
-          // Only add unique URLs
-          if (source.url && !sources.some((s) => s.url === source.url)) {
-            // Create a source object with only properties from the ResearchSource interface
-            const researchSource: ResearchSource = {
-              url: source.url,
-              content: source.content || '',
-              ai_overview: source.ai_overview || '',
-              title: source.title || 'Unknown Title',
-              domain: source.domain || '',
-              isAcademic: source.isAcademic,
-            };
-
-            // Add domain if not present but URL is valid
-            if (!researchSource.domain && researchSource.url) {
-              try {
-                researchSource.domain = new URL(researchSource.url).hostname;
-              } catch (e) {
-                // Invalid URL, keep domain empty
-              }
-            }
-
-            sources.push(researchSource);
-          }
-        });
-      }
-    });
-
     console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
     console.log(
       `Research completed with ${this.depthSynthesis.size} depth levels`
@@ -251,6 +339,26 @@ export class DeepResearch implements DeepResearchInstance {
     console.log(`Final report length: ${research.length} characters`);
     console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
     console.log(`Sources collected: ${sources.length}`);
+
+    // Generate comprehensive test files with all the data
+    await this.generateLogs(finalReport);
+
+    // Write final report to output files
+    fs.writeFileSync(
+      'logs/final_report.json',
+      JSON.stringify(finalReport, null, 2)
+    );
+
+    // Add a note about source references to the markdown report
+    const sourceReferencesNote = `
+> **Note on References:** The numeric references ([1], [2], etc.) in this report correspond to entries in the 'source_references.md' file in the same directory. This file provides the mapping between reference numbers and the actual sources with URLs.
+
+`;
+    fs.writeFileSync(
+      'logs/final_report.md',
+      sourceReferencesNote + (finalReport.analysis || 'No analysis available')
+    );
+    fs.writeFileSync('logs/sources.json', JSON.stringify(sources, null, 2));
 
     return {
       success: true,

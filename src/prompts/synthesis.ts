@@ -78,11 +78,19 @@ export const generateReportPrompt = ({
   allSyntheses = [],
   maxOutputTokens,
   targetOutputLength,
+  sources = [],
 }: {
   mainPrompt: string[];
   allSyntheses: any[];
   maxOutputTokens?: number;
   targetOutputLength?: 'concise' | 'standard' | 'detailed' | number;
+  sources?: Array<{
+    url: string;
+    title: string;
+    domain: string;
+    ai_overview: string;
+    isAcademic?: boolean;
+  }>;
 }) => {
   // Convert targetLength to specific instructions
   let lengthGuidance = '';
@@ -121,6 +129,20 @@ Confidence: ${synthesis.confidence}
     })
     .join('\n\n');
 
+  // Format sources as a numbered bibliography
+  const sourcesFormatted =
+    sources.length > 0
+      ? `\n\nSOURCES (USE THESE EXACT REFERENCES IN YOUR REPORT):\n` +
+        sources
+          .map(
+            (source, index) =>
+              `[${index + 1}] ${source.title || 'Unknown Title'}. ${
+                source.domain || new URL(source.url).hostname
+              }. URL: ${source.url}`
+          )
+          .join('\n')
+      : '';
+
   const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
 
 You will:
@@ -132,6 +154,8 @@ You will:
 6. Pinpoint remaining knowledge gaps and recommend avenues for further inquiry.
 7. Conclude with a concise summary of findings and practical or theoretical implications.
 8. Cite every factual claim or statistic with in-text references (e.g. "[1]", "[2]") and append a numbered bibliography.
+
+CRITICAL: Use ONLY the exact numbered references provided at the end of the prompt. Do not make up or alter references. Each citation like [1], [2], etc. must match the numbered references exactly.
 
 Structure your output exactly like this:
 – Title: A descriptive, engaging headline  
@@ -146,9 +170,9 @@ Structure your output exactly like this:
 – 5. Conflicting Evidence & Resolutions  
 – 6. Knowledge Gaps & Future Directions  
 – 7. Conclusion  
-– References
+– References (use the exact references provided in the prompt)
 
-Additionally, include a JSON metadata section at the end with the following structure:
+IMPORTANT: After your complete article, you MUST INCLUDE a JSON metadata section at the end with the following structure:
 \`\`\`json
 {
   "keyThemes": ["Theme 1", "Theme 2", ...],
@@ -167,9 +191,15 @@ Additionally, include a JSON metadata section at the end with the following stru
     }
   ],
   "confidence": 0.85,
-  "relatedQuestions": ["Question 1", "Question 2", ...]
+  "relatedQuestions": ["Question 1", "Question 2", ...],
+  "citationMapping": {
+    "1": "URL of source 1",
+    "2": "URL of source 2"
+  }
 }
-\`\`\``;
+\`\`\`
+
+The JSON metadata section is REQUIRED and must be valid, parseable JSON.`;
 
   const userPrompt = `Main Research Topic(s):
 ${mainPrompt.join('\n')}
@@ -184,8 +214,9 @@ ${
 
 Intermediate Research Syntheses:
 ${combinedSyntheses}
+${sourcesFormatted}
 
-Please create a final comprehensive research article according to the instructions.`;
+Please create a final comprehensive research article according to the instructions. Remember to include the JSON metadata section at the end.`;
 
   return {
     systemPrompt,
@@ -212,29 +243,26 @@ export const generateEvaluationPrompt = ({
     knowledgeGaps: string[];
   };
 }) => {
-  const systemPrompt = `You are an expert research evaluator. Your task is to assess if the current search results provide sufficient information to generate a comprehensive deep research report on the main topic.
+  const systemPrompt = `You are an expert research evaluator. Your task is to carefully assess if the current search results provide sufficient information to generate a comprehensive deep research report on the main topic.
 
-Evaluate the following:
+Think through this step-by-step:
 1. Information coverage: Do the search results cover the main aspects of the topic?
 2. Information depth: Is there enough detailed information to create a substantive analysis?
 3. Information quality: Are the sources reliable and the information accurate?
 4. Knowledge gaps: Are there significant gaps that would prevent a comprehensive report?
 5. Potential for additional questions: Could more targeted questions yield better information?
 
-Based on your evaluation, provide a confidence score from 0 to 1, where:
-- 0-0.5: Insufficient information, major gaps, needs more research
-- 0.5-0.7: Partial information, some gaps, could benefit from more research
-- 0.7-0.85: Good information, minor gaps, might benefit from targeted research
-- 0.85-1.0: Excellent information, comprehensive coverage, sufficient for a report
+After your careful analysis, provide a confidence score and a clear yes/no determination.
+Format your final conclusion exactly like this at the end of your response:
 
-Format your response as a valid JSON object with the following structure:
-{
-  "evaluation": "Your detailed evaluation of the information...",
-  "confidenceScore": 0.75,
-  "sufficientInformation": true/false,
-  "potentialQuestions": ["Question 1", "Question 2", ...],
-  "rationale": "Explanation for your decision..."
-}`;
+Confidence: [0-1 score]
+Sufficient: [true/false]
+
+Where:
+- Confidence 0-0.5: Insufficient information, major gaps, needs more research
+- Confidence 0.5-0.7: Partial information, some gaps, could benefit from more research
+- Confidence 0.7-0.85: Good information, minor gaps, might benefit from targeted research
+- Confidence 0.85-1.0: Excellent information, comprehensive coverage, sufficient for a report`;
 
   const combinedContent = results
     .map((result) => {
