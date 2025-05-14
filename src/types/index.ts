@@ -50,6 +50,7 @@ export interface DeepResearchConfig {
 }
 
 export interface DeepResearchInstance {
+  prompts?: string[];
   config: DeepResearchConfig;
   generateSubQuestions(): Promise<SubQuestionGeneratorResult>;
   fireWebSearches(
@@ -62,6 +63,7 @@ export interface DeepResearchInstance {
   ): Promise<RecursiveResearchResult>;
   getSynthesis(): Map<number, SynthesisOutput[]>;
   generateFinalSynthesis(): Promise<SynthesisOutput>;
+  generate(prompt: string[]): Promise<DeepResearchResponse>;
 }
 
 export interface DeepResearchResponse {
