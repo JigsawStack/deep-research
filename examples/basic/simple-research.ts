@@ -1,17 +1,5 @@
 import createDeepResearch from '../..';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createDeepInfra } from '@ai-sdk/deepinfra';
-
-const geminiInstance = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
-const openaiInstance = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const deepInfraInstance = createDeepInfra({
-  apiKey: process.env.DEEPINFRA_API_KEY,
-});
+import 'dotenv/config';
 
 // Basic usage example
 async function basicResearch() {
@@ -30,14 +18,13 @@ async function basicResearch() {
     },
     synthesis: {
       maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 'detailed', // Changed to use the correct type
+      targetOutputLength: 'detailed',
       formatAsMarkdown: true,
     },
     models: {
-      // Use the correct model types as defined in the config
-      default: openaiInstance, // For regular generations
-      reasoning: deepInfraInstance, // For synthesis and analysis
-      output: geminiInstance, // For quick operations
+      default: 'gpt-4o', // Default model
+      reasoning: 'gpt-4o', // Reasoning model
+      output: 'gemini', // Output model
     },
     format: 'json',
   });
@@ -48,33 +35,36 @@ async function basicResearch() {
     // Add more related prompts if needed
   ];
 
-  const result = await deepResearch.generate(prompts); // Make sure to await the promise
+  try {
+    console.log('Starting deep research...');
+    const result = await deepResearch.generate(prompts);
 
-  // Log research results
-  console.log('\n=== RESEARCH SUMMARY ===');
-  console.log(`Research completed successfully: ${result.success}`);
+    // Log research results
+    console.log('\n=== RESEARCH SUMMARY ===');
+    console.log(`Research completed successfully: ${result.success}`);
 
-  console.log('\n=== RESEARCH ===');
-  console.log(result.research);
+    console.log('\n=== RESEARCH ===');
+    console.log(result.research);
 
-  // Log token usage
-  console.log('\n=== TOKEN USAGE ===');
-  console.log({
-    inputTokens: result._usage.input_tokens,
-    outputTokens: result._usage.output_tokens,
-    inferenceTimeTokens: result._usage.inference_time_tokens,
-    totalTokens: result._usage.total_tokens,
-  });
+    // Log token usage
+    console.log('\n=== TOKEN USAGE ===');
+    console.log({
+      inputTokens: result._usage.input_tokens,
+      outputTokens: result._usage.output_tokens,
+      inferenceTimeTokens: result._usage.inference_time_tokens,
+      totalTokens: result._usage.total_tokens,
+    });
 
-  // Log sources (currently empty array, but will be populated in future)
-  console.log('\n=== SOURCES ===');
-  console.log(result.sources);
+    // Log sources (currently empty array, but will be populated in future)
+    console.log('\n=== SOURCES ===');
+    console.log(result.sources);
 
-  return result;
+    return result;
+  } catch (error) {
+    console.error('Research failed with error:', error);
+    process.exit(1);
+  }
 }
 
-// Make sure to handle errors properly
-basicResearch().catch((error) => {
-  console.error('Research failed:', error);
-  process.exit(1);
-});
+// Run the research
+basicResearch();
