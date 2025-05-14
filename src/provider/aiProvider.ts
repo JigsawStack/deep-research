@@ -241,13 +241,13 @@ export class AIProvider {
         let defaultModel: string;
         switch (providerName) {
           case 'openai':
-            defaultModel = 'gpt-3.5-turbo';
+            defaultModel = 'gpt-4o';
             break;
           case 'gemini':
-            defaultModel = 'gemini-1.0-pro';
+            defaultModel = 'gemini-2.0-flash';
             break;
           case 'deepinfra':
-            defaultModel = 'mistral-7b-instruct';
+            defaultModel = 'deepseek-ai/DeepSeek-R1';
             break;
           default:
             throw modelError;

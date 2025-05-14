@@ -121,9 +121,9 @@ export async function generateReport(
 /**
  * Check if we have sufficient information to stop the research
  * Does this content sufficient for the main questions asked
- * Out of 5? 
+ * Out of 5?
  * Do you think that there can be more relevant questions that can be asked
- * Should I go deeper or should 
+ * Should I go deeper or should
  */
 
 export async function hasSufficientInformation(

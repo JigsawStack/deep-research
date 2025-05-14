@@ -93,10 +93,7 @@ export class DeepResearch implements DeepResearchInstance {
     return this.depthSynthesis;
   }
 
-  public async generate(
-    prompt: string[],
-    format: 'json' | 'markdown' = 'json'
-  ): Promise<DeepResearchResponse> {
+  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
     if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
       throw new Error('Prompt must be provided as a non-empty array');
     }
@@ -168,17 +165,14 @@ export class DeepResearch implements DeepResearchInstance {
     const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
 
     // Ensure we have a valid research output
-    let research = 'No research results available.';
+    let research = finalReport.analysis || 'No research results available.';
 
-    if (finalReport) {
-      if (finalReport.analysis) {
-        // If analysis field exists, use it
-        research = finalReport.analysis;
-      } else if (format === 'json' && Object.keys(finalReport).length > 0) {
-        // Format the research output based on the synthesis data
-        research = JSON.stringify(finalReport, null, 2);
-      }
-    }
+    console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
+    console.log(
+      `Research completed with ${this.depthSynthesis.size} depth levels`
+    );
+    console.log(`Final report length: ${research.length} characters`);
+    console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
 
     return {
       success: true,
@@ -189,7 +183,7 @@ export class DeepResearch implements DeepResearchInstance {
         inference_time_tokens: inferenceTimeTokens,
         total_tokens: Math.round(totalTokens),
       },
-      sources: [], // Now populated from search results
+      sources: [], // Populate sources from the final report
     };
   }
 
@@ -207,9 +201,13 @@ export class DeepResearch implements DeepResearchInstance {
     const isMaxDepthReached =
       currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level);
 
-    console.log(`Performing research at depth level: ${currentDepth}`);
+    console.log(`\n===== DEPTH LEVEL ${currentDepth} =====`);
+    console.log(`Initial web search results: ${initialResults.length}`);
 
     // Check if we already have sufficient information
+    console.log(
+      `Checking if we have sufficient information at depth ${currentDepth}...`
+    );
     const hasSufficientInfo = await hasSufficientInformation(
       {
         mainPrompt: this.prompts,
@@ -220,10 +218,13 @@ export class DeepResearch implements DeepResearchInstance {
       this.config.depth?.confidenceThreshold ||
         DEFAULT_DEPTH_CONFIG.confidenceThreshold
     );
+    console.log(`Sufficient information check result: ${hasSufficientInfo}`);
 
     // Early return conditions - but don't generate final synthesis yet
     if (isMaxDepthReached) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
       console.log(`Maximum depth level ${currentDepth} reached.`);
+      console.log(`Early termination due to max depth reached.`);
       return {
         isComplete: true,
         reason: 'max_depth_reached',
@@ -231,7 +232,9 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     if (hasSufficientInfo) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
       console.log(`Sufficient information found at depth ${currentDepth}.`);
+      console.log(`Early termination due to sufficient information.`);
       return {
         isComplete: true,
         reason: 'sufficient_info',
@@ -239,6 +242,9 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     // First, synthesize the current level results
+    console.log(
+      `Starting synthesis at depth ${currentDepth} with ${initialResults.length} results...`
+    );
     const synthesis = await synthesize(
       {
         mainPrompt: this.prompts,
@@ -249,6 +255,7 @@ export class DeepResearch implements DeepResearchInstance {
       this.aiProvider,
       this.config.models?.default as string
     );
+    console.log(`Synthesis at depth ${currentDepth} completed`);
 
     // Store the synthesis for this depth level
     if (!this.depthSynthesis.has(currentDepth)) {
@@ -263,7 +270,20 @@ export class DeepResearch implements DeepResearchInstance {
     });
 
     // For each search result, generate follow-up questions
+    let totalFollowUpQuestions = 0;
+    let totalWebSearches = 0;
+
+    console.log(
+      `\nProcessing ${initialResults.length} search results for follow-up questions at depth ${currentDepth}...`
+    );
+
     for (const result of initialResults) {
+      console.log(
+        `Generating follow-up questions for result: "${result.question.question.substring(
+          0,
+          50
+        )}..."`
+      );
       // Use the function directly
       const followupQuestions = await generateFollowupQuestions(
         this.prompts,
@@ -273,6 +293,8 @@ export class DeepResearch implements DeepResearchInstance {
         this.aiProvider,
         (this.config.models?.default as string) || 'gemini-2.0-flash'
       );
+      console.log(`Generated ${followupQuestions.length} follow-up questions`);
+      totalFollowUpQuestions += followupQuestions.length;
 
       if (followupQuestions.length > 0) {
         // Convert follow-up questions to SubQuestionGeneratorResult format
@@ -292,14 +314,27 @@ export class DeepResearch implements DeepResearchInstance {
 
         try {
           // Fire web searches directly
+          console.log(
+            `Firing web searches for ${subQuestions.questions.length} follow-up questions...`
+          );
           const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
           const followupResults = await jigsaw.fireWebSearches(subQuestions);
+          console.log(
+            `Received ${followupResults.length} web search results for follow-up questions`
+          );
+          totalWebSearches += followupResults.length;
 
           // Recursively process deeper results with the current synthesis
+          console.log(
+            `Starting recursive research at depth ${currentDepth + 1}...`
+          );
           const deeperResult = await this.performRecursiveResearch(
             followupResults,
             currentDepth + 1,
             synthesis
+          );
+          console.log(
+            `Returned from recursive research at depth ${currentDepth + 1}`
           );
 
           // If we got a result from deeper level (null means we should stop), return it
@@ -318,6 +353,13 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     // If we get here, we've completed this depth but haven't triggered early termination
+    console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
+    console.log(
+      `Total follow-up questions generated: ${totalFollowUpQuestions}`
+    );
+    console.log(`Total web searches performed: ${totalWebSearches}`);
+    console.log(`Research at depth ${currentDepth} completed\n`);
+
     return {
       isComplete: true,
       reason: 'research_complete',

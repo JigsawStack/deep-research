@@ -6,7 +6,7 @@ async function basicResearch() {
   // Create instance using the factory function
   const deepResearch = await createDeepResearch({
     depth: {
-      level: 2, // Detailed analysis
+      level: 3, // Detailed analysis
       includeReferences: true,
       confidenceThreshold: 0.7,
     },
@@ -18,20 +18,20 @@ async function basicResearch() {
     },
     synthesis: {
       maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 'detailed',
+      targetOutputLength: 5000,
       formatAsMarkdown: true,
     },
     models: {
       default: 'gpt-4o', // Default model
-      reasoning: 'gpt-4o', // Reasoning model
-      output: 'gpt-4o', // Output model - using the same model for consistency
+      reasoning: 'deepseek-ai/DeepSeek-R1', // Reasoning model
+      output: 'gemini-2.0-flash', // Output model - using the same model for consistency
     },
     jigsawApiKey: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method
   const prompts = [
-    'What are the latest developments in quantum computing?',
+    'what is the meaning of life?'
     // Add more related prompts if needed
   ];
 
