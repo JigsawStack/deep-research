@@ -9,7 +9,7 @@ import { ProviderV1, LanguageModelV1 } from '@ai-sdk/provider';
  */
 export class AIProvider {
   private providers: Map<string, ProviderV1> = new Map();
-  private directProviders: Map<string, ProviderV1> = new Map();
+  private directModels: Map<string, LanguageModelV1> = new Map();
 
   /**
    * Initialize the provider with optional provider instances
@@ -38,39 +38,40 @@ export class AIProvider {
   /**
    * Add or replace a provider
    */
-  addProvider(name: string, provider: any): void {
+  addProvider(name: string, provider: ProviderV1): void {
     this.providers.set(name, provider);
   }
 
   /**
-   * Add a direct provider with a specific identifier
-   * This is for cases where the user provides a provider instance directly
+   * Add a direct model with a specific identifier
+   * This is for cases where the user provides a model instance directly
    */
-  addDirectProvider(id: string, provider: any): void {
-    this.directProviders.set(id, provider);
+  addDirectProvider(id: string, model: LanguageModelV1): void {
+    this.directModels.set(id, model);
   }
 
   /**
    * Get a specific provider by name
    */
-  getProvider(name: string): any {
+  getProvider(name: string): ProviderV1 | undefined {
     return this.providers.get(name);
   }
 
   /**
    * Generate text using the specified model or provider
    * The model can be:
-   * 1. A string like 'gemini-2.0-flash' (provider-model format)
-   * 2. A direct reference to a provider instance (stored with a unique ID)
+   * 1. A direct LanguageModelV1 instance
+   * 2. A string ID for a stored direct model
+   * 3. A string in provider-model format (e.g., 'gemini-2.0-flash')
    */
   async generateText(
     prompt: string,
-    modelOrProvider: string | any
+    modelOrProvider: string | LanguageModelV1
   ): Promise<string> {
     try {
-      // Case 1: Direct provider instance reference
+      // Case 1: Direct LanguageModelV1 instance
       if (typeof modelOrProvider !== 'string') {
-        // If it's a direct provider instance, use it directly
+        // If it's a direct model instance, use it directly
         const result = await generateText({
           model: modelOrProvider,
           prompt,
@@ -78,14 +79,14 @@ export class AIProvider {
         return result.text;
       }
 
-      // Case 2: Check if it's a direct provider ID we've stored
-      if (this.directProviders.has(modelOrProvider)) {
-        const provider = this.directProviders.get(modelOrProvider);
-        if (!provider) {
-          throw new Error(`Direct provider '${modelOrProvider}' not found`);
+      // Case 2: Check if it's a direct model ID we've stored
+      if (this.directModels.has(modelOrProvider)) {
+        const model = this.directModels.get(modelOrProvider);
+        if (!model) {
+          throw new Error(`Direct model '${modelOrProvider}' not found`);
         }
         const result = await generateText({
-          model: provider as LanguageModelV1,
+          model, // This is already a LanguageModelV1
           prompt,
         });
         return result.text;
@@ -93,17 +94,19 @@ export class AIProvider {
 
       // Case 3: String in provider-model format
       // Parse the model string to identify the provider
-      const [providerName, ...modelParts] = modelOrProvider.split('-');
+      const [providerName] = modelOrProvider.split('-');
       const provider = this.providers.get(providerName);
-
       if (!provider) {
         throw new Error(
           `Provider '${providerName}' not found. Please add it using addProvider method.`
         );
       }
 
+      // Use the languageModel method to get the LanguageModelV1 instance
+      const model = provider.languageModel(modelOrProvider);
+
       const result = await generateText({
-        model: provider(modelOrProvider),
+        model, // Now this is a LanguageModelV1
         prompt,
       });
 

@@ -24,7 +24,7 @@ async function basicResearch() {
     models : {
       output: geminiInstance
 
-    }
+    },
     format: 'json',
   });
 

@@ -38,12 +38,19 @@ export class DeepResearch implements DeepResearchInstance {
     if (config.models) {
       // For each model type (default, quick, reasoning, etc.)
       Object.entries(config.models).forEach(([modelType, modelValue]) => {
-        // If it's not a string, it's likely a provider instance
-        if (modelValue && typeof modelValue !== 'string') {
-          // Add it as a direct provider with the model type as the ID
-          this.aiProvider.addDirectProvider(modelType, modelValue);
+        if (modelValue) {
+          if (typeof modelValue !== 'string') {
+            // Check if it's a LanguageModelV1 or a ProviderV1
+            if ('languageModel' in modelValue) {
+              // It's a ProviderV1, add it as a provider
+              this.aiProvider.addProvider(modelType, modelValue);
+            } else {
+              // It's likely a LanguageModelV1, add it as a direct model
+              this.aiProvider.addDirectProvider(modelType, modelValue);
+            }
+          }
+          // If it's a string, it will be handled by the generateText method
         }
-        // If it's a string, it will be handled by the generateText method
       });
     }
 
