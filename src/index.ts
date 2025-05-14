@@ -25,7 +25,7 @@ import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
 import { SynthesisOutput } from './types/synthesis';
-
+import fs from 'fs';
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
   public prompts?: string[];
@@ -153,6 +153,9 @@ export class DeepResearch implements DeepResearchInstance {
       this.aiProvider,
       this.config.models?.reasoning as string
     );
+
+    fs.writeFileSync('t.json', JSON.stringify(finalReport, null, 2));
+    fs.writeFileSync('t.md', finalReport.analysis);
 
     console.log(
       `Final research report generated with ${
@@ -425,9 +428,9 @@ export class DeepResearch implements DeepResearchInstance {
   }
 }
 
-export async function createDeepResearch(
+export function createDeepResearch(
   config: Partial<DeepResearchConfig>
-): Promise<DeepResearchInstance> {
+): DeepResearchInstance {
   // Set up default configs
   const defaultConfig: DeepResearchConfig = {
     depth: {

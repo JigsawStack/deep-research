@@ -25,7 +25,7 @@ async function basicResearch() {
   const deepseekModel = deepinfra.languageModel('deepseek-ai/DeepSeek-R1');
 
   // Create instance using the factory function with direct model instances
-  const deepResearch = await createDeepResearch({
+  const deepResearch = createDeepResearch({
     depth: {
       level: 3, // Detailed analysis
       includeReferences: true,
@@ -51,14 +51,11 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = [
-    'what is the meaning of life?',
-    // Add more related prompts if needed
-  ];
+  const prompts = ['what is the meaning of life?'];
 
   try {
     console.log('Starting deep research...');
-    const result = await deepResearch.generate(prompts, 'markdown');
+    const result = await deepResearch.generate(prompts);
 
     // Log research results
     console.log('\n=== RESEARCH SUMMARY ===');

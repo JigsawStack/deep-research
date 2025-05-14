@@ -55,10 +55,7 @@ export interface DeepResearchInstance {
   prompts?: string[];
   config: DeepResearchConfig;
   getSynthesis(): Map<number, SynthesisOutput[]>;
-  generate(
-    prompt: string[],
-    format?: 'json' | 'markdown'
-  ): Promise<DeepResearchResponse>;
+  generate(prompt: string[]): Promise<DeepResearchResponse>;
 }
 
 export interface DeepResearchResponse {
