@@ -19,11 +19,11 @@ import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
 import { SynthesisOutput } from './types/synthesis';
+import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
 
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
   public prompts?: string[];
-  private followupGenerator: FollowupQuestionGenerator;
   private synthesizer: Synthesizer;
   private depthSynthesis: Map<number, SynthesisOutput[]>;
   private aiProvider: AIProvider;
@@ -49,7 +49,6 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     this.questionGenerator = new SubQuestionGenerator(this.aiProvider);
-    this.followupGenerator = new FollowupQuestionGenerator(this.aiProvider);
     this.synthesizer = new Synthesizer(this.aiProvider);
     this.depthSynthesis = new Map();
   }
@@ -168,13 +167,14 @@ export class DeepResearch implements DeepResearchInstance {
 
     // For each search result, generate follow-up questions
     for (const result of initialResults) {
-      const followupQuestions =
-        await this.followupGenerator.generateFollowupQuestions(
-          this.prompts,
-          result,
-          this.config.breadth?.maxParallelTopics ||
-            DEFAULT_BREADTH_CONFIG.maxParallelTopics
-        );
+      const followupQuestions = await generateFollowupQuestions(
+        this.prompts,
+        result,
+        this.config.breadth?.maxParallelTopics ||
+          DEFAULT_BREADTH_CONFIG.maxParallelTopics,
+        this.aiProvider,
+        this.config.models?.default as string | undefined
+      );
 
       if (followupQuestions.length > 0) {
         // Convert follow-up questions to SubQuestionGeneratorResult format
