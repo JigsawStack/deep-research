@@ -4,6 +4,7 @@ import {
   ReportConfig,
   SynthesisInput,
   SynthesisOutput,
+  ReportOutput,
 } from '../types/synthesis';
 import { WebSearchResult } from '../types';
 import { cleanJsonResponse } from '../utils/utils';
@@ -31,8 +32,13 @@ export async function synthesize(
   });
 
   try {
+    console.log(
+      `Beginning synthesis at depth ${currentDepth} with ${results.length} results...`
+    );
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
     // Use reasoning model for synthesis to get better analytical results
+    console.log(`Using reasoning model for depth ${currentDepth} synthesis...`);
     const response = await provider.generateText(
       combinedPrompt,
       provider.getReasoningModel()
@@ -41,12 +47,29 @@ export async function synthesize(
     let synthesis: SynthesisOutput;
     try {
       const cleanedResponse = cleanJsonResponse(response);
-      console.log(`Synthesis at depth ${currentDepth} completed`);
+      console.log(
+        `Synthesis at depth ${currentDepth} completed, processing JSON output...`
+      );
 
       synthesis = JSON.parse(cleanedResponse);
       synthesis.depth = currentDepth;
+
+      // Add diagnostics
+      console.log(
+        `Synthesis at depth ${currentDepth} successfully parsed with:`
+      );
+      console.log(
+        `- Analysis length: ${
+          synthesis.analysis ? synthesis.analysis.length : 0
+        } chars`
+      );
+      console.log(`- Key themes: ${synthesis.keyThemes.length} items`);
+      console.log(`- Insights: ${synthesis.insights.length} items`);
+      console.log(`- Knowledge gaps: ${synthesis.knowledgeGaps.length} items`);
+      console.log(`- Confidence: ${synthesis.confidence}`);
     } catch (parseError) {
       console.error('Raw synthesis response:', response);
+      console.error('JSON parse error details:', parseError);
       throw new Error(
         `Failed to parse synthesis response as JSON: ${parseError}`
       );
@@ -54,7 +77,10 @@ export async function synthesize(
 
     return synthesis;
   } catch (error) {
-    console.error('Error generating synthesis:', error);
+    console.error(
+      `Error generating synthesis at depth ${currentDepth}:`,
+      error
+    );
     return failedSynthesis(mainPrompt, results, currentDepth);
   }
 }
@@ -81,6 +107,33 @@ export function failedSynthesis(
 }
 
 /**
+ * Generate a default report when the AI report generation fails
+ */
+export function failedReport(
+  mainPrompt: string[],
+  sources: Array<{
+    url: string;
+    title: string;
+    domain: string;
+  }> = []
+): ReportOutput {
+  return {
+    analysis: `Research report for ${mainPrompt.join(
+      ', '
+    )} could not be generated.`,
+    keyThemes: ['Report generation failed'],
+    insights: ['Unable to generate report due to processing error'],
+    knowledgeGaps: ['Complete report unavailable - please try again'],
+    sources: sources.map((source, index) => ({
+      index: index + 1,
+      url: source.url,
+      title: source.title || 'Unknown Title',
+      domain: source.domain || new URL(source.url).hostname,
+    })),
+  };
+}
+
+/**
  * Generate a comprehensive research report from all syntheses
  */
 export async function generateReport(
@@ -94,7 +147,7 @@ export async function generateReport(
     ai_overview: string;
     isAcademic?: boolean;
   }> = []
-): Promise<SynthesisOutput> {
+): Promise<ReportOutput> {
   const { mainPrompt, allSyntheses } = input;
   const { maxOutputTokens, targetOutputLength } = config;
 
@@ -113,63 +166,23 @@ export async function generateReport(
       provider.getOutputModel()
     );
 
-    let report: SynthesisOutput;
+    let report: ReportOutput;
     try {
-      // First try parsing the response as JSON
+      // Clean the response
       const cleanedResponse = cleanJsonResponse(response);
       console.log('Research report generated');
 
-      // Check if the response is likely a markdown report (starts with common markdown title indicators)
-      if (
-        cleanedResponse.startsWith('–') ||
-        cleanedResponse.startsWith('#') ||
-        cleanedResponse.includes('Title:')
-      ) {
-        console.log('Detected markdown response, extracting metadata...');
-
-        // Parse metadata from the response if available
-        const metadataMatch = cleanedResponse.match(
-          /```json\s*(\{[\s\S]*?\})\s*```/
-        );
-        let metadata = null;
-
-        if (metadataMatch && metadataMatch[1]) {
-          try {
-            metadata = JSON.parse(metadataMatch[1]);
-            console.log('Successfully extracted metadata from markdown');
-          } catch (metadataError) {
-            console.warn('Failed to parse metadata JSON from markdown');
-          }
-        }
-
-        // Extract themes from markdown content if metadata is not available
-        const themeRegex = /Theme[s]?:?\s*(.*?)(?:\n|\r|$)/i;
-        const keyThemesMatch = cleanedResponse.match(themeRegex);
-        const extractedThemes = keyThemesMatch
-          ? keyThemesMatch[1]
-              .split(/,|;/)
-              .map((theme) => theme.trim())
-              .filter(Boolean)
-          : ['Meaning of life', 'Purpose', 'Fulfillment'];
-
-        // Create the report object
-        report = {
-          analysis: cleanedResponse,
-          keyThemes: metadata?.keyThemes || extractedThemes,
-          insights: metadata?.insights || ['Extracted from markdown content'],
-          knowledgeGaps: metadata?.knowledgeGaps || ['Further research needed'],
-          confidence: metadata?.confidence || 0.8,
-          depth: 0,
-          relatedQuestions: metadata?.relatedQuestions || [],
-        };
-      } else {
-        // Standard JSON parsing
-        report = JSON.parse(cleanedResponse);
-        report.depth = 0; // 0 represents final report
-      }
+      // Simply use the response as the analysis without complex extraction
+      report = {
+        analysis: cleanedResponse,
+        keyThemes: ['Research report'],
+        insights: ['See full analysis for details'],
+        knowledgeGaps: ['See full analysis for details'],
+        sources: [],
+      };
 
       // Add source references to the report
-      if (sources.length > 0 && !report.sources) {
+      if (sources.length > 0) {
         report.sources = sources.map((source, index) => ({
           index: index + 1,
           url: source.url,
@@ -177,19 +190,16 @@ export async function generateReport(
           domain: source.domain || new URL(source.url).hostname,
         }));
       }
-    } catch (parseError) {
-      console.error('Error parsing research report:', parseError);
-      console.error('Raw response snippet:', response.substring(0, 200));
+    } catch (error) {
+      console.error('Error processing research report:', error);
 
       // Fallback to treating the entire response as the analysis
       report = {
         analysis: response,
-        keyThemes: ['Content extraction failed'],
-        insights: ['Parsing error occurred'],
-        knowledgeGaps: ['Complete extraction unavailable'],
-        confidence: 0.5,
-        depth: 0,
-        relatedQuestions: [],
+        keyThemes: ['Research report'],
+        insights: ['See full analysis for details'],
+        knowledgeGaps: ['See full analysis for details'],
+        sources: [],
       };
 
       // Still add sources even in error case
@@ -206,7 +216,14 @@ export async function generateReport(
     return report;
   } catch (error) {
     console.error('Error generating research report:', error);
-    return failedSynthesis(mainPrompt, [], 0);
+    return failedReport(
+      mainPrompt,
+      sources.map((s) => ({
+        url: s.url,
+        title: s.title || 'Unknown Title',
+        domain: s.domain || new URL(s.url).hostname,
+      }))
+    );
   }
 }
 

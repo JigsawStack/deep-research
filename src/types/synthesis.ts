@@ -49,8 +49,22 @@ export interface ReportConfig {
   formatAsMarkdown: boolean;
 }
 
+export interface ReportOutput {
+  analysis: string;
+  keyThemes: string[];
+  insights: string[];
+  knowledgeGaps: string[];
+  sources: Array<{
+    index: number;
+    url: string;
+    title?: string;
+    domain?: string;
+  }>;
+  citationMapping?: Record<string, string>;
+}
+
 // Overall synthesis result including all depth levels and final report
 export interface SynthesisResult {
   depthSynthesis: Map<number, SynthesisOutput[]>;
-  finalReport: SynthesisOutput;
+  finalReport: ReportOutput;
 }

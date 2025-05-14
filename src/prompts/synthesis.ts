@@ -171,35 +171,7 @@ Structure your output exactly like this:
 – 6. Knowledge Gaps & Future Directions  
 – 7. Conclusion  
 – References (use the exact references provided in the prompt)
-
-IMPORTANT: After your complete article, you MUST INCLUDE a JSON metadata section at the end with the following structure:
-\`\`\`json
-{
-  "keyThemes": ["Theme 1", "Theme 2", ...],
-  "insights": ["Insight 1", "Insight 2", ...],
-  "knowledgeGaps": ["Gap 1", "Gap 2", ...],
-  "conflictingInformation": [
-    {
-      "topic": "Topic with conflict",
-      "conflicts": [
-        {
-          "claim1": "First claim",
-          "claim2": "Contradicting claim",
-          "resolution": "Possible resolution if available"
-        }
-      ]
-    }
-  ],
-  "confidence": 0.85,
-  "relatedQuestions": ["Question 1", "Question 2", ...],
-  "citationMapping": {
-    "1": "URL of source 1",
-    "2": "URL of source 2"
-  }
-}
-\`\`\`
-
-The JSON metadata section is REQUIRED and must be valid, parseable JSON.`;
+`;
 
   const userPrompt = `Main Research Topic(s):
 ${mainPrompt.join('\n')}
@@ -214,9 +186,7 @@ ${
 
 Intermediate Research Syntheses:
 ${combinedSyntheses}
-${sourcesFormatted}
-
-Please create a final comprehensive research article according to the instructions. Remember to include the JSON metadata section at the end.`;
+${sourcesFormatted}`;
 
   return {
     systemPrompt,

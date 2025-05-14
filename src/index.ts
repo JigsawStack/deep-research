@@ -24,7 +24,7 @@ import { SubQuestionGeneratorResult } from './types/generators';
 import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
-import { SynthesisOutput } from './types/synthesis';
+import { SynthesisOutput, ReportOutput } from './types/synthesis';
 import fs from 'fs';
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
@@ -113,7 +113,7 @@ export class DeepResearch implements DeepResearchInstance {
     return this.depthSynthesis;
   }
 
-  public async generateLogs(finalReport?: any) {
+  public async generateLogs(finalReport?: ReportOutput) {
     // Create logs directory if it doesn't exist
     if (!fs.existsSync('logs')) {
       fs.mkdirSync('logs');
@@ -121,6 +121,9 @@ export class DeepResearch implements DeepResearchInstance {
 
     // Write config
     fs.writeFileSync('logs/config.json', JSON.stringify(this.config, null, 2));
+
+    // Write prompts
+    fs.writeFileSync('logs/prompts.md', this.prompts?.join('\n') || '');
 
     // Write synthesis map with detailed information
     const synthesisMap: Record<number, SynthesisOutput[]> = {};
@@ -131,6 +134,76 @@ export class DeepResearch implements DeepResearchInstance {
       'logs/synthesis_by_depth.json',
       JSON.stringify(synthesisMap, null, 2)
     );
+
+    // Write all syntheses flattened
+    const allSyntheses: SynthesisOutput[] = [];
+    this.depthSynthesis.forEach((syntheses) => {
+      allSyntheses.push(...syntheses);
+    });
+    fs.writeFileSync(
+      'logs/all_syntheses.json',
+      JSON.stringify(allSyntheses, null, 2)
+    );
+
+    // Create a more detailed synthesis map with key information and previews
+    const detailedSynthesisMap: Record<string, any> = {};
+    this.depthSynthesis.forEach((syntheses, depth) => {
+      detailedSynthesisMap[`depth_${depth}`] = syntheses.map(
+        (synthesis, index) => ({
+          index,
+          depth,
+          confidence: synthesis.confidence,
+          key_themes: synthesis.keyThemes,
+          insights_count: synthesis.insights.length,
+          knowledge_gaps_count: synthesis.knowledgeGaps.length,
+          analysis_preview: synthesis.analysis.substring(0, 150) + '...',
+        })
+      );
+    });
+    fs.writeFileSync(
+      'logs/detailed_synthesis_map.json',
+      JSON.stringify(detailedSynthesisMap, null, 2)
+    );
+
+    // Write a markdown log of all syntheses
+    let synthesisMd = '# All Research Syntheses\n\n';
+
+    if (allSyntheses.length === 0) {
+      synthesisMd +=
+        '**No syntheses were generated during this research run**\n\n';
+      synthesisMd +=
+        'This could be due to an early termination or insufficient information.\n';
+    } else {
+      this.depthSynthesis.forEach((syntheses, depth) => {
+        synthesisMd += `## Depth Level ${depth}\n\n`;
+
+        syntheses.forEach((synthesis, index) => {
+          synthesisMd += `### Synthesis ${depth}.${index + 1}\n\n`;
+          synthesisMd += `- **Confidence:** ${synthesis.confidence}\n`;
+          synthesisMd += `- **Key Themes:** ${synthesis.keyThemes.join(
+            ', '
+          )}\n\n`;
+
+          synthesisMd += `#### Insights\n\n`;
+          synthesis.insights.forEach((insight) => {
+            synthesisMd += `- ${insight}\n`;
+          });
+          synthesisMd += '\n';
+
+          synthesisMd += `#### Knowledge Gaps\n\n`;
+          synthesis.knowledgeGaps.forEach((gap) => {
+            synthesisMd += `- ${gap}\n`;
+          });
+          synthesisMd += '\n';
+
+          synthesisMd += `#### Analysis\n\n`;
+          synthesisMd += `${synthesis.analysis.substring(0, 800)}...\n\n`;
+          synthesisMd += '---\n\n';
+        });
+      });
+    }
+
+    fs.writeFileSync('logs/all_syntheses.md', synthesisMd);
 
     // Create source reference file to help match references in final report
     try {
@@ -226,6 +299,17 @@ export class DeepResearch implements DeepResearchInstance {
     console.log(
       `Recursive research completed with reason: ${recursiveResult.reason}`
     );
+
+    // Store the synthesis from the recursive result if available
+    if (recursiveResult.synthesis) {
+      const depth = recursiveResult.synthesis.depth || 1;
+      console.log(`Storing synthesis from recursive result at depth ${depth}`);
+
+      if (!this.depthSynthesis.has(depth)) {
+        this.depthSynthesis.set(depth, []);
+      }
+      this.depthSynthesis.get(depth)?.push(recursiveResult.synthesis);
+    }
 
     // Get all the syntheses
     const allDepthSynthesis = this.getSynthesis();
@@ -349,14 +433,9 @@ export class DeepResearch implements DeepResearchInstance {
       JSON.stringify(finalReport, null, 2)
     );
 
-    // Add a note about source references to the markdown report
-    const sourceReferencesNote = `
-> **Note on References:** The numeric references ([1], [2], etc.) in this report correspond to entries in the 'source_references.md' file in the same directory. This file provides the mapping between reference numbers and the actual sources with URLs.
-
-`;
     fs.writeFileSync(
       'logs/final_report.md',
-      sourceReferencesNote + (finalReport.analysis || 'No analysis available')
+      finalReport.analysis || 'No analysis available'
     );
     fs.writeFileSync('logs/sources.json', JSON.stringify(sources, null, 2));
 
@@ -407,28 +486,7 @@ export class DeepResearch implements DeepResearchInstance {
     );
     console.log(`Sufficient information check result: ${hasSufficientInfo}`);
 
-    // Early return conditions - but don't generate final synthesis yet
-    if (isMaxDepthReached) {
-      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
-      console.log(`Maximum depth level ${currentDepth} reached.`);
-      console.log(`Early termination due to max depth reached.`);
-      return {
-        isComplete: true,
-        reason: 'max_depth_reached',
-      };
-    }
-
-    if (hasSufficientInfo) {
-      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
-      console.log(`Sufficient information found at depth ${currentDepth}.`);
-      console.log(`Early termination due to sufficient information.`);
-      return {
-        isComplete: true,
-        reason: 'sufficient_info',
-      };
-    }
-
-    // First, synthesize the current level results
+    // First, synthesize the current level results - always do this regardless of early termination
     console.log(
       `Starting synthesis at depth ${currentDepth} with ${initialResults.length} results...`
     );
@@ -454,6 +512,29 @@ export class DeepResearch implements DeepResearchInstance {
       keyThemes: synthesis.keyThemes,
       confidence: synthesis.confidence,
     });
+
+    // Early return conditions - check after generating at least one synthesis
+    if (isMaxDepthReached) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
+      console.log(`Maximum depth level ${currentDepth} reached.`);
+      console.log(`Early termination due to max depth reached.`);
+      return {
+        isComplete: true,
+        reason: 'max_depth_reached',
+        synthesis, // Return the synthesis we just generated
+      };
+    }
+
+    if (hasSufficientInfo) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
+      console.log(`Sufficient information found at depth ${currentDepth}.`);
+      console.log(`Early termination due to sufficient information.`);
+      return {
+        isComplete: true,
+        reason: 'sufficient_info',
+        synthesis, // Return the synthesis we just generated
+      };
+    }
 
     // For each search result, generate follow-up questions
     let totalFollowUpQuestions = 0;
@@ -548,6 +629,7 @@ export class DeepResearch implements DeepResearchInstance {
     return {
       isComplete: true,
       reason: 'research_complete',
+      synthesis, // Return the synthesis we just generated
     }; // Signal that we're done with research
   }
 }
