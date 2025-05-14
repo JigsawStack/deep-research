@@ -31,22 +31,27 @@ export class DeepResearch implements DeepResearchInstance {
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
-    this.questionGenerator = new SubQuestionGenerator();
-    this.followupGenerator = new FollowupQuestionGenerator();
-    this.synthesizer = new Synthesizer();
-    this.depthSynthesis = new Map();
-    // Initialize AIProvider with providers from config
+
+    // Initialize AIProvider
     this.aiProvider = new AIProvider();
 
-    // Add providers from config if available
-    if (config.models?.providers) {
-      // Add each provider to the AIProvider
-      Object.entries(config.models.providers).forEach(([name, provider]) => {
-        if (provider) {
-          this.aiProvider.addProvider(name, provider);
+    // Add providers from config.models if available
+    if (config.models) {
+      // For each model type (default, quick, reasoning, etc.)
+      Object.entries(config.models).forEach(([modelType, modelValue]) => {
+        // If it's not a string, it's likely a provider instance
+        if (modelValue && typeof modelValue !== 'string') {
+          // Add it as a direct provider with the model type as the ID
+          this.aiProvider.addDirectProvider(modelType, modelValue);
         }
+        // If it's a string, it will be handled by the generateText method
       });
     }
+
+    this.questionGenerator = new SubQuestionGenerator(this.aiProvider);
+    this.followupGenerator = new FollowupQuestionGenerator(this.aiProvider);
+    this.synthesizer = new Synthesizer(this.aiProvider);
+    this.depthSynthesis = new Map();
   }
 
   private validateAndMergeConfig(

@@ -1,5 +1,6 @@
 import { SubQuestion, SubQuestionGeneratorResult } from './generators';
 import { SynthesisConfig, SynthesisOutput } from './synthesis';
+import { ProviderV1 } from '@ai-sdk/provider';
 
 export interface RecursiveResearchResult {
   isComplete: boolean;
@@ -21,10 +22,9 @@ export interface ResearchResult {
 export type ModelType = 'default' | 'quick' | 'reasoning';
 
 export interface ModelConfig {
-  default: string | any; // Can be a model name string or a provider instance
-  reasoning: string | any;
-  output: string | any; // Adding output as you mentioned
-  // No need for separate providers object
+  default: string | ProviderV1;
+  output?: string | ProviderV1;
+  reasoning?: string | ProviderV1;
 }
 
 export interface ResearchDepthConfig {

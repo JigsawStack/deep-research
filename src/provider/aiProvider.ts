@@ -2,14 +2,14 @@ import { generateText } from 'ai';
 import { GoogleGenerativeAIProvider } from '@ai-sdk/google';
 import { DeepInfraProvider } from '@ai-sdk/deepinfra';
 import { OpenAIProvider as OpenAISDKProvider } from '@ai-sdk/openai';
-
+import { ProviderV1 } from '@ai-sdk/provider';
 /**
  * AIProvider acts as an abstract factory for different AI model providers
  * It unifies the interface for interacting with different provider types
  */
 export class AIProvider {
-  private providers: Map<string, any> = new Map();
-  private directProviders: Map<string, any> = new Map();
+  private providers: Map<string, ProviderV1> = new Map();
+  private directProviders: Map<string, ProviderV1> = new Map();
 
   /**
    * Initialize the provider with optional provider instances
@@ -36,17 +36,18 @@ export class AIProvider {
   }
 
   /**
-   * Add a named provider that will be used with string-based model names
+   * Add or replace a provider
    */
   addProvider(name: string, provider: any): void {
     this.providers.set(name, provider);
   }
 
   /**
-   * Add a direct provider instance that will be referenced by a key
+   * Add a direct provider with a specific identifier
+   * This is for cases where the user provides a provider instance directly
    */
-  addDirectProvider(key: string, provider: any): void {
-    this.directProviders.set(key, provider);
+  addDirectProvider(id: string, provider: any): void {
+    this.directProviders.set(id, provider);
   }
 
   /**
@@ -57,76 +58,56 @@ export class AIProvider {
   }
 
   /**
-   * Get a direct provider by key
-   */
-  getDirectProvider(key: string): any {
-    return this.directProviders.get(key);
-  }
-
-  /**
    * Generate text using the specified model or provider
    * The model can be:
-   * 1. A string model name with provider prefix, e.g., 'gemini-2.0-flash'
-   * 2. A key referencing a direct provider instance
+   * 1. A string like 'gemini-2.0-flash' (provider-model format)
+   * 2. A direct reference to a provider instance (stored with a unique ID)
    */
   async generateText(
     prompt: string,
     modelOrProvider: string | any
   ): Promise<string> {
-    // Case 1: Direct provider instance was passed
-    if (typeof modelOrProvider !== 'string') {
-      try {
+    try {
+      // Case 1: Direct provider instance reference
+      if (typeof modelOrProvider !== 'string') {
+        // If it's a direct provider instance, use it directly
         const result = await generateText({
           model: modelOrProvider,
           prompt,
         });
         return result.text;
-      } catch (error) {
-        throw new Error(
-          `Error generating text with direct provider: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
       }
-    }
 
-    // Case 2: Check if it's a key for a direct provider we have stored
-    if (this.directProviders.has(modelOrProvider)) {
-      const provider = this.directProviders.get(modelOrProvider);
-      try {
+      // Case 2: Check if it's a direct provider ID we've stored
+      if (this.directProviders.has(modelOrProvider)) {
+        const provider = this.directProviders.get(modelOrProvider);
         const result = await generateText({
           model: provider,
           prompt,
         });
         return result.text;
-      } catch (error) {
+      }
+
+      // Case 3: String in provider-model format
+      // Parse the model string to identify the provider
+      const [providerName, ...modelParts] = modelOrProvider.split('-');
+      const provider = this.providers.get(providerName);
+
+      if (!provider) {
         throw new Error(
-          `Error generating text with provider key ${modelOrProvider}: ${
-            error instanceof Error ? error.message : String(error)
-          }`
+          `Provider '${providerName}' not found. Please add it using addProvider method.`
         );
       }
-    }
 
-    // Case 3: String model name with provider prefix
-    const [providerName, ...modelParts] = modelOrProvider.split('-');
-    const provider = this.providers.get(providerName);
-
-    if (!provider) {
-      throw new Error(
-        `Provider '${providerName}' not found for model ${modelOrProvider}. Please add it using addProvider method.`
-      );
-    }
-
-    try {
       const result = await generateText({
         model: provider(modelOrProvider),
         prompt,
       });
+
       return result.text;
     } catch (error) {
       throw new Error(
-        `Error generating text with model ${modelOrProvider}: ${
+        `Error generating text with ${String(modelOrProvider)}: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
