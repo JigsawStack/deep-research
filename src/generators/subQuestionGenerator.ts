@@ -1,134 +1,150 @@
 import { SubQuestion } from '../types/generators';
 import { ResearchBreadthConfig } from '../types';
 import 'dotenv/config';
-import { GeminiProvider } from '../provider/gemini';
+
 import {
   generateSubQuestionsPrompt,
   checkRelevancePrompt,
 } from '../prompts/generators';
+import { AIProvider } from '../provider/aiProvider';
 
-export class SubQuestionGenerator {
-  private geminiInstance: GeminiProvider;
-  constructor() {
-    // if(!process.env.OPENAI_API_KEY) {
-    //   throw new Error('OPENAI_API_KEY is not set');
-    // }
-    this.geminiInstance = GeminiProvider.getInstance({
-      apiKey: process.env.GEMINI_API_KEY || '',
-    });
+/**
+ * Checks if a question is relevant to the main research topic
+ */
+export async function checkRelevance(
+  question: string,
+  mainPrompt: string[],
+  model: string,
+  provider: AIProvider
+): Promise<boolean> {
+  const { systemPrompt, userPrompt } = checkRelevancePrompt({
+    question,
+    mainPrompt,
+  });
+
+  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
+  const response = await provider.generateText(combinedPrompt, model);
+
+  // Normalize the response to handle different formats
+  const normalizedResponse = response.trim().toLowerCase();
+
+  // Check if it contains "true" anywhere in the response
+  return normalizedResponse.includes('true');
+}
+
+/**
+ * Validates the generated questions for relevance and proper format
+ */
+async function validateResponse(
+  questions: SubQuestion[],
+  mainPrompt: string[],
+  model: string,
+  provider: AIProvider
+): Promise<SubQuestion[]> {
+  if (!Array.isArray(questions)) {
+    throw new Error('Invalid response format: expected an array of questions');
   }
 
-  async generateSubQuestions(
-    mainPrompt: string[],
-    breadthConfig: ResearchBreadthConfig
-  ): Promise<any> {
-    const targetQuestionCount = breadthConfig.maxParallelTopics + 2;
+  const validatedQuestions = [...questions]; // Create a copy to avoid modifying during iteration
 
-    const { systemPrompt, userPrompt } = generateSubQuestionsPrompt({
-      mainPrompt,
-      targetQuestionCount,
-    });
-
-    try {
-      const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      // const response = await this.openaiInstance.generateText(
-      //   combinedPrompt,
-      //   'gpt-4o'
-      // );
-      const response = await this.geminiInstance.generateText(
-        combinedPrompt,
-        'gemini-2.0-flash'
-      );
-
-      let parsedQuestions;
-      try {
-        parsedQuestions = JSON.parse(response);
-      } catch (parseError) {
-        throw new Error(`Failed to parse response as JSON: ${parseError}`);
+  // Using Promise.all for proper handling of asynchronous operations
+  const relevanceChecks = await Promise.all(
+    validatedQuestions.map(async (q) => {
+      if (!q.question || typeof q.relevanceScore !== 'number') {
+        q.relevanceScore = 0;
+        return false;
+      }
+      if (q.relevanceScore < 0 || q.relevanceScore > 1) {
+        q.relevanceScore = 0;
+        return false;
       }
 
-      // pick the questions equal to the breadthConfig.maxParallelTopics
-      let questions: SubQuestion[] = parsedQuestions.slice(
-        0,
-        breadthConfig.maxParallelTopics
-      );
+      // Check if the question is relevant to the main research topic
+      return await checkRelevance(q.question, mainPrompt, model, provider);
+    })
+  );
 
-      questions = await this.validateResponse(questions, mainPrompt);
+  // Filter out irrelevant questions
+  return validatedQuestions.filter(
+    (_, index) =>
+      relevanceChecks[index] && validatedQuestions[index].relevanceScore > 0
+  );
+}
 
-      return {
-        questions,
-        metadata: {
-          totalGenerated: questions.length,
-          averageRelevanceScore:
-            questions.reduce((acc, q) => acc + q.relevanceScore, 0) /
-            questions.length,
-          generationTimestamp: new Date().toISOString(),
-        },
-      };
-    } catch (error: unknown) {
-      throw new Error(
-        `Failed to generate sub-questions: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
+/**
+ * Generates sub-questions for a main research topic
+ */
+
+export interface GenerateSubQuestionsOptions {
+  mainPrompt: string[];
+  breadthConfig: ResearchBreadthConfig;
+  provider: AIProvider;
+  generationModel?: string;
+  relevanceCheckModel?: string;
+}
+
+export async function generateSubQuestions({
+  mainPrompt,
+  breadthConfig,
+  provider,
+  generationModel = 'gemini-2.0-flash',
+  relevanceCheckModel = 'gpt-4o',
+}: GenerateSubQuestionsOptions): Promise<any> {
+  if (!mainPrompt || mainPrompt.length === 0) {
+    throw new Error('Prompts must be set before generating sub-questions');
   }
 
-  public async checkRelevance(
-    question: string,
-    mainPrompt: string[]
-  ): Promise<boolean> {
-    const { systemPrompt, userPrompt } = checkRelevancePrompt({
-      question,
-      mainPrompt,
-    });
+  const targetQuestionCount = breadthConfig.maxParallelTopics + 2;
 
+  const { systemPrompt, userPrompt } = generateSubQuestionsPrompt({
+    mainPrompt,
+    targetQuestionCount,
+  });
+
+  try {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await this.geminiInstance.generateText(
+
+    const response = await provider.generateText(
       combinedPrompt,
-      'gemini-1.5-flash'
+      generationModel
     );
 
-    // Normalize the response to handle different formats
-    const normalizedResponse = response.trim().toLowerCase();
-
-    // Check if it contains "true" anywhere in the response
-    return normalizedResponse.includes('true');
-  }
-
-  private async validateResponse(
-    questions: SubQuestion[],
-    mainPrompt: string[]
-  ): Promise<SubQuestion[]> {
-    if (!Array.isArray(questions)) {
-      throw new Error(
-        'Invalid response format: expected an array of questions'
-      );
+    let parsedQuestions;
+    try {
+      parsedQuestions = JSON.parse(response);
+    } catch (parseError) {
+      throw new Error(`Failed to parse response as JSON: ${parseError}`);
     }
 
-    const validatedQuestions = [...questions]; // Create a copy to avoid modifying during iteration
-
-    // Using Promise.all for proper handling of asynchronous operations
-    const relevanceChecks = await Promise.all(
-      validatedQuestions.map(async (q) => {
-        if (!q.question || typeof q.relevanceScore !== 'number') {
-          q.relevanceScore = 0;
-          return false;
-        }
-        if (q.relevanceScore < 0 || q.relevanceScore > 1) {
-          q.relevanceScore = 0;
-          return false;
-        }
-
-        // Check if the question is relevant to the main research topic
-        return await this.checkRelevance(q.question, mainPrompt);
-      })
+    // pick the questions equal to the breadthConfig.maxParallelTopics
+    let questions: SubQuestion[] = parsedQuestions.slice(
+      0,
+      breadthConfig.maxParallelTopics
     );
 
-    // Filter out irrelevant questions
-    return validatedQuestions.filter(
-      (_, index) =>
-        relevanceChecks[index] && validatedQuestions[index].relevanceScore > 0
+    questions = await validateResponse(
+      questions,
+      mainPrompt,
+      relevanceCheckModel,
+      provider
+    );
+
+    return {
+      questions,
+      metadata: {
+        totalGenerated: questions.length,
+        averageRelevanceScore:
+          questions.reduce((acc, q) => acc + q.relevanceScore, 0) /
+          questions.length,
+        generationTimestamp: new Date().toISOString(),
+      },
+    };
+  } catch (error: unknown) {
+    throw new Error(
+      `Failed to generate sub-questions: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
   }
 }

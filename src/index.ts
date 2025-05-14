@@ -1,11 +1,18 @@
+import AIProvider from './provider/aiProvider';
 import {
   DeepResearchConfig,
   DeepResearchInstance,
   DeepResearchResponse,
   RecursiveResearchResult,
+  ResearchSource,
 } from './types';
-import { FollowupQuestionGenerator } from './generators/followupQuestionGenerator';
-import { Synthesizer } from './synthesis/synthesizer';
+import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
+import { generateSubQuestions } from './generators/subQuestionGenerator';
+import {
+  synthesize,
+  generateReport,
+  hasSufficientInformation,
+} from './synthesis/synthesizer';
 
 import {
   DEFAULT_CONFIG,
@@ -13,7 +20,6 @@ import {
   DEFAULT_BREADTH_CONFIG,
   DEFAULT_SYNTHESIS_CONFIG,
 } from './config/defaults';
-import { SubQuestionGenerator } from './generators/subQuestionGenerator';
 import { SubQuestionGeneratorResult } from './types/generators';
 import { WebSearchResult } from './types';
 import 'dotenv/config';
@@ -22,28 +28,48 @@ import { SynthesisOutput } from './types/synthesis';
 
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
-  private questionGenerator: SubQuestionGenerator;
-  private followupGenerator: FollowupQuestionGenerator;
-  private synthesizer: Synthesizer;
+  public prompts?: string[];
   private depthSynthesis: Map<number, SynthesisOutput[]>;
+  private aiProvider: AIProvider;
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
-    this.questionGenerator = new SubQuestionGenerator();
-    this.followupGenerator = new FollowupQuestionGenerator();
-    this.synthesizer = new Synthesizer();
+
+    // Initialize AIProvider
+    this.aiProvider = new AIProvider();
+
+    // Add models from config.models if available
+    if (config.models) {
+      // For each model type (default, quick, reasoning, etc.)
+      Object.entries(config.models).forEach(([modelType, modelValue]) => {
+        if (modelValue) {
+          if (typeof modelValue !== 'string') {
+            // It's a LanguageModelV1 instance, add it as a direct model
+            this.aiProvider.addDirectProvider(modelType, modelValue);
+          }
+          // If it's a string, it will be handled by the generateText method
+        }
+      });
+    }
+
     this.depthSynthesis = new Map();
   }
 
   private validateAndMergeConfig(
     config: Partial<DeepResearchConfig>
   ): DeepResearchConfig {
-    if (!config.prompt || !Array.isArray(config.prompt)) {
-      throw new Error('Prompt must be provided as an array');
+    // Merge models carefully to handle both string and LanguageModelV1 instances
+    const mergedModels = { ...DEFAULT_CONFIG.models };
+
+    if (config.models) {
+      Object.entries(config.models).forEach(([key, value]) => {
+        if (value !== undefined) {
+          mergedModels[key] = value;
+        }
+      });
     }
 
     return {
-      prompt: config.prompt,
       depth: {
         ...DEFAULT_DEPTH_CONFIG,
         ...config.depth,
@@ -56,44 +82,193 @@ export class DeepResearch implements DeepResearchInstance {
         ...DEFAULT_SYNTHESIS_CONFIG,
         ...config.synthesis,
       },
-      format: config.format || DEFAULT_CONFIG.format,
-      models: {
-        ...DEFAULT_CONFIG.models,
-        ...config.models,
-      },
+      models: mergedModels,
+      jigsawApiKey:
+        config.jigsawApiKey ||
+        (() => {
+          throw new Error('Jigsaw API key must be provided in config');
+        })(),
     };
   }
 
-  public async fireWebSearches(
-    subQuestions: SubQuestionGeneratorResult
-  ): Promise<WebSearchResult[]> {
-    const jigsaw = JigsawProvider.getInstance();
-    const results = await jigsaw.fireWebSearches(subQuestions);
-    return results;
+  public getSynthesis(): Map<number, SynthesisOutput[]> {
+    return this.depthSynthesis;
   }
 
-  public async generateSubQuestions(): Promise<SubQuestionGeneratorResult> {
-    return this.questionGenerator.generateSubQuestions(this.config.prompt, {
-      ...DEFAULT_BREADTH_CONFIG,
-      ...this.config.breadth,
+  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
+    if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
+      throw new Error('Prompt must be provided as a non-empty array');
+    }
+
+    // Store the prompt in the class property
+    this.prompts = prompt;
+
+    // Generate sub-questions directly using the imported function
+    const subQuestions = await generateSubQuestions({
+      mainPrompt: this.prompts,
+      breadthConfig: {
+        ...DEFAULT_BREADTH_CONFIG,
+        ...this.config.breadth,
+      },
+      provider: this.aiProvider,
+      generationModel: this.config.models?.default as string,
+      relevanceCheckModel: this.config.models?.reasoning as string,
     });
+    console.log(`Generated ${subQuestions.questions.length} sub-questions`);
+
+    // Fire web searches directly
+    const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+    const initialSearch = await jigsaw.fireWebSearches(subQuestions);
+    console.log(`Received ${initialSearch.length} initial search results`);
+
+    // Perform recursive research
+    const recursiveResult = await this.performRecursiveResearch(initialSearch);
+    console.log(
+      `Recursive research completed with reason: ${recursiveResult.reason}`
+    );
+
+    // Get all the syntheses
+    const allDepthSynthesis = this.getSynthesis();
+    console.log(
+      `Synthesis map contains ${allDepthSynthesis.size} depth levels`
+    );
+
+    // Generate the final synthesis
+    const allSyntheses: SynthesisOutput[] = [];
+    this.depthSynthesis.forEach((syntheses) => {
+      allSyntheses.push(...syntheses);
+    });
+
+    const finalReport = await generateReport(
+      {
+        mainPrompt: this.prompts,
+        allSyntheses: allSyntheses,
+      },
+      {
+        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+        targetOutputLength:
+          this.config.synthesis?.targetOutputLength ?? 'standard',
+        formatAsMarkdown: true,
+      },
+      this.aiProvider,
+      this.config.models?.reasoning as string
+    );
+
+    console.log(
+      `Final research report generated with ${
+        finalReport.analysis ? finalReport.analysis.length : 0
+      } characters`
+    );
+
+    console.log(`\n===== FINAL REPORT DEBUG =====`);
+    console.log(`Report object keys: ${Object.keys(finalReport).join(', ')}`);
+    console.log(`Report analysis exists: ${!!finalReport.analysis}`);
+    console.log(`Report analysis type: ${typeof finalReport.analysis}`);
+    console.log(
+      `Report analysis length: ${
+        finalReport.analysis ? finalReport.analysis.length : 0
+      }`
+    );
+    console.log(
+      `Report analysis preview: ${
+        finalReport.analysis
+          ? finalReport.analysis.substring(0, 200)
+          : 'No analysis'
+      }`
+    );
+
+    if (!finalReport.analysis || finalReport.analysis.length === 0) {
+      console.error(`WARNING: Final report analysis is empty or undefined!`);
+    }
+
+    // Calculate token usage (placeholder values - implement actual counting)
+    const inputTokens = 256; // Estimate based on prompt length
+    const outputTokens = 500; // Rough estimate
+    const inferenceTimeTokens = 975; // Placeholder
+    const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
+
+    // Ensure we have a valid research output
+    let research = finalReport.analysis || 'No research results available.';
+
+    // Collect sources from all search results
+    const sources: ResearchSource[] = [];
+
+    // Extract unique sources from initial search results
+    initialSearch.forEach((result) => {
+      if (result.searchResults && result.searchResults.results) {
+        result.searchResults.results.forEach((source) => {
+          // Only add unique URLs
+          if (source.url && !sources.some((s) => s.url === source.url)) {
+            // Create a source object with only properties from the ResearchSource interface
+            const researchSource: ResearchSource = {
+              url: source.url,
+              content: source.content || '',
+              ai_overview: source.ai_overview || '',
+              title: source.title || 'Unknown Title',
+              domain: source.domain || '',
+              isAcademic: source.isAcademic,
+            };
+
+            // Add domain if not present but URL is valid
+            if (!researchSource.domain && researchSource.url) {
+              try {
+                researchSource.domain = new URL(researchSource.url).hostname;
+              } catch (e) {
+                // Invalid URL, keep domain empty
+              }
+            }
+
+            sources.push(researchSource);
+          }
+        });
+      }
+    });
+
+    console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
+    console.log(
+      `Research completed with ${this.depthSynthesis.size} depth levels`
+    );
+    console.log(`Final report length: ${research.length} characters`);
+    console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
+    console.log(`Sources collected: ${sources.length}`);
+
+    return {
+      success: true,
+      research: research,
+      _usage: {
+        input_tokens: Math.round(inputTokens),
+        output_tokens: Math.round(outputTokens),
+        inference_time_tokens: inferenceTimeTokens,
+        total_tokens: Math.round(totalTokens),
+      },
+      sources: sources,
+    };
   }
 
-  public async performRecursiveResearch(
+  // We still need the recursive research method since it's complex and has internal state
+  private async performRecursiveResearch(
     initialResults: WebSearchResult[],
     currentDepth: number = 1,
     parentSynthesis?: SynthesisOutput
   ): Promise<RecursiveResearchResult> {
+    if (!this.prompts || this.prompts.length === 0) {
+      throw new Error('Prompts must be set before performing research');
+    }
+
     // Store conditions in variables
     const isMaxDepthReached =
       currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level);
 
-    console.log(`Performing research at depth level: ${currentDepth}`);
+    console.log(`\n===== DEPTH LEVEL ${currentDepth} =====`);
+    console.log(`Initial web search results: ${initialResults.length}`);
 
     // Check if we already have sufficient information
-    const hasSufficientInfo = await this.synthesizer.hasSufficientInformation(
+    console.log(
+      `Checking if we have sufficient information at depth ${currentDepth}...`
+    );
+    const hasSufficientInfo = await hasSufficientInformation(
       {
-        mainPrompt: this.config.prompt,
+        mainPrompt: this.prompts,
         results: initialResults,
         currentDepth,
         parentSynthesis,
@@ -101,10 +276,13 @@ export class DeepResearch implements DeepResearchInstance {
       this.config.depth?.confidenceThreshold ||
         DEFAULT_DEPTH_CONFIG.confidenceThreshold
     );
+    console.log(`Sufficient information check result: ${hasSufficientInfo}`);
 
     // Early return conditions - but don't generate final synthesis yet
     if (isMaxDepthReached) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
       console.log(`Maximum depth level ${currentDepth} reached.`);
+      console.log(`Early termination due to max depth reached.`);
       return {
         isComplete: true,
         reason: 'max_depth_reached',
@@ -112,7 +290,9 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     if (hasSufficientInfo) {
+      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
       console.log(`Sufficient information found at depth ${currentDepth}.`);
+      console.log(`Early termination due to sufficient information.`);
       return {
         isComplete: true,
         reason: 'sufficient_info',
@@ -120,12 +300,20 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     // First, synthesize the current level results
-    const synthesis = await this.synthesizer.synthesizeResults({
-      mainPrompt: this.config.prompt,
-      results: initialResults,
-      currentDepth,
-      parentSynthesis,
-    });
+    console.log(
+      `Starting synthesis at depth ${currentDepth} with ${initialResults.length} results...`
+    );
+    const synthesis = await synthesize(
+      {
+        mainPrompt: this.prompts,
+        results: initialResults,
+        currentDepth,
+        parentSynthesis,
+      },
+      this.aiProvider,
+      this.config.models?.default as string
+    );
+    console.log(`Synthesis at depth ${currentDepth} completed`);
 
     // Store the synthesis for this depth level
     if (!this.depthSynthesis.has(currentDepth)) {
@@ -140,14 +328,31 @@ export class DeepResearch implements DeepResearchInstance {
     });
 
     // For each search result, generate follow-up questions
+    let totalFollowUpQuestions = 0;
+    let totalWebSearches = 0;
+
+    console.log(
+      `\nProcessing ${initialResults.length} search results for follow-up questions at depth ${currentDepth}...`
+    );
+
     for (const result of initialResults) {
-      const followupQuestions =
-        await this.followupGenerator.generateFollowupQuestions(
-          this.config.prompt,
-          result,
-          this.config.breadth?.maxParallelTopics ||
-            DEFAULT_BREADTH_CONFIG.maxParallelTopics
-        );
+      console.log(
+        `Generating follow-up questions for result: "${result.question.question.substring(
+          0,
+          50
+        )}..."`
+      );
+      // Use the function directly
+      const followupQuestions = await generateFollowupQuestions(
+        this.prompts,
+        result,
+        this.config.breadth?.maxParallelTopics ||
+          DEFAULT_BREADTH_CONFIG.maxParallelTopics,
+        this.aiProvider,
+        (this.config.models?.default as string) || 'gemini-2.0-flash'
+      );
+      console.log(`Generated ${followupQuestions.length} follow-up questions`);
+      totalFollowUpQuestions += followupQuestions.length;
 
       if (followupQuestions.length > 0) {
         // Convert follow-up questions to SubQuestionGeneratorResult format
@@ -166,14 +371,28 @@ export class DeepResearch implements DeepResearchInstance {
         };
 
         try {
-          // Fire web searches for the follow-up questions
-          const followupResults = await this.fireWebSearches(subQuestions);
+          // Fire web searches directly
+          console.log(
+            `Firing web searches for ${subQuestions.questions.length} follow-up questions...`
+          );
+          const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+          const followupResults = await jigsaw.fireWebSearches(subQuestions);
+          console.log(
+            `Received ${followupResults.length} web search results for follow-up questions`
+          );
+          totalWebSearches += followupResults.length;
 
           // Recursively process deeper results with the current synthesis
+          console.log(
+            `Starting recursive research at depth ${currentDepth + 1}...`
+          );
           const deeperResult = await this.performRecursiveResearch(
             followupResults,
             currentDepth + 1,
             synthesis
+          );
+          console.log(
+            `Returned from recursive research at depth ${currentDepth + 1}`
           );
 
           // If we got a result from deeper level (null means we should stop), return it
@@ -192,194 +411,55 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     // If we get here, we've completed this depth but haven't triggered early termination
+    console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
+    console.log(
+      `Total follow-up questions generated: ${totalFollowUpQuestions}`
+    );
+    console.log(`Total web searches performed: ${totalWebSearches}`);
+    console.log(`Research at depth ${currentDepth} completed\n`);
+
     return {
       isComplete: true,
       reason: 'research_complete',
     }; // Signal that we're done with research
   }
-
-  public getSynthesis(): Map<number, SynthesisOutput[]> {
-    return this.depthSynthesis;
-  }
-
-  public async generateFinalSynthesis(): Promise<SynthesisOutput> {
-    // Get all the syntheses from all depth levels
-    const allSyntheses: SynthesisOutput[] = [];
-    this.depthSynthesis.forEach((syntheses) => {
-      allSyntheses.push(...syntheses);
-    });
-
-    // Use the synthesizer's generateFinalSynthesis method
-    return this.synthesizer.generateFinalSynthesis({
-      mainPrompt: this.config.prompt,
-      allSyntheses: allSyntheses,
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength:
-        this.config.synthesis?.targetOutputLength ??
-        DEFAULT_SYNTHESIS_CONFIG.targetOutputLength,
-    });
-  }
 }
 
 export async function createDeepResearch(
   config: Partial<DeepResearchConfig>
-): Promise<DeepResearchResponse> {
-  const deepResearch = new DeepResearch(config);
-  const subQuestions = await deepResearch.generateSubQuestions();
-
-  console.log(`Generated ${subQuestions.questions.length} sub-questions`);
-
-  const initialSearch = await deepResearch.fireWebSearches(subQuestions);
-
-  console.log(`Received ${initialSearch.length} initial search results`);
-
-  // Perform recursive research to populate the depthSynthesis map
-  const recursiveResult = await deepResearch.performRecursiveResearch(
-    initialSearch
-  );
-  console.log(
-    `Recursive research completed with reason: ${recursiveResult.reason}`
-  );
-
-  // Get all the syntheses
-  const allDepthSynthesis = deepResearch.getSynthesis();
-  console.log(`Synthesis map contains ${allDepthSynthesis.size} depth levels`);
-  allDepthSynthesis.forEach((syntheses, depth) => {
-    console.log(`Depth ${depth}: ${syntheses.length} syntheses generated`);
-  });
-
-  // Generate the final synthesis
-  const finalSynthesis = await deepResearch.generateFinalSynthesis();
-  console.log(
-    `Final synthesis generated with ${
-      finalSynthesis.analysis ? finalSynthesis.analysis.length : 0
-    } characters`
-  );
-
-  // Calculate token usage (placeholder values - implement actual counting)
-  const inputTokens = 256; // Estimate based on prompt length
-  const outputTokens = 500; // Rough estimate
-  const inferenceTimeTokens = 975; // Placeholder
-  const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
-
-  // Ensure we have a valid research output
-  let research = 'No research results available.';
-
-  if (finalSynthesis) {
-    if (finalSynthesis.analysis) {
-      // If analysis field exists, use it
-      research = finalSynthesis.analysis;
-    } else if (
-      config.format === 'json' &&
-      Object.keys(finalSynthesis).length > 0
-    ) {
-      // If we're in JSON format and have synthesis data but no analysis field,
-      // generate a formatted research output from the available fields
-      try {
-        const sections = [];
-
-        // Add title based on the prompt
-        sections.push(
-          `# Research on ${config.prompt?.[0] || 'Requested Topic'}\n`
-        );
-
-        // Add key themes section
-        if (finalSynthesis.keyThemes && finalSynthesis.keyThemes.length > 0) {
-          sections.push('## Key Themes\n');
-          finalSynthesis.keyThemes.forEach((theme) => {
-            sections.push(`- ${theme}`);
-          });
-          sections.push('\n');
-        }
-
-        // Add insights section
-        if (finalSynthesis.insights && finalSynthesis.insights.length > 0) {
-          sections.push('## Key Insights\n');
-          finalSynthesis.insights.forEach((insight) => {
-            sections.push(`- ${insight}`);
-          });
-          sections.push('\n');
-        }
-
-        // Add knowledge gaps section
-        if (
-          finalSynthesis.knowledgeGaps &&
-          finalSynthesis.knowledgeGaps.length > 0
-        ) {
-          sections.push('## Knowledge Gaps\n');
-          finalSynthesis.knowledgeGaps.forEach((gap) => {
-            sections.push(`- ${gap}`);
-          });
-          sections.push('\n');
-        }
-
-        // Add conflicting information section
-        if (
-          finalSynthesis.conflictingInformation &&
-          finalSynthesis.conflictingInformation.length > 0
-        ) {
-          sections.push('## Conflicting Information\n');
-          finalSynthesis.conflictingInformation.forEach((conflict) => {
-            sections.push(`### ${conflict.topic}\n`);
-            conflict.conflicts.forEach((item) => {
-              sections.push(`- **Claim 1**: ${item.claim1}`);
-              sections.push(`- **Claim 2**: ${item.claim2}`);
-              sections.push(
-                `- **Resolution**: ${
-                  item.resolution || 'No resolution provided'
-                }\n`
-              );
-            });
-          });
-          sections.push('\n');
-        }
-
-        // Add related questions section
-        if (
-          finalSynthesis.relatedQuestions &&
-          finalSynthesis.relatedQuestions.length > 0
-        ) {
-          sections.push('## Related Questions\n');
-          finalSynthesis.relatedQuestions.forEach((question) => {
-            sections.push(`- ${question}`);
-          });
-          sections.push('\n');
-        }
-
-        // Add confidence score
-        if (finalSynthesis.confidence !== undefined) {
-          sections.push(
-            `## Confidence Score\n${finalSynthesis.confidence * 100}%\n`
-          );
-        }
-
-        research = sections.join('\n');
-      } catch (error) {
-        console.error('Error formatting research output:', error);
-      }
-    }
-  }
-
-  console.log(`Research output length: ${research.length} characters`);
-  if (research === 'No research results available.') {
-    console.log('WARNING: Using default "No research results available" text');
-    console.log(
-      'Final synthesis data:',
-      JSON.stringify(finalSynthesis, null, 2)
-    );
-  }
-
-  return {
-    success: true,
-    research: research,
-    _usage: {
-      input_tokens: Math.round(inputTokens),
-      output_tokens: Math.round(outputTokens),
-      inference_time_tokens: inferenceTimeTokens,
-      total_tokens: Math.round(totalTokens),
+): Promise<DeepResearchInstance> {
+  // Set up default configs
+  const defaultConfig: DeepResearchConfig = {
+    depth: {
+      level: 3,
+      maxTokensPerAnalysis: 4000,
+      includeReferences: true,
+      confidenceThreshold: 0.7,
     },
-    sources: [], // Now populated from search results
+    breadth: {
+      level: 2,
+      maxParallelTopics: 3,
+      includeRelatedTopics: true,
+      minRelevanceScore: 0.8,
+    },
+    synthesis: {
+      maxOutputTokens: 8000,
+      targetOutputLength: 5000,
+      formatAsMarkdown: true,
+    },
   };
+
+  // Merge provided config with defaults
+  const mergedConfig = {
+    ...defaultConfig,
+    ...config,
+    depth: { ...defaultConfig.depth, ...config.depth },
+    breadth: { ...defaultConfig.breadth, ...config.breadth },
+    synthesis: { ...defaultConfig.synthesis, ...config.synthesis },
+  };
+
+  // Return new instance with merged config
+  return new DeepResearch(mergedConfig);
 }
 
 // Default export

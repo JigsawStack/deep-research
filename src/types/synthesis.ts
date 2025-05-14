@@ -1,43 +1,50 @@
 import { WebSearchResult } from '.';
 
-export interface FinalSynthesisInput {
+// Base interface for common synthesis properties
+export interface BaseSynthesisInput {
   mainPrompt: string[];
-  allSyntheses: SynthesisOutput[];
-  maxOutputTokens?: number;
-  targetOutputLength: 'concise' | 'standard' | 'detailed' | number;
 }
-export interface SynthesisInput {
-  mainPrompt: string[];
+
+// Interface for synthesizing search results
+export interface SynthesisInput extends BaseSynthesisInput {
   results: WebSearchResult[];
   currentDepth: number;
   parentSynthesis?: SynthesisOutput;
 }
 
+// Interface for generating the final research report
+export interface ReportInput extends BaseSynthesisInput {
+  allSyntheses: SynthesisOutput[];
+}
+
+// Common output format for both synthesis and report
 export interface SynthesisOutput {
   analysis: string;
   keyThemes: string[];
   insights: string[];
   knowledgeGaps: string[];
-  conflictingInformation?: {
+  conflictingInformation?: Array<{
     topic: string;
-    conflicts: {
+    conflicts: Array<{
       claim1: string;
       claim2: string;
       resolution?: string;
-    }[];
-  }[];
+    }>;
+  }>;
   confidence: number;
   depth: number;
   relatedQuestions: string[];
 }
 
-export interface SynthesisConfig {
-  maxOutputTokens: number;
-  targetOutputLength: FinalSynthesisInput['targetOutputLength'];
+// Configuration for report generation
+export interface ReportConfig {
+  maxOutputTokens?: number;
+  targetOutputLength: 'concise' | 'standard' | 'detailed' | number;
   formatAsMarkdown: boolean;
 }
 
+// Overall synthesis result including all depth levels and final report
 export interface SynthesisResult {
   depthSynthesis: Map<number, SynthesisOutput[]>;
-  finalSynthesis: SynthesisOutput;
+  finalReport: SynthesisOutput;
 }

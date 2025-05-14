@@ -73,7 +73,7 @@ Please synthesize this information according to the instructions.`;
   };
 };
 
-export const generateFinalSynthesisPrompt = ({
+export const generateReportPrompt = ({
   mainPrompt,
   allSyntheses = [],
   maxOutputTokens,

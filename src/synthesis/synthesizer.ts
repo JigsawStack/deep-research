@@ -1,6 +1,7 @@
-import GeminiProvider from '../provider/gemini';
+import { AIProvider } from '../provider/aiProvider';
 import {
-  FinalSynthesisInput,
+  ReportInput,
+  ReportConfig,
   SynthesisInput,
   SynthesisOutput,
 } from '../types/synthesis';
@@ -9,162 +10,149 @@ import { cleanJsonResponse } from '../utils/utils';
 import 'dotenv/config';
 import {
   generateSynthesisPrompt,
-  generateFinalSynthesisPrompt,
+  generateReportPrompt,
 } from '../prompts/synthesis';
 
-export class Synthesizer {
-  private geminiInstance: GeminiProvider;
+/**
+ * Synthesize search results into a coherent analysis
+ */
+export async function synthesize(
+  input: SynthesisInput,
+  provider: AIProvider,
+  model: string = 'gemini-2.0-flash'
+): Promise<SynthesisOutput> {
+  const { mainPrompt, results, currentDepth, parentSynthesis } = input;
 
-  constructor() {
-    this.geminiInstance = GeminiProvider.getInstance({
-      apiKey: process.env.GEMINI_API_KEY || '',
-    });
-  }
+  const { systemPrompt, userPrompt } = generateSynthesisPrompt({
+    mainPrompt,
+    results,
+    currentDepth,
+    parentSynthesis,
+  });
 
-  async synthesizeResults(input: SynthesisInput): Promise<SynthesisOutput> {
-    const { mainPrompt, results, currentDepth, parentSynthesis } = input;
+  try {
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    const response = await provider.generateText(combinedPrompt, model);
 
-    const { systemPrompt, userPrompt } = generateSynthesisPrompt({
-      mainPrompt,
-      results,
-      currentDepth,
-      parentSynthesis,
-    });
-
+    let synthesis: SynthesisOutput;
     try {
-      const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await this.geminiInstance.generateText(
-        combinedPrompt,
-        'gemini-2.0-flash'
+      const cleanedResponse = cleanJsonResponse(response);
+      console.log(`Synthesis at depth ${currentDepth} completed`);
+
+      synthesis = JSON.parse(cleanedResponse);
+      synthesis.depth = currentDepth;
+    } catch (parseError) {
+      console.error('Raw synthesis response:', response);
+      throw new Error(
+        `Failed to parse synthesis response as JSON: ${parseError}`
       );
-
-      let synthesis: SynthesisOutput;
-      try {
-        // Clean the response to handle markdown-formatted JSON
-        const cleanedResponse = cleanJsonResponse(response);
-        console.log(`Synthesis at depth ${currentDepth} completed`);
-
-        synthesis = JSON.parse(cleanedResponse);
-        synthesis.depth = currentDepth;
-      } catch (parseError) {
-        console.error('Raw synthesis response:', response);
-        throw new Error(
-          `Failed to parse synthesis response as JSON: ${parseError}`
-        );
-      }
-
-      return synthesis;
-    } catch (error) {
-      console.error('Error generating synthesis:', error);
-      return this.generateDefaultSynthesis(mainPrompt, results, currentDepth);
-    }
-  }
-
-  private generateDefaultSynthesis(
-    mainPrompt: string[],
-    results: WebSearchResult[],
-    currentDepth: number
-  ): SynthesisOutput {
-    return {
-      analysis: `Synthesis of ${
-        results.length
-      } results related to ${mainPrompt.join(', ')}`,
-      keyThemes: ['Information insufficient for detailed synthesis'],
-      insights: ['Unable to generate insights due to processing error'],
-      knowledgeGaps: [
-        'Complete synthesis unavailable - further research needed',
-      ],
-      confidence: 0.3,
-      depth: currentDepth,
-      relatedQuestions: results.map((r) => r.question.question),
-    };
-  }
-
-  async generateFinalSynthesis(
-    input: FinalSynthesisInput
-  ): Promise<SynthesisOutput> {
-    const {
-      mainPrompt,
-      allSyntheses = [],
-      maxOutputTokens,
-      targetOutputLength,
-    } = input;
-
-    const { systemPrompt, userPrompt } = generateFinalSynthesisPrompt({
-      mainPrompt,
-      allSyntheses,
-      maxOutputTokens,
-      targetOutputLength,
-    });
-
-    try {
-      const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-      const response = await this.geminiInstance.generateText(
-        combinedPrompt,
-        'gemini-2.0-flash'
-      );
-
-      console.log(`Raw synthesis response: ${response.substring(0, 200)}...`);
-
-      let synthesis: SynthesisOutput;
-      try {
-        // Clean the response to handle markdown-formatted JSON
-        const cleanedResponse = cleanJsonResponse(response);
-        console.log(`Final synthesis completed`);
-
-        synthesis = JSON.parse(cleanedResponse);
-
-        // If we're getting a JSON metadata object without an analysis field,
-        // use the full markdown article as the analysis
-        if (!synthesis.analysis && response.length > 0) {
-          synthesis.analysis = response;
-        }
-
-        synthesis.depth = 0; // 0 represents final synthesis
-      } catch (parseError) {
-        console.error('Error generating final synthesis:', parseError);
-        throw new Error(
-          `Failed to parse final synthesis response as JSON: ${parseError}`
-        );
-      }
-
-      return synthesis;
-    } catch (error) {
-      console.error('Error generating final synthesis:', error);
-      return this.generateDefaultSynthesis(mainPrompt, [], 0);
-    }
-  }
-
-  async hasSufficientInformation(
-    input: SynthesisInput,
-    confidenceThreshold: number = 0.85
-  ): Promise<boolean> {
-    // If we have a parent synthesis with high confidence, we might have enough info
-    if (
-      input.parentSynthesis &&
-      input.parentSynthesis.confidence >= confidenceThreshold
-    ) {
-      // Check if we have a good variety of themes and insights
-      const hasSubstantiveContent =
-        input.parentSynthesis.keyThemes &&
-        input.parentSynthesis.keyThemes.length >= 3 &&
-        input.parentSynthesis.insights &&
-        input.parentSynthesis.insights.length >= 3 &&
-        input.parentSynthesis.knowledgeGaps &&
-        input.parentSynthesis.knowledgeGaps.length <= 2; // Not too many knowledge gaps
-
-      if (hasSubstantiveContent) {
-        return true;
-      }
     }
 
-    // If we have many results at the current depth, we might have enough info
-    if (input.results.length >= 5) {
-      return true;
-    }
-
-    return false;
+    return synthesis;
+  } catch (error) {
+    console.error('Error generating synthesis:', error);
+    return failedSynthesis(mainPrompt, results, currentDepth);
   }
 }
 
-export default Synthesizer;
+/**
+ * Generate a default synthesis when the AI synthesis fails
+ */
+export function failedSynthesis(
+  mainPrompt: string[],
+  results: WebSearchResult[],
+  currentDepth: number
+): SynthesisOutput {
+  return {
+    analysis: `Synthesis of ${
+      results.length
+    } results related to ${mainPrompt.join(', ')}`,
+    keyThemes: ['Information insufficient for detailed synthesis'],
+    insights: ['Unable to generate insights due to processing error'],
+    knowledgeGaps: ['Complete synthesis unavailable - further research needed'],
+    confidence: 0.3,
+    depth: currentDepth,
+    relatedQuestions: results.map((r) => r.question.question),
+  };
+}
+
+/**
+ * Generate a comprehensive research report from all syntheses
+ */
+export async function generateReport(
+  input: ReportInput,
+  config: ReportConfig,
+  provider: AIProvider,
+  model: string = 'gemini-2.0-flash'
+): Promise<SynthesisOutput> {
+  const { mainPrompt, allSyntheses } = input;
+  const { maxOutputTokens, targetOutputLength } = config;
+
+  const { systemPrompt, userPrompt } = generateReportPrompt({
+    mainPrompt,
+    allSyntheses,
+    maxOutputTokens,
+    targetOutputLength,
+  });
+
+  try {
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    const response = await provider.generateText(combinedPrompt, model);
+
+    let report: SynthesisOutput;
+    try {
+      const cleanedResponse = cleanJsonResponse(response);
+      console.log('Research report generated');
+
+      report = JSON.parse(cleanedResponse);
+      report.depth = 0; // 0 represents final report
+    } catch (parseError) {
+      console.error('Error generating research report:', parseError);
+      throw new Error(`Failed to parse research report as JSON: ${parseError}`);
+    }
+
+    return report;
+  } catch (error) {
+    console.error('Error generating research report:', error);
+    return failedSynthesis(mainPrompt, [], 0);
+  }
+}
+
+/**
+ * Check if we have sufficient information to stop the research
+ * Does this content sufficient for the main questions asked
+ * Out of 5?
+ * Do you think that there can be more relevant questions that can be asked
+ * Should I go deeper or should
+ */
+
+export async function hasSufficientInformation(
+  input: SynthesisInput,
+  confidenceThreshold: number = 0.85
+): Promise<boolean> {
+  // If we have a parent synthesis with high confidence, we might have enough info
+  if (
+    input.parentSynthesis &&
+    input.parentSynthesis.confidence >= confidenceThreshold
+  ) {
+    // Check if we have a good variety of themes and insights
+    const hasSubstantiveContent =
+      input.parentSynthesis.keyThemes &&
+      input.parentSynthesis.keyThemes.length >= 3 &&
+      input.parentSynthesis.insights &&
+      input.parentSynthesis.insights.length >= 3 &&
+      input.parentSynthesis.knowledgeGaps &&
+      input.parentSynthesis.knowledgeGaps.length <= 2; // Not too many knowledge gaps
+
+    if (hasSubstantiveContent) {
+      return true;
+    }
+  }
+
+  // If we have many results at the current depth, we might have enough info
+  if (input.results.length >= 5) {
+    return true;
+  }
+
+  return false;
+}

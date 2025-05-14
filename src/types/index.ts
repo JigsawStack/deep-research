@@ -1,5 +1,6 @@
-import { SubQuestion, SubQuestionGeneratorResult } from './generators';
-import { SynthesisConfig, SynthesisOutput } from './synthesis';
+import { SubQuestion } from './generators';
+import { ReportConfig, SynthesisOutput } from './synthesis';
+import { LanguageModelV1 } from '@ai-sdk/provider';
 
 export interface RecursiveResearchResult {
   isComplete: boolean;
@@ -21,9 +22,11 @@ export interface ResearchResult {
 export type ModelType = 'default' | 'quick' | 'reasoning';
 
 export interface ModelConfig {
-  default: string;
-  quick: string;
-  reasoning: string;
+  default?: string | LanguageModelV1;
+  quick?: string | LanguageModelV1;
+  reasoning?: string | LanguageModelV1;
+  output?: string | LanguageModelV1;
+  [key: string]: string | LanguageModelV1 | undefined;
 }
 
 export interface ResearchDepthConfig {
@@ -41,27 +44,21 @@ export interface ResearchBreadthConfig {
 }
 
 export interface DeepResearchConfig {
-  prompt: string[];
   depth?: Partial<ResearchDepthConfig>;
   breadth?: Partial<ResearchBreadthConfig>;
-  format: 'json';
   models?: Partial<ModelConfig>;
-  synthesis: SynthesisConfig;
+  synthesis: ReportConfig;
+  jigsawApiKey?: string;
 }
 
 export interface DeepResearchInstance {
+  prompts?: string[];
   config: DeepResearchConfig;
-  generateSubQuestions(): Promise<SubQuestionGeneratorResult>;
-  fireWebSearches(
-    subQuestions: SubQuestionGeneratorResult
-  ): Promise<WebSearchResult[]>;
-  performRecursiveResearch(
-    initialResults: WebSearchResult[],
-    currentDepth?: number,
-    parentSynthesis?: SynthesisOutput
-  ): Promise<RecursiveResearchResult>;
   getSynthesis(): Map<number, SynthesisOutput[]>;
-  generateFinalSynthesis(): Promise<SynthesisOutput>;
+  generate(
+    prompt: string[],
+    format?: 'json' | 'markdown'
+  ): Promise<DeepResearchResponse>;
 }
 
 export interface DeepResearchResponse {
