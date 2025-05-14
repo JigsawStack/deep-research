@@ -8,15 +8,15 @@ export class JigsawProvider {
   private static instance: JigsawProvider;
   private jigsawInstance: ReturnType<typeof JigsawStack>;
 
-  private constructor() {
+  private constructor(apiKey?: string) {
     this.jigsawInstance = JigsawStack({
-      apiKey: process.env.JIGSAW_API_KEY,
+      apiKey: apiKey || process.env.JIGSAW_API_KEY,
     });
   }
 
-  public static getInstance(): JigsawProvider {
+  public static getInstance(apiKey?: string): JigsawProvider {
     if (!JigsawProvider.instance) {
-      JigsawProvider.instance = new JigsawProvider();
+      JigsawProvider.instance = new JigsawProvider(apiKey);
     }
     return JigsawProvider.instance;
   }

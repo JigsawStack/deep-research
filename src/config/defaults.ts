@@ -30,12 +30,9 @@ export const DEFAULT_SYNTHESIS_CONFIG: ReportConfig = {
   formatAsMarkdown: true,
 };
 
-export const DEFAULT_FORMAT = 'json';
-
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
   synthesis: DEFAULT_SYNTHESIS_CONFIG,
-  format: DEFAULT_FORMAT,
 } as const;

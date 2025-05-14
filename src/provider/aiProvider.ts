@@ -14,12 +14,40 @@ import { createDeepInfra } from '@ai-sdk/deepinfra';
 export class AIProvider {
   private providers: Map<string, ProviderV1> = new Map();
   private directModels: Map<string, LanguageModelV1> = new Map();
+
+  // Model prefix to provider mapping
   private modelToProviderMap: Record<string, string> = {
+    // OpenAI models
     gpt: 'openai',
+    'text-davinci': 'openai',
+    'text-curie': 'openai',
+    'text-babbage': 'openai',
+    'text-ada': 'openai',
+    davinci: 'openai',
+    curie: 'openai',
+    babbage: 'openai',
+    ada: 'openai',
+    whisper: 'openai',
+    'dall-e': 'openai',
+    o1: 'openai',
+    o3: 'openai',
+    o4: 'openai',
+
+    // Google/Gemini models
     gemini: 'gemini',
+    palm: 'gemini',
+    'text-bison': 'gemini',
+    'chat-bison': 'gemini',
+
+    // DeepInfra models
     deepseek: 'deepinfra',
     mistral: 'deepinfra',
     llama: 'deepinfra',
+    mixtral: 'deepinfra',
+    qwen: 'deepinfra',
+    yi: 'deepinfra',
+    phi: 'deepinfra',
+    claude: 'deepinfra',
   };
 
   /**
@@ -127,15 +155,23 @@ export class AIProvider {
       return this.modelToProviderMap[prefix];
     }
 
-    // Try to infer the provider from the model name
-    if (modelName.startsWith('gpt')) return 'openai';
-    if (modelName.startsWith('gemini')) return 'gemini';
-    if (
-      modelName.startsWith('deepseek') ||
-      modelName.startsWith('mistral') ||
-      modelName.startsWith('llama')
-    )
+    // Check if the model name contains a provider name
+    for (const [modelPrefix, providerName] of Object.entries(
+      this.modelToProviderMap
+    )) {
+      if (modelName.includes(modelPrefix)) {
+        return providerName;
+      }
+    }
+
+    // If we couldn't determine the provider, check if we have any providers available
+    if (this.providers.has('openai')) {
+      return 'openai';
+    } else if (this.providers.has('gemini')) {
+      return 'gemini';
+    } else if (this.providers.has('deepinfra')) {
       return 'deepinfra';
+    }
 
     // Default to OpenAI if we can't determine the provider
     return 'openai';
@@ -146,7 +182,7 @@ export class AIProvider {
    * The model can be:
    * 1. A direct LanguageModelV1 instance
    * 2. A string ID for a stored direct model
-   * 3. A string in provider-model format (e.g., 'gemini-2.0-flash')
+   * 3. A string model name (e.g., 'gpt-4o', 'gemini-1.5-pro')
    */
   async generateText(
     prompt: string,
@@ -186,15 +222,45 @@ export class AIProvider {
         );
       }
 
-      // Use the languageModel method to get the LanguageModelV1 instance
-      const model = provider.languageModel(modelOrProvider);
+      try {
+        // Use the languageModel method to get the LanguageModelV1 instance
+        const model = provider.languageModel(modelOrProvider);
 
-      const result = await generateText({
-        model, // Now this is a LanguageModelV1
-        prompt,
-      });
+        const result = await generateText({
+          model, // Now this is a LanguageModelV1
+          prompt,
+        });
 
-      return result.text;
+        return result.text;
+      } catch (modelError) {
+        // If the model doesn't exist, try using a default model for the provider
+        console.warn(
+          `Model '${modelOrProvider}' not found, trying default model for ${providerName}`
+        );
+
+        let defaultModel: string;
+        switch (providerName) {
+          case 'openai':
+            defaultModel = 'gpt-3.5-turbo';
+            break;
+          case 'gemini':
+            defaultModel = 'gemini-1.0-pro';
+            break;
+          case 'deepinfra':
+            defaultModel = 'mistral-7b-instruct';
+            break;
+          default:
+            throw modelError;
+        }
+
+        const model = provider.languageModel(defaultModel);
+        const result = await generateText({
+          model,
+          prompt,
+        });
+
+        return result.text;
+      }
     } catch (error) {
       throw new Error(
         `Error generating text with ${String(modelOrProvider)}: ${

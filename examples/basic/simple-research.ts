@@ -6,7 +6,7 @@ async function basicResearch() {
   // Create instance using the factory function
   const deepResearch = await createDeepResearch({
     depth: {
-      level: 3, // Detailed analysis
+      level: 2, // Detailed analysis
       includeReferences: true,
       confidenceThreshold: 0.7,
     },
@@ -24,9 +24,9 @@ async function basicResearch() {
     models: {
       default: 'gpt-4o', // Default model
       reasoning: 'gpt-4o', // Reasoning model
-      output: 'gemini', // Output model
+      output: 'gpt-4o', // Output model - using the same model for consistency
     },
-    format: 'json',
+    jigsawApiKey: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method
@@ -37,7 +37,7 @@ async function basicResearch() {
 
   try {
     console.log('Starting deep research...');
-    const result = await deepResearch.generate(prompts);
+    const result = await deepResearch.generate(prompts, 'markdown');
 
     // Log research results
     console.log('\n=== RESEARCH SUMMARY ===');

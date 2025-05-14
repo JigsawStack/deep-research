@@ -77,11 +77,15 @@ export class DeepResearch implements DeepResearchInstance {
         ...DEFAULT_SYNTHESIS_CONFIG,
         ...config.synthesis,
       },
-      format: config.format || DEFAULT_CONFIG.format,
       models: {
         ...DEFAULT_CONFIG.models,
         ...config.models,
       },
+      jigsawApiKey:
+        config.jigsawApiKey ||
+        (() => {
+          throw new Error('Jigsaw API key must be provided in config');
+        })(),
     };
   }
 
@@ -89,7 +93,10 @@ export class DeepResearch implements DeepResearchInstance {
     return this.depthSynthesis;
   }
 
-  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
+  public async generate(
+    prompt: string[],
+    format: 'json' | 'markdown' = 'json'
+  ): Promise<DeepResearchResponse> {
     if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
       throw new Error('Prompt must be provided as a non-empty array');
     }
@@ -111,7 +118,7 @@ export class DeepResearch implements DeepResearchInstance {
     console.log(`Generated ${subQuestions.questions.length} sub-questions`);
 
     // Fire web searches directly
-    const jigsaw = JigsawProvider.getInstance();
+    const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     const initialSearch = await jigsaw.fireWebSearches(subQuestions);
     console.log(`Received ${initialSearch.length} initial search results`);
 
@@ -167,13 +174,9 @@ export class DeepResearch implements DeepResearchInstance {
       if (finalReport.analysis) {
         // If analysis field exists, use it
         research = finalReport.analysis;
-      } else if (
-        this.config.format === 'json' &&
-        Object.keys(finalReport).length > 0
-      ) {
+      } else if (format === 'json' && Object.keys(finalReport).length > 0) {
         // Format the research output based on the synthesis data
-        // (keeping the existing formatting logic)
-        // ...
+        research = JSON.stringify(finalReport, null, 2);
       }
     }
 
@@ -289,7 +292,7 @@ export class DeepResearch implements DeepResearchInstance {
 
         try {
           // Fire web searches directly
-          const jigsaw = JigsawProvider.getInstance();
+          const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
           const followupResults = await jigsaw.fireWebSearches(subQuestions);
 
           // Recursively process deeper results with the current synthesis
@@ -327,7 +330,6 @@ export async function createDeepResearch(
 ): Promise<DeepResearchInstance> {
   // Set up default configs
   const defaultConfig: DeepResearchConfig = {
-    format: 'json',
     depth: {
       level: 3,
       maxTokensPerAnalysis: 4000,

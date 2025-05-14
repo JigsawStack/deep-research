@@ -44,16 +44,19 @@ export interface ResearchBreadthConfig {
 export interface DeepResearchConfig {
   depth?: Partial<ResearchDepthConfig>;
   breadth?: Partial<ResearchBreadthConfig>;
-  format: 'json';
   models?: Partial<ModelConfig>;
   synthesis: ReportConfig;
+  jigsawApiKey?: string;
 }
 
 export interface DeepResearchInstance {
   prompts?: string[];
   config: DeepResearchConfig;
   getSynthesis(): Map<number, SynthesisOutput[]>;
-  generate(prompt: string[]): Promise<DeepResearchResponse>;
+  generate(
+    prompt: string[],
+    format?: 'json' | 'markdown'
+  ): Promise<DeepResearchResponse>;
 }
 
 export interface DeepResearchResponse {
