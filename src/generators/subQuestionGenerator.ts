@@ -14,7 +14,6 @@ import { AIProvider } from '../provider/aiProvider';
 export async function checkRelevance(
   question: string,
   mainPrompt: string[],
-  model: string,
   provider: AIProvider
 ): Promise<boolean> {
   const { systemPrompt, userPrompt } = checkRelevancePrompt({
@@ -24,7 +23,10 @@ export async function checkRelevance(
 
   const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-  const response = await provider.generateText(combinedPrompt, model);
+  const response = await provider.generateText(
+    combinedPrompt,
+    provider.getReasoningModel()
+  );
 
   // Normalize the response to handle different formats
   const normalizedResponse = response.trim().toLowerCase();
@@ -39,7 +41,6 @@ export async function checkRelevance(
 async function validateResponse(
   questions: SubQuestion[],
   mainPrompt: string[],
-  model: string,
   provider: AIProvider
 ): Promise<SubQuestion[]> {
   if (!Array.isArray(questions)) {
@@ -61,7 +62,7 @@ async function validateResponse(
       }
 
       // Check if the question is relevant to the main research topic
-      return await checkRelevance(q.question, mainPrompt, model, provider);
+      return await checkRelevance(q.question, mainPrompt, provider);
     })
   );
 
@@ -88,8 +89,6 @@ export async function generateSubQuestions({
   mainPrompt,
   breadthConfig,
   provider,
-  generationModel = 'gemini-2.0-flash',
-  relevanceCheckModel = 'gpt-4o',
 }: GenerateSubQuestionsOptions): Promise<any> {
   if (!mainPrompt || mainPrompt.length === 0) {
     throw new Error('Prompts must be set before generating sub-questions');
@@ -107,7 +106,7 @@ export async function generateSubQuestions({
 
     const response = await provider.generateText(
       combinedPrompt,
-      generationModel
+      provider.getDefaultModel()
     );
 
     let parsedQuestions;
@@ -123,12 +122,7 @@ export async function generateSubQuestions({
       breadthConfig.maxParallelTopics
     );
 
-    questions = await validateResponse(
-      questions,
-      mainPrompt,
-      relevanceCheckModel,
-      provider
-    );
+    questions = await validateResponse(questions, mainPrompt, provider);
 
     return {
       questions,

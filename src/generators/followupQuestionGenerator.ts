@@ -11,8 +11,7 @@ export async function generateFollowupQuestions(
   mainPrompt: string[],
   searchResult: WebSearchResult,
   maxQuestions: number = 4,
-  provider: AIProvider,
-  model: string = 'gemini-2.0-flash'
+  provider: AIProvider
 ): Promise<string[]> {
   const { systemPrompt, userPrompt } = generateFollowupPrompts({
     maxQuestions,
@@ -30,7 +29,10 @@ export async function generateFollowupQuestions(
     while (attempts < maxAttempts) {
       attempts++;
       try {
-        const response = await provider.generateText(combinedPrompt, model);
+        const response = await provider.generateText(
+          combinedPrompt,
+          provider.getDefaultModel()
+        );
 
         // Clean the response to handle markdown-formatted JSON
         const cleanedResponse = cleanJsonResponse(response);

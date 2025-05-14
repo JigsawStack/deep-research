@@ -6,6 +6,19 @@ import { createDeepInfra } from '@ai-sdk/deepinfra';
 
 // Basic usage example
 async function basicResearch() {
+  // Check for required API keys
+  if (
+    !process.env.OPENAI_API_KEY ||
+    !process.env.GEMINI_API_KEY ||
+    !process.env.DEEPINFRA_API_KEY
+  ) {
+    console.error('Error: API keys are required for all models.');
+    console.error(
+      'Please set OPENAI_API_KEY, GEMINI_API_KEY, and DEEPINFRA_API_KEY in your environment variables.'
+    );
+    process.exit(1);
+  }
+
   // Create model instances directly
   const openai = createOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -24,7 +37,7 @@ async function basicResearch() {
   const geminiModel = gemini.languageModel('gemini-2.0-flash');
   const deepseekModel = deepinfra.languageModel('deepseek-ai/DeepSeek-R1');
 
-  // Create instance using the factory function with direct model instances
+  // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
     depth: {
       level: 3, // Detailed analysis
@@ -43,10 +56,14 @@ async function basicResearch() {
       formatAsMarkdown: true,
     },
     models: {
-      default: openaiModel, // Pass the model instance directly
-      reasoning: deepseekModel, // Pass the model instance directly
-      output: geminiModel, // Pass the model instance directly
+      default: openaiModel, // OpenAI as default model
+      reasoning: deepseekModel, // DeepInfra for reasoning
+      output: geminiModel, // Gemini for output formatting
     },
+    // Pass API keys from environment variables to config
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    deepInfraApiKey: process.env.DEEPINFRA_API_KEY,
     jigsawApiKey: process.env.JIGSAW_API_KEY,
   });
 

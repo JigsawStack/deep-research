@@ -48,7 +48,10 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   models?: Partial<ModelConfig>;
   synthesis: ReportConfig;
-  jigsawApiKey?: string;
+  jigsawApiKey: string;
+  openaiApiKey: string;
+  geminiApiKey: string;
+  deepInfraApiKey: string;
 }
 
 export interface DeepResearchInstance {

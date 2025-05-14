@@ -192,3 +192,80 @@ Please create a final comprehensive research article according to the instructio
     userPrompt,
   };
 };
+
+export const generateEvaluationPrompt = ({
+  mainPrompt,
+  results,
+  currentDepth,
+  parentSynthesis,
+}: {
+  mainPrompt: string[];
+  results: Array<{
+    question: { question: string };
+    searchResults: { ai_overview: string };
+  }>;
+  currentDepth: number;
+  parentSynthesis?: {
+    analysis: string;
+    confidence: number;
+    keyThemes: string[];
+    knowledgeGaps: string[];
+  };
+}) => {
+  const systemPrompt = `You are an expert research evaluator. Your task is to assess if the current search results provide sufficient information to generate a comprehensive deep research report on the main topic.
+
+Evaluate the following:
+1. Information coverage: Do the search results cover the main aspects of the topic?
+2. Information depth: Is there enough detailed information to create a substantive analysis?
+3. Information quality: Are the sources reliable and the information accurate?
+4. Knowledge gaps: Are there significant gaps that would prevent a comprehensive report?
+5. Potential for additional questions: Could more targeted questions yield better information?
+
+Based on your evaluation, provide a confidence score from 0 to 1, where:
+- 0-0.5: Insufficient information, major gaps, needs more research
+- 0.5-0.7: Partial information, some gaps, could benefit from more research
+- 0.7-0.85: Good information, minor gaps, might benefit from targeted research
+- 0.85-1.0: Excellent information, comprehensive coverage, sufficient for a report
+
+Format your response as a valid JSON object with the following structure:
+{
+  "evaluation": "Your detailed evaluation of the information...",
+  "confidenceScore": 0.75,
+  "sufficientInformation": true/false,
+  "potentialQuestions": ["Question 1", "Question 2", ...],
+  "rationale": "Explanation for your decision..."
+}`;
+
+  const combinedContent = results
+    .map((result) => {
+      return `
+Question: ${result.question.question}
+Overview: ${result.searchResults.ai_overview}
+      `;
+    })
+    .join('\n\n');
+
+  const userPrompt = `Main Research Topic(s):
+${mainPrompt.join('\n')}
+
+Current Depth Level: ${currentDepth}
+
+${
+  parentSynthesis
+    ? `Parent Synthesis Analysis: ${parentSynthesis.analysis}
+Parent Synthesis Confidence: ${parentSynthesis.confidence}
+Parent Synthesis Key Themes: ${parentSynthesis.keyThemes.join(', ')}
+Parent Synthesis Knowledge Gaps: ${parentSynthesis.knowledgeGaps.join(', ')}`
+    : 'No parent synthesis available.'
+}
+
+Search Results:
+${combinedContent}
+
+Please evaluate if this information is sufficient to generate a comprehensive research report on the main topic.`;
+
+  return {
+    systemPrompt,
+    userPrompt,
+  };
+};

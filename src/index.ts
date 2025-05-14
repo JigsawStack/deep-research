@@ -35,8 +35,23 @@ export class DeepResearch implements DeepResearchInstance {
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
 
-    // Initialize AIProvider
-    this.aiProvider = new AIProvider();
+    // Check if required API keys are provided
+    if (
+      !this.config.openaiApiKey ||
+      !this.config.geminiApiKey ||
+      !this.config.deepInfraApiKey
+    ) {
+      throw new Error(
+        'All API keys (openaiApiKey, geminiApiKey, deepInfraApiKey) are required'
+      );
+    }
+
+    // Initialize AIProvider with API keys from config
+    this.aiProvider = new AIProvider({
+      openaiApiKey: this.config.openaiApiKey,
+      geminiApiKey: this.config.geminiApiKey,
+      deepInfraApiKey: this.config.deepInfraApiKey,
+    });
 
     // Add models from config.models if available
     if (config.models) {
@@ -45,7 +60,7 @@ export class DeepResearch implements DeepResearchInstance {
         if (modelValue) {
           if (typeof modelValue !== 'string') {
             // It's a LanguageModelV1 instance, add it as a direct model
-            this.aiProvider.addDirectProvider(modelType, modelValue);
+            this.aiProvider.addDirectModel(modelType, modelValue);
           }
           // If it's a string, it will be handled by the generateText method
         }
@@ -88,6 +103,9 @@ export class DeepResearch implements DeepResearchInstance {
         (() => {
           throw new Error('Jigsaw API key must be provided in config');
         })(),
+      openaiApiKey: config.openaiApiKey || '',
+      geminiApiKey: config.geminiApiKey || '',
+      deepInfraApiKey: config.deepInfraApiKey || '',
     };
   }
 
@@ -150,12 +168,11 @@ export class DeepResearch implements DeepResearchInstance {
           this.config.synthesis?.targetOutputLength ?? 'standard',
         formatAsMarkdown: true,
       },
-      this.aiProvider,
-      this.config.models?.reasoning as string
+      this.aiProvider
     );
 
-    fs.writeFileSync('t.json', JSON.stringify(finalReport, null, 2));
-    fs.writeFileSync('t.md', finalReport.analysis);
+    fs.writeFileSync('test.json', JSON.stringify(finalReport, null, 2));
+    fs.writeFileSync('test.md', finalReport.analysis);
 
     console.log(
       `Final research report generated with ${
@@ -277,7 +294,8 @@ export class DeepResearch implements DeepResearchInstance {
         parentSynthesis,
       },
       this.config.depth?.confidenceThreshold ||
-        DEFAULT_DEPTH_CONFIG.confidenceThreshold
+        DEFAULT_DEPTH_CONFIG.confidenceThreshold,
+      this.aiProvider
     );
     console.log(`Sufficient information check result: ${hasSufficientInfo}`);
 
@@ -313,8 +331,7 @@ export class DeepResearch implements DeepResearchInstance {
         currentDepth,
         parentSynthesis,
       },
-      this.aiProvider,
-      this.config.models?.default as string
+      this.aiProvider
     );
     console.log(`Synthesis at depth ${currentDepth} completed`);
 
@@ -351,8 +368,7 @@ export class DeepResearch implements DeepResearchInstance {
         result,
         this.config.breadth?.maxParallelTopics ||
           DEFAULT_BREADTH_CONFIG.maxParallelTopics,
-        this.aiProvider,
-        (this.config.models?.default as string) || 'gemini-2.0-flash'
+        this.aiProvider
       );
       console.log(`Generated ${followupQuestions.length} follow-up questions`);
       totalFollowUpQuestions += followupQuestions.length;
@@ -450,6 +466,11 @@ export function createDeepResearch(
       targetOutputLength: 5000,
       formatAsMarkdown: true,
     },
+    // Default empty values for API keys, they must be provided by user
+    openaiApiKey: '',
+    geminiApiKey: '',
+    deepInfraApiKey: '',
+    jigsawApiKey: '',
   };
 
   // Merge provided config with defaults

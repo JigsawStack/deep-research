@@ -11,6 +11,7 @@ import 'dotenv/config';
 import {
   generateSynthesisPrompt,
   generateReportPrompt,
+  generateEvaluationPrompt,
 } from '../prompts/synthesis';
 
 /**
@@ -18,8 +19,7 @@ import {
  */
 export async function synthesize(
   input: SynthesisInput,
-  provider: AIProvider,
-  model: string = 'gemini-2.0-flash'
+  provider: AIProvider
 ): Promise<SynthesisOutput> {
   const { mainPrompt, results, currentDepth, parentSynthesis } = input;
 
@@ -32,7 +32,10 @@ export async function synthesize(
 
   try {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await provider.generateText(combinedPrompt, model);
+    const response = await provider.generateText(
+      combinedPrompt,
+      provider.getDefaultModel()
+    );
 
     let synthesis: SynthesisOutput;
     try {
@@ -82,8 +85,7 @@ export function failedSynthesis(
 export async function generateReport(
   input: ReportInput,
   config: ReportConfig,
-  provider: AIProvider,
-  model: string = 'gemini-2.0-flash'
+  provider: AIProvider
 ): Promise<SynthesisOutput> {
   const { mainPrompt, allSyntheses } = input;
   const { maxOutputTokens, targetOutputLength } = config;
@@ -97,7 +99,10 @@ export async function generateReport(
 
   try {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await provider.generateText(combinedPrompt, model);
+    const response = await provider.generateText(
+      combinedPrompt,
+      provider.getOutputModel()
+    );
 
     let report: SynthesisOutput;
     try {
@@ -120,39 +125,82 @@ export async function generateReport(
 
 /**
  * Check if we have sufficient information to stop the research
- * Does this content sufficient for the main questions asked
- * Out of 5?
- * Do you think that there can be more relevant questions that can be asked
- * Should I go deeper or should
+ * Uses the reasoning model to evaluate if the current information is enough
+ * to generate a comprehensive research report
  */
-
 export async function hasSufficientInformation(
   input: SynthesisInput,
-  confidenceThreshold: number = 0.85
+  confidenceThreshold: number = 0.85,
+  provider?: AIProvider
 ): Promise<boolean> {
-  // If we have a parent synthesis with high confidence, we might have enough info
-  if (
-    input.parentSynthesis &&
-    input.parentSynthesis.confidence >= confidenceThreshold
-  ) {
-    // Check if we have a good variety of themes and insights
-    const hasSubstantiveContent =
-      input.parentSynthesis.keyThemes &&
-      input.parentSynthesis.keyThemes.length >= 3 &&
-      input.parentSynthesis.insights &&
-      input.parentSynthesis.insights.length >= 3 &&
-      input.parentSynthesis.knowledgeGaps &&
-      input.parentSynthesis.knowledgeGaps.length <= 2; // Not too many knowledge gaps
+  if (!provider) {
+    // If no provider is passed, fall back to the simple heuristic approach
+    // If we have a parent synthesis with high confidence, we might have enough info
+    if (
+      input.parentSynthesis &&
+      input.parentSynthesis.confidence >= confidenceThreshold
+    ) {
+      // Check if we have a good variety of themes and insights
+      const hasSubstantiveContent =
+        input.parentSynthesis.keyThemes &&
+        input.parentSynthesis.keyThemes.length >= 3 &&
+        input.parentSynthesis.insights &&
+        input.parentSynthesis.insights.length >= 3 &&
+        input.parentSynthesis.knowledgeGaps &&
+        input.parentSynthesis.knowledgeGaps.length <= 2; // Not too many knowledge gaps
 
-    if (hasSubstantiveContent) {
+      if (hasSubstantiveContent) {
+        return true;
+      }
+    }
+
+    // If we have many results at the current depth, we might have enough info
+    if (input.results.length >= 5) {
       return true;
     }
+
+    return false;
   }
 
-  // If we have many results at the current depth, we might have enough info
-  if (input.results.length >= 5) {
-    return true;
-  }
+  // Use the reasoning model to evaluate if we have sufficient information
+  const { mainPrompt, results, currentDepth, parentSynthesis } = input;
 
-  return false;
+  const { systemPrompt, userPrompt } = generateEvaluationPrompt({
+    mainPrompt,
+    results,
+    currentDepth,
+    parentSynthesis,
+  });
+
+  try {
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    const response = await provider.generateText(
+      combinedPrompt,
+      provider.getReasoningModel()
+    );
+
+    try {
+      const cleanedResponse = cleanJsonResponse(response);
+      const evaluation = JSON.parse(cleanedResponse);
+
+      console.log(`Information sufficiency evaluation:`, {
+        confidenceScore: evaluation.confidenceScore,
+        sufficientInformation: evaluation.sufficientInformation,
+        potentialQuestions: evaluation.potentialQuestions?.length || 0,
+      });
+
+      // Return the model's evaluation, or fall back to the confidence threshold
+      return typeof evaluation.sufficientInformation === 'boolean'
+        ? evaluation.sufficientInformation
+        : evaluation.confidenceScore >= confidenceThreshold;
+    } catch (parseError) {
+      console.error('Error parsing evaluation response:', parseError);
+      // Fall back to simple heuristic
+      return input.results.length >= 5;
+    }
+  } catch (error) {
+    console.error('Error evaluating information sufficiency:', error);
+    // Fall back to simple heuristic
+    return input.results.length >= 5;
+  }
 }
