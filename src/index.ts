@@ -6,8 +6,12 @@ import {
   RecursiveResearchResult,
 } from './types';
 import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
-import { Synthesizer } from './synthesis/synthesizer';
 import { generateSubQuestions } from './generators/subQuestionGenerator';
+import {
+  synthesize,
+  generateReport,
+  hasSufficientInformation,
+} from './synthesis/synthesizer';
 
 import {
   DEFAULT_CONFIG,
@@ -24,7 +28,6 @@ import { SynthesisOutput } from './types/synthesis';
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
   public prompts?: string[];
-  private synthesizer: Synthesizer;
   private depthSynthesis: Map<number, SynthesisOutput[]>;
   private aiProvider: AIProvider;
 
@@ -54,7 +57,6 @@ export class DeepResearch implements DeepResearchInstance {
       });
     }
 
-    this.synthesizer = new Synthesizer(this.aiProvider);
     this.depthSynthesis = new Map();
   }
 
@@ -131,18 +133,24 @@ export class DeepResearch implements DeepResearchInstance {
       allSyntheses.push(...syntheses);
     });
 
-    const finalSynthesis = await this.synthesizer.generateFinalSynthesis({
-      mainPrompt: this.prompts,
-      allSyntheses: allSyntheses,
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength:
-        this.config.synthesis?.targetOutputLength ??
-        DEFAULT_SYNTHESIS_CONFIG.targetOutputLength,
-    });
+    const finalReport = await generateReport(
+      {
+        mainPrompt: this.prompts,
+        allSyntheses: allSyntheses,
+      },
+      {
+        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+        targetOutputLength:
+          this.config.synthesis?.targetOutputLength ?? 'standard',
+        formatAsMarkdown: true,
+      },
+      this.aiProvider,
+      this.config.models?.reasoning as string
+    );
 
     console.log(
-      `Final synthesis generated with ${
-        finalSynthesis.analysis ? finalSynthesis.analysis.length : 0
+      `Final research report generated with ${
+        finalReport.analysis ? finalReport.analysis.length : 0
       } characters`
     );
 
@@ -155,13 +163,13 @@ export class DeepResearch implements DeepResearchInstance {
     // Ensure we have a valid research output
     let research = 'No research results available.';
 
-    if (finalSynthesis) {
-      if (finalSynthesis.analysis) {
+    if (finalReport) {
+      if (finalReport.analysis) {
         // If analysis field exists, use it
-        research = finalSynthesis.analysis;
+        research = finalReport.analysis;
       } else if (
         this.config.format === 'json' &&
-        Object.keys(finalSynthesis).length > 0
+        Object.keys(finalReport).length > 0
       ) {
         // Format the research output based on the synthesis data
         // (keeping the existing formatting logic)
@@ -199,7 +207,7 @@ export class DeepResearch implements DeepResearchInstance {
     console.log(`Performing research at depth level: ${currentDepth}`);
 
     // Check if we already have sufficient information
-    const hasSufficientInfo = await this.synthesizer.hasSufficientInformation(
+    const hasSufficientInfo = await hasSufficientInformation(
       {
         mainPrompt: this.prompts,
         results: initialResults,
@@ -228,12 +236,16 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     // First, synthesize the current level results
-    const synthesis = await this.synthesizer.synthesizeResults({
-      mainPrompt: this.prompts,
-      results: initialResults,
-      currentDepth,
-      parentSynthesis,
-    });
+    const synthesis = await synthesize(
+      {
+        mainPrompt: this.prompts,
+        results: initialResults,
+        currentDepth,
+        parentSynthesis,
+      },
+      this.aiProvider,
+      this.config.models?.default as string
+    );
 
     // Store the synthesis for this depth level
     if (!this.depthSynthesis.has(currentDepth)) {
