@@ -42,7 +42,7 @@ async function basicResearch() {
     depth: {
       level: 3, // Detailed analysis
       includeReferences: true,
-      confidenceThreshold: 0.7,
+      confidenceThreshold: 0.9,
     },
     breadth: {
       level: 2, // Main topic + direct relationships

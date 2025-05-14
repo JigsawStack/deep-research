@@ -15,7 +15,7 @@ export const DEFAULT_DEPTH_CONFIG: ResearchDepthConfig = {
   level: 3,
   maxTokensPerAnalysis: 2048,
   includeReferences: true,
-  confidenceThreshold: 0.85,
+  confidenceThreshold: 0.9,
 };
 
 export const DEFAULT_BREADTH_CONFIG: ResearchBreadthConfig = {
