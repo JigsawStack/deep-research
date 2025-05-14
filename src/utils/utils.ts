@@ -6,8 +6,25 @@ export function cleanJsonResponse(response: string): string {
     try {
       // Extract and parse the JSON block
       const jsonContent = jsonBlockMatch[1].trim();
+
       // Test if it's valid JSON
-      JSON.parse(jsonContent);
+      const parsedJson = JSON.parse(jsonContent);
+
+      // If we have a markdown report, add the full report content as the analysis
+      if (!parsedJson.analysis && response.indexOf('```json') > 0) {
+        // Extract the markdown content before the JSON block
+        const markdownContent = response
+          .substring(0, response.indexOf('```json'))
+          .trim();
+        if (markdownContent.length > 0) {
+          console.log(
+            `Adding markdown content (${markdownContent.length} chars) as analysis`
+          );
+          parsedJson.analysis = markdownContent;
+          return JSON.stringify(parsedJson);
+        }
+      }
+
       return jsonContent;
     } catch (e) {
       console.error('Failed to parse JSON metadata block:', e);
@@ -41,6 +58,21 @@ export function cleanJsonResponse(response: string): string {
       // Test if it's valid JSON
       JSON.parse(potentialJson);
       return potentialJson;
+    }
+
+    // If we have a markdown report with no valid JSON, create a JSON with the content as analysis
+    if (response.length > 0 && !response.includes('<thinking>')) {
+      console.log('Creating JSON with markdown content as analysis');
+      const jsonWithContent = JSON.stringify({
+        analysis: response,
+        keyThemes: ['Generated from markdown content'],
+        insights: ['Content extracted from markdown'],
+        knowledgeGaps: [],
+        confidence: 0.8,
+        relatedQuestions: [],
+        depth: 0,
+      });
+      return jsonWithContent;
     }
   } catch (e) {
     // If parsing fails, try to fix common issues with JSON strings

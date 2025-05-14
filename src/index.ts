@@ -4,6 +4,7 @@ import {
   DeepResearchInstance,
   DeepResearchResponse,
   RecursiveResearchResult,
+  ResearchSource,
 } from './types';
 import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
 import { generateSubQuestions } from './generators/subQuestionGenerator';
@@ -158,6 +159,27 @@ export class DeepResearch implements DeepResearchInstance {
       } characters`
     );
 
+    console.log(`\n===== FINAL REPORT DEBUG =====`);
+    console.log(`Report object keys: ${Object.keys(finalReport).join(', ')}`);
+    console.log(`Report analysis exists: ${!!finalReport.analysis}`);
+    console.log(`Report analysis type: ${typeof finalReport.analysis}`);
+    console.log(
+      `Report analysis length: ${
+        finalReport.analysis ? finalReport.analysis.length : 0
+      }`
+    );
+    console.log(
+      `Report analysis preview: ${
+        finalReport.analysis
+          ? finalReport.analysis.substring(0, 200)
+          : 'No analysis'
+      }`
+    );
+
+    if (!finalReport.analysis || finalReport.analysis.length === 0) {
+      console.error(`WARNING: Final report analysis is empty or undefined!`);
+    }
+
     // Calculate token usage (placeholder values - implement actual counting)
     const inputTokens = 256; // Estimate based on prompt length
     const outputTokens = 500; // Rough estimate
@@ -167,12 +189,47 @@ export class DeepResearch implements DeepResearchInstance {
     // Ensure we have a valid research output
     let research = finalReport.analysis || 'No research results available.';
 
+    // Collect sources from all search results
+    const sources: ResearchSource[] = [];
+
+    // Extract unique sources from initial search results
+    initialSearch.forEach((result) => {
+      if (result.searchResults && result.searchResults.results) {
+        result.searchResults.results.forEach((source) => {
+          // Only add unique URLs
+          if (source.url && !sources.some((s) => s.url === source.url)) {
+            // Create a source object with only properties from the ResearchSource interface
+            const researchSource: ResearchSource = {
+              url: source.url,
+              content: source.content || '',
+              ai_overview: source.ai_overview || '',
+              title: source.title || 'Unknown Title',
+              domain: source.domain || '',
+              isAcademic: source.isAcademic,
+            };
+
+            // Add domain if not present but URL is valid
+            if (!researchSource.domain && researchSource.url) {
+              try {
+                researchSource.domain = new URL(researchSource.url).hostname;
+              } catch (e) {
+                // Invalid URL, keep domain empty
+              }
+            }
+
+            sources.push(researchSource);
+          }
+        });
+      }
+    });
+
     console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
     console.log(
       `Research completed with ${this.depthSynthesis.size} depth levels`
     );
     console.log(`Final report length: ${research.length} characters`);
     console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
+    console.log(`Sources collected: ${sources.length}`);
 
     return {
       success: true,
@@ -183,7 +240,7 @@ export class DeepResearch implements DeepResearchInstance {
         inference_time_tokens: inferenceTimeTokens,
         total_tokens: Math.round(totalTokens),
       },
-      sources: [], // Populate sources from the final report
+      sources: sources,
     };
   }
 
