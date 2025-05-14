@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import { GoogleGenerativeAIProvider } from '@ai-sdk/google';
 import { DeepInfraProvider } from '@ai-sdk/deepinfra';
 import { OpenAIProvider as OpenAISDKProvider } from '@ai-sdk/openai';
-import { ProviderV1 } from '@ai-sdk/provider';
+import { ProviderV1, LanguageModelV1 } from '@ai-sdk/provider';
 /**
  * AIProvider acts as an abstract factory for different AI model providers
  * It unifies the interface for interacting with different provider types
@@ -81,8 +81,11 @@ export class AIProvider {
       // Case 2: Check if it's a direct provider ID we've stored
       if (this.directProviders.has(modelOrProvider)) {
         const provider = this.directProviders.get(modelOrProvider);
+        if (!provider) {
+          throw new Error(`Direct provider '${modelOrProvider}' not found`);
+        }
         const result = await generateText({
-          model: provider,
+          model: provider as LanguageModelV1,
           prompt,
         });
         return result.text;

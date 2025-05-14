@@ -5,8 +5,9 @@ import {
   DeepResearchResponse,
   RecursiveResearchResult,
 } from './types';
-import { FollowupQuestionGenerator } from './generators/followupQuestionGenerator';
+import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
 import { Synthesizer } from './synthesis/synthesizer';
+import { generateSubQuestions } from './generators/subQuestionGenerator';
 
 import {
   DEFAULT_CONFIG,
@@ -19,7 +20,6 @@ import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
 import { SynthesisOutput } from './types/synthesis';
-import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
 
 export class DeepResearch implements DeepResearchInstance {
   public config: DeepResearchConfig;
@@ -27,7 +27,6 @@ export class DeepResearch implements DeepResearchInstance {
   private synthesizer: Synthesizer;
   private depthSynthesis: Map<number, SynthesisOutput[]>;
   private aiProvider: AIProvider;
-  private questionGenerator: SubQuestionGenerator;
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateAndMergeConfig(config);
@@ -48,7 +47,6 @@ export class DeepResearch implements DeepResearchInstance {
       });
     }
 
-    this.questionGenerator = new SubQuestionGenerator(this.aiProvider);
     this.synthesizer = new Synthesizer(this.aiProvider);
     this.depthSynthesis = new Map();
   }
@@ -78,30 +76,107 @@ export class DeepResearch implements DeepResearchInstance {
     };
   }
 
-  public async fireWebSearches(
-    subQuestions: SubQuestionGeneratorResult
-  ): Promise<WebSearchResult[]> {
-    const jigsaw = JigsawProvider.getInstance();
-    const results = await jigsaw.fireWebSearches(subQuestions);
-    return results;
+  public getSynthesis(): Map<number, SynthesisOutput[]> {
+    return this.depthSynthesis;
   }
 
-  public async generateSubQuestions(): Promise<SubQuestionGeneratorResult> {
-    if (!this.prompts || this.prompts.length === 0) {
-      throw new Error('Prompts must be set before generating sub-questions');
+  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
+    if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
+      throw new Error('Prompt must be provided as a non-empty array');
     }
 
-    return this.questionGenerator.generateSubQuestions(
-      this.prompts,
-      {
+    // Store the prompt in the class property
+    this.prompts = prompt;
+
+    // Generate sub-questions directly using the imported function
+    const subQuestions = await generateSubQuestions({
+      mainPrompt: this.prompts,
+      breadthConfig: {
         ...DEFAULT_BREADTH_CONFIG,
         ...this.config.breadth,
       },
-      this.aiProvider
+      provider: this.aiProvider,
+      generationModel: this.config.models?.default as string,
+      relevanceCheckModel: this.config.models?.reasoning as string,
+    });
+    console.log(`Generated ${subQuestions.questions.length} sub-questions`);
+
+    // Fire web searches directly
+    const jigsaw = JigsawProvider.getInstance();
+    const initialSearch = await jigsaw.fireWebSearches(subQuestions);
+    console.log(`Received ${initialSearch.length} initial search results`);
+
+    // Perform recursive research
+    const recursiveResult = await this.performRecursiveResearch(initialSearch);
+    console.log(
+      `Recursive research completed with reason: ${recursiveResult.reason}`
     );
+
+    // Get all the syntheses
+    const allDepthSynthesis = this.getSynthesis();
+    console.log(
+      `Synthesis map contains ${allDepthSynthesis.size} depth levels`
+    );
+
+    // Generate the final synthesis
+    const allSyntheses: SynthesisOutput[] = [];
+    this.depthSynthesis.forEach((syntheses) => {
+      allSyntheses.push(...syntheses);
+    });
+
+    const finalSynthesis = await this.synthesizer.generateFinalSynthesis({
+      mainPrompt: this.prompts,
+      allSyntheses: allSyntheses,
+      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+      targetOutputLength:
+        this.config.synthesis?.targetOutputLength ??
+        DEFAULT_SYNTHESIS_CONFIG.targetOutputLength,
+    });
+
+    console.log(
+      `Final synthesis generated with ${
+        finalSynthesis.analysis ? finalSynthesis.analysis.length : 0
+      } characters`
+    );
+
+    // Calculate token usage (placeholder values - implement actual counting)
+    const inputTokens = 256; // Estimate based on prompt length
+    const outputTokens = 500; // Rough estimate
+    const inferenceTimeTokens = 975; // Placeholder
+    const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
+
+    // Ensure we have a valid research output
+    let research = 'No research results available.';
+
+    if (finalSynthesis) {
+      if (finalSynthesis.analysis) {
+        // If analysis field exists, use it
+        research = finalSynthesis.analysis;
+      } else if (
+        this.config.format === 'json' &&
+        Object.keys(finalSynthesis).length > 0
+      ) {
+        // Format the research output based on the synthesis data
+        // (keeping the existing formatting logic)
+        // ...
+      }
+    }
+
+    return {
+      success: true,
+      research: research,
+      _usage: {
+        input_tokens: Math.round(inputTokens),
+        output_tokens: Math.round(outputTokens),
+        inference_time_tokens: inferenceTimeTokens,
+        total_tokens: Math.round(totalTokens),
+      },
+      sources: [], // Now populated from search results
+    };
   }
 
-  public async performRecursiveResearch(
+  // We still need the recursive research method since it's complex and has internal state
+  private async performRecursiveResearch(
     initialResults: WebSearchResult[],
     currentDepth: number = 1,
     parentSynthesis?: SynthesisOutput
@@ -167,13 +242,14 @@ export class DeepResearch implements DeepResearchInstance {
 
     // For each search result, generate follow-up questions
     for (const result of initialResults) {
+      // Use the function directly
       const followupQuestions = await generateFollowupQuestions(
         this.prompts,
         result,
         this.config.breadth?.maxParallelTopics ||
           DEFAULT_BREADTH_CONFIG.maxParallelTopics,
         this.aiProvider,
-        this.config.models?.default as string | undefined
+        (this.config.models?.default as string) || 'gemini-2.0-flash'
       );
 
       if (followupQuestions.length > 0) {
@@ -193,8 +269,9 @@ export class DeepResearch implements DeepResearchInstance {
         };
 
         try {
-          // Fire web searches for the follow-up questions
-          const followupResults = await this.fireWebSearches(subQuestions);
+          // Fire web searches directly
+          const jigsaw = JigsawProvider.getInstance();
+          const followupResults = await jigsaw.fireWebSearches(subQuestions);
 
           // Recursively process deeper results with the current synthesis
           const deeperResult = await this.performRecursiveResearch(
@@ -223,103 +300,6 @@ export class DeepResearch implements DeepResearchInstance {
       isComplete: true,
       reason: 'research_complete',
     }; // Signal that we're done with research
-  }
-
-  public getSynthesis(): Map<number, SynthesisOutput[]> {
-    return this.depthSynthesis;
-  }
-
-  public async generateFinalSynthesis(): Promise<SynthesisOutput> {
-    if (!this.prompts || this.prompts.length === 0) {
-      throw new Error('Prompts must be set before generating final synthesis');
-    }
-
-    // Get all the syntheses from all depth levels
-    const allSyntheses: SynthesisOutput[] = [];
-    this.depthSynthesis.forEach((syntheses) => {
-      allSyntheses.push(...syntheses);
-    });
-
-    // Use the synthesizer's generateFinalSynthesis method
-    return this.synthesizer.generateFinalSynthesis({
-      mainPrompt: this.prompts,
-      allSyntheses: allSyntheses,
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength:
-        this.config.synthesis?.targetOutputLength ??
-        DEFAULT_SYNTHESIS_CONFIG.targetOutputLength,
-    });
-  }
-
-  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
-    if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
-      throw new Error('Prompt must be provided as a non-empty array');
-    }
-
-    // Store the prompt in the class property
-    this.prompts = prompt;
-
-    // Now proceed with the existing implementation
-    const subQuestions = await this.generateSubQuestions();
-    console.log(`Generated ${subQuestions.questions.length} sub-questions`);
-
-    const initialSearch = await this.fireWebSearches(subQuestions);
-    console.log(`Received ${initialSearch.length} initial search results`);
-
-    // Perform recursive research to populate the depthSynthesis map
-    const recursiveResult = await this.performRecursiveResearch(initialSearch);
-    console.log(
-      `Recursive research completed with reason: ${recursiveResult.reason}`
-    );
-
-    // Get all the syntheses
-    const allDepthSynthesis = this.getSynthesis();
-    console.log(
-      `Synthesis map contains ${allDepthSynthesis.size} depth levels`
-    );
-
-    // Generate the final synthesis
-    const finalSynthesis = await this.generateFinalSynthesis();
-    console.log(
-      `Final synthesis generated with ${
-        finalSynthesis.analysis ? finalSynthesis.analysis.length : 0
-      } characters`
-    );
-
-    // Calculate token usage (placeholder values - implement actual counting)
-    const inputTokens = 256; // Estimate based on prompt length
-    const outputTokens = 500; // Rough estimate
-    const inferenceTimeTokens = 975; // Placeholder
-    const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
-
-    // Ensure we have a valid research output
-    let research = 'No research results available.';
-
-    if (finalSynthesis) {
-      if (finalSynthesis.analysis) {
-        // If analysis field exists, use it
-        research = finalSynthesis.analysis;
-      } else if (
-        this.config.format === 'json' &&
-        Object.keys(finalSynthesis).length > 0
-      ) {
-        // Format the research output based on the synthesis data
-        // (keeping the existing formatting logic)
-        // ...
-      }
-    }
-
-    return {
-      success: true,
-      research: research,
-      _usage: {
-        input_tokens: Math.round(inputTokens),
-        output_tokens: Math.round(outputTokens),
-        inference_time_tokens: inferenceTimeTokens,
-        total_tokens: Math.round(totalTokens),
-      },
-      sources: [], // Now populated from search results
-    };
   }
 }
 

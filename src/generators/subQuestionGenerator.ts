@@ -75,13 +75,26 @@ async function validateResponse(
 /**
  * Generates sub-questions for a main research topic
  */
-export async function generateSubQuestions(
-  mainPrompt: string[],
-  breadthConfig: ResearchBreadthConfig,
-  provider: AIProvider,
-  generationModel: string = 'gemini-2.0-flash',
-  relevanceCheckModel: string = 'gemini-1.5-flash'
-): Promise<any> {
+
+export interface GenerateSubQuestionsOptions {
+  mainPrompt: string[];
+  breadthConfig: ResearchBreadthConfig;
+  provider: AIProvider;
+  generationModel?: string;
+  relevanceCheckModel?: string;
+}
+
+export async function generateSubQuestions({
+  mainPrompt,
+  breadthConfig,
+  provider,
+  generationModel = 'gemini-2.0-flash',
+  relevanceCheckModel = 'gpt-4o',
+}: GenerateSubQuestionsOptions): Promise<any> {
+  if (!mainPrompt || mainPrompt.length === 0) {
+    throw new Error('Prompts must be set before generating sub-questions');
+  }
+
   const targetQuestionCount = breadthConfig.maxParallelTopics + 2;
 
   const { systemPrompt, userPrompt } = generateSubQuestionsPrompt({
