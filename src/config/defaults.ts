@@ -3,11 +3,11 @@ import {
   ResearchBreadthConfig,
   ResearchDepthConfig,
 } from '../types';
-import { SynthesisConfig } from '../types/synthesis';
+import { ReportConfig } from '../types/synthesis';
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: 'gpt-4.1',
-  quick: 'gemini-2-flash',
+  output: 'gemini-2-flash',
   reasoning: 'deepseek-r1',
 };
 
@@ -25,7 +25,7 @@ export const DEFAULT_BREADTH_CONFIG: ResearchBreadthConfig = {
   minRelevanceScore: 0.7,
 };
 
-export const DEFAULT_SYNTHESIS_CONFIG: SynthesisConfig = {
+export const DEFAULT_SYNTHESIS_CONFIG: ReportConfig = {
   targetOutputLength: 'standard',
   formatAsMarkdown: true,
 };

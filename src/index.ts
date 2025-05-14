@@ -343,7 +343,7 @@ export async function createDeepResearch(
     synthesis: {
       maxOutputTokens: 8000,
       targetOutputLength: 5000,
-      includeSourceDetails: true,
+      formatAsMarkdown: true,
     },
   };
 

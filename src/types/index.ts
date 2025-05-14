@@ -1,5 +1,5 @@
-import { SubQuestion, SubQuestionGeneratorResult } from './generators';
-import { SynthesisConfig, SynthesisOutput } from './synthesis';
+import { SubQuestion } from './generators';
+import { ReportConfig, SynthesisOutput } from './synthesis';
 import { ProviderV1 } from '@ai-sdk/provider';
 
 export interface RecursiveResearchResult {
@@ -46,7 +46,7 @@ export interface DeepResearchConfig {
   breadth?: Partial<ResearchBreadthConfig>;
   format: 'json';
   models?: Partial<ModelConfig>;
-  synthesis: SynthesisConfig;
+  synthesis: ReportConfig;
 }
 
 export interface DeepResearchInstance {
