@@ -1,6 +1,5 @@
 import createDeepResearch from '../..';
 import 'dotenv/config';
-// import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createDeepInfra } from '@ai-sdk/deepinfra';
 
@@ -10,7 +9,8 @@ async function basicResearch() {
   if (
     !process.env.OPENAI_API_KEY ||
     !process.env.GEMINI_API_KEY ||
-    !process.env.DEEPINFRA_API_KEY
+    !process.env.DEEPINFRA_API_KEY ||
+    !process.env.JIGSAW_API_KEY
   ) {
     console.error('Error: API keys are required for all models.');
     console.error(
@@ -18,11 +18,6 @@ async function basicResearch() {
     );
     process.exit(1);
   }
-
-  // Create model instances directly
-  // const openai = createOpenAI({
-  //   apiKey: process.env.OPENAI_API_KEY,
-  // });
 
   const gemini = createGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -33,19 +28,18 @@ async function basicResearch() {
   });
 
   // Get model instances
-  // const openaiModel = openai('gpt-4o');
   const geminiModel = gemini('gemini-2.0-flash');
   const deepseekModel = deepinfra('deepseek-ai/DeepSeek-R1');
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
     depth: {
-      maxLevel: 3, // Detailed analysis
+      maxLevel: 2, // Detailed analysis
       includeReferences: true,
       confidenceThreshold: 0.9,
     },
     breadth: {
-      maxParallelTopics: 4,
+      maxParallelTopics: 5,
       includeRelatedTopics: true,
       minRelevanceScore: 0.8,
     },
@@ -65,7 +59,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ['what is quantum computing?'];
+  const prompts = ['what is the meaning of life in space?'];
 
   try {
     console.log('Starting deep research...');

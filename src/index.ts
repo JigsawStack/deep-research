@@ -11,7 +11,7 @@ import { JigsawProvider } from './provider/jigsaw';
 import fs from 'fs';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { PROMPTS } from './prompts';
+import { PROMPTS } from './prompts/prompts';
 export class DeepResearch {
   public config: DeepResearchConfig;
   public prompts?: string[];
@@ -99,6 +99,46 @@ export class DeepResearch {
     };
   }
 
+  // Add this function to the DeepResearch class to summarize search results
+  private deduplicateSearchResults(
+    results: WebSearchResult[]
+  ): WebSearchResult[] {
+    // Create a map to deduplicate by URL
+    const urlMap = new Map<string, boolean>();
+
+    // Create a summarized version of the results
+    return results.map((result) => {
+      // Keep the question and ai_overview
+      const summarized = {
+        question: result.question,
+        searchResults: {
+          ai_overview: result.searchResults.ai_overview,
+          results: result.searchResults.results.filter((item) => {
+            // Skip if we've seen this URL before
+            if (urlMap.has(item.url)) {
+              return false;
+            }
+
+            // Mark this URL as seen
+            urlMap.set(item.url, true);
+
+            // Keep only essential information
+            return {
+              url: item.url,
+              title: item.title || '',
+              domain: item.domain || '',
+              ai_overview: item.ai_overview || '',
+              // Truncate content to reduce token count
+              content: item.content ? item.content.substring(0, 1000) : '',
+            };
+          }),
+        },
+      };
+
+      return summarized;
+    });
+  }
+
   /**
    * Generate a research plan with focused search queries for a given topic
    *
@@ -158,7 +198,8 @@ export class DeepResearch {
     // step 1: generate research plan
     const { queries, plan } = await this.generateResearchPlan(
       prompt,
-      this.aiProvider
+      this.aiProvider,
+      this.config.breadth?.maxParallelTopics
     );
 
     console.log(`Research plan: ${plan}`);
@@ -171,11 +212,15 @@ export class DeepResearch {
       `Received ${initialSearchResults.length} initial search results`
     );
 
+    // step 2.5: deduplicate results
+    const deduplicatedResults =
+      this.deduplicateSearchResults(initialSearchResults);
+
     // step 3: iteratively search until we have enough results
     const iterativeResult = await this.performIterativeResearch({
       prompt,
       researchPlan: plan,
-      initialResults: initialSearchResults,
+      initialResults: deduplicatedResults,
       allQueries: queries,
     });
 
