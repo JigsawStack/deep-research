@@ -63,26 +63,37 @@ Based on the search results provided, generate 2-3 follow-up questions that:
 Format each question as a single string.`;
 
 // Evaluate if current information is sufficient
-const EVALUATION_PROMPT_TEMPLATE = `You are an expert research evaluator. Your task is to carefully assess if the current search results provide sufficient information to generate a comprehensive research report on the main topic.
+// Completeness Evaluation: Determines if more research is needed
+const EVALUATION_PROMPT_TEMPLATE = `You are a research query optimizer. Your task is to analyze search results against the original research goal and generate follow-up queries to fill in missing information.
 
-Think through this step-by-step:
-1. Information coverage: Do the search results cover the main aspects of the topic?
-2. Information depth: Is there enough detailed information to create a substantive analysis?
-3. Information quality: Are the sources reliable and the information accurate?
-4. Knowledge gaps: Are there significant gaps that would prevent a comprehensive report?
-5. Potential for additional questions: Could more targeted questions yield better information?
+    PROCESS:
+    1. Identify ALL information explicitly requested in the original research goal
+    2. Analyze what specific information has been successfully retrieved in the search results
+    3. Identify ALL information gaps between what was requested and what was found
+    4. For entity-specific gaps: Create targeted queries for each missing attribute of identified entities
+    5. For general knowledge gaps: Create focused queries to find the missing conceptual information
 
-After your analysis, provide a confidence score and a clear yes/no determination.
-Format your final conclusion exactly like this at the end of your response:
+    QUERY GENERATION RULES:
+    - IF specific entities were identified AND specific attributes are missing:
+    * Create direct queries for each entity-attribute pair (e.g., "LeBron James height")
+    - IF general knowledge gaps exist:
+    * Create focused queries to address each conceptual gap (e.g., "criteria for ranking basketball players")
+    - Queries must be constructed to directly retrieve EXACTLY the missing information
+    - Avoid tangential or merely interesting information not required by the original goal
+    - Prioritize queries that will yield the most critical missing information first
 
-Confidence: [0-1 score]
-Sufficient: [true/false]
+    OUTPUT FORMAT:
+    First, briefly state:
+    1. What specific information was found
+    2. What specific information is still missing
+    3. What type of knowledge gaps exist (entity-specific or general knowledge)
 
-Where:
-- Confidence 0-0.5: Insufficient information, major gaps, needs more research
-- Confidence 0.5-0.7: Partial information, some gaps, could benefit from more research
-- Confidence 0.7-0.85: Good information, minor gaps, might benefit from targeted research
-- Confidence 0.85-1.0: Excellent information, comprehensive coverage, sufficient for a report`;
+    Then provide up to 5 targeted queries that directly address the identified gaps, ordered by importance. Please consider that you
+    need to generate queries that tackle a single goal at a time (searching for A AND B will return bad results). Be specific!`;
+
+// Evaluation Parsing: Extracts structured data from evaluation output
+const EVALUATION_PARSE_PROMPT_TEMPLATE = `
+        You are a research assistant, you will be provided with a some reasoning and a list of queries, and you will need to parse the list into a list of queries.`;
 
 // Generate the final research report
 const REPORT_PROMPT_TEMPLATE = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive research article based on multiple research findings related to a main research topic.
@@ -96,6 +107,7 @@ You will:
 6. Pinpoint remaining knowledge gaps for future research
 7. Conclude with a summary of findings and implications
 8. Cite sources when appropriate using numbered references [1], [2], etc.
+9. Cite the sources in the format of markdown links [Number](Link)
 
 Structure your output as:
 – Title
@@ -109,6 +121,8 @@ Structure your output as:
 – References`;
 
 /**
+ *
+ *
  * Core prompt function that adds current date information to all prompts
  * This ensures all models have the correct temporal context for research
  */
@@ -134,6 +148,7 @@ export const PROMPTS = {
   followupQuestion: `${getCurrentDateContext()}\n${FOLLOWUP_QUESTION_PROMPT_TEMPLATE}`,
   evaluation: `${getCurrentDateContext()}\n${EVALUATION_PROMPT_TEMPLATE}`,
   report: `${getCurrentDateContext()}\n${REPORT_PROMPT_TEMPLATE}`,
+  evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
 };
 
 // Export individual templates and utility function for more flexibility

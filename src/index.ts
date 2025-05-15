@@ -9,7 +9,7 @@ import {
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
 import fs from 'fs';
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { PROMPTS } from './prompts/prompts';
 
@@ -65,21 +65,6 @@ function extractJSONFromResponse(text: string) {
 
   // If we still couldn't extract JSON, throw an error
   throw new Error('Could not extract valid JSON from response');
-}
-
-// Function to create clear prompts with JSON format instructions
-function createJsonPrompt(basePrompt: string): string {
-  return `${basePrompt}
-
-IMPORTANT INSTRUCTIONS FOR RESPONSE FORMAT:
-1. Respond ONLY with a valid JSON object
-2. Do NOT include any explanation, thinking, or any text outside the JSON object
-3. Do NOT use markdown code blocks - just provide the raw JSON
-4. Make sure your response starts with '{' and ends with '}'
-5. Ensure all JSON properties are properly quoted
-
-Example of correct response format:
-{"property1": "value1", "property2": "value2"}`;
 }
 
 // Type definitions for the research log
@@ -236,7 +221,7 @@ export class DeepResearch {
               domain: item.domain || '',
               ai_overview: item.ai_overview || '',
               // Truncate content to reduce token count
-              content: item.content ? item.content.substring(0, 1000) : '',
+              // content: item.content ? item.content.substring(0, 1000) : '',
             };
           }),
         },
@@ -244,48 +229,6 @@ export class DeepResearch {
 
       return summarized;
     });
-  }
-
-  /**
-   * Prepare search results for model evaluation by truncating them to fit within context limits
-   * @param results Search results to truncate
-   * @returns Truncated search results suitable for model input
-   */
-  private truncateResultsForModelInput(
-    results: WebSearchResult[]
-  ): WebSearchResult[] {
-    // Limit the number of results to prevent context length issues
-    const MAX_RESULTS = 10;
-    const MAX_ITEMS_PER_RESULT = 5;
-    const MAX_CONTENT_LENGTH = 500;
-
-    // Take only a subset of results
-    const truncatedResults = results.slice(0, MAX_RESULTS).map((result) => {
-      // Create a copy with truncated content
-      return {
-        question: result.question,
-        searchResults: {
-          ai_overview: result.searchResults.ai_overview,
-          // Take only a few items from each result and truncate their content
-          results: result.searchResults.results
-            .slice(0, MAX_ITEMS_PER_RESULT)
-            .map((item) => ({
-              url: item.url,
-              title: item.title || '',
-              domain: item.domain || '',
-              ai_overview: item.ai_overview
-                ? item.ai_overview.substring(0, MAX_CONTENT_LENGTH)
-                : '',
-              // Severely truncate content to reduce token count
-              content: item.content
-                ? item.content.substring(0, MAX_CONTENT_LENGTH)
-                : '',
-            })),
-        },
-      };
-    });
-
-    return truncatedResults;
   }
 
   /**
@@ -317,9 +260,7 @@ export class DeepResearch {
               'A detailed plan explaining the research approach and methodology'
             ),
         }),
-        prompt: createJsonPrompt(
-          `Generate a research plan and focused search queries to thoroughly research the following topic: ${topic}. Include both specific search queries and a detailed explanation of the research approach.`
-        ),
+        prompt: `Generate a research plan and focused search queries to thoroughly research the following topic: ${topic}. Include both specific search queries and a detailed explanation of the research approach.`,
       });
 
       let queries = result.object.queries;
@@ -391,6 +332,58 @@ export class DeepResearch {
         queries: limitedQueries, // Return topic and variations as fallback queries
         plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
       };
+    }
+  }
+
+  private async summarizeResultsForSynthesis(
+    results: WebSearchResult[]
+  ): Promise<string> {
+    // Group results by related topics and extract key themes
+    console.log(`  Creating intelligent summary of search results...`);
+
+    try {
+      const summarizationResponse = await generateText({
+        model: this.aiProvider.getOutputModel(),
+        prompt: `Summarize the following search results for research synthesis.
+  Focus on extracting:
+  1. Key themes and concepts
+  2. Important sources with citations
+  3. Main findings and consensus points
+  4. Areas of disagreement
+  5. Most reliable information
+  
+  Search Results:
+  ${JSON.stringify(results, null, 2)}
+  
+  Your summary should preserve the most important information while reducing the token count.
+  Include source URLs when mentioning specific facts or claims to maintain traceability.`,
+      });
+
+      console.log(
+        `  Intelligent summary created (${summarizationResponse.text.length} chars)`
+      );
+      return summarizationResponse.text;
+    } catch (error: any) {
+      console.error(
+        `  Error creating intelligent summary: ${error.message || error}`
+      );
+
+      // Fallback to simpler approach if the summary generation fails
+      const simpleTopicList = results.map((r) => r.question).join(', ');
+      const domainsList = new Set<string>();
+
+      results.forEach((result) => {
+        if (result.searchResults?.results) {
+          result.searchResults.results.forEach((item) => {
+            if (item.domain) domainsList.add(item.domain);
+          });
+        }
+      });
+
+      return `Search results summary (fallback mode):
+  - Topics researched: ${simpleTopicList}
+  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Total search results: ${results.length}`;
     }
   }
 
@@ -577,7 +570,7 @@ export class DeepResearch {
 
     researchLog.steps[researchLog.steps.length - 1].details = {
       reportTime: reportDuration,
-      reportLength: finalReport.report ? finalReport.report.length : 0,
+      reportLength: finalReport.report ? finalReport.report : 0,
     };
 
     // Save the research log
@@ -604,12 +597,15 @@ export class DeepResearch {
     searchResults: WebSearchResult[];
     synthesizedResults: string;
   }) {
-    // Truncate results to fit within model's context length
-    const truncatedResults = this.truncateResultsForModelInput(searchResults);
-
-    const reportPrompt = createJsonPrompt(`${PROMPTS.report}
+    const reportPrompt = `${PROMPTS.report}
+    
+    DO NOT GO OVER THE MAX_OUTPUT_TOKEN ${
+      this.config.synthesis?.maxOutputTokens
+    } TOKENS
+    AND TRY TO AIM FOR ${this.config.synthesis?.targetOutputLength} TOKENS
 
 Main Research Topic: ${prompt}
+
 
 Research Plan:
 ${researchPlan}
@@ -618,48 +614,21 @@ Synthesized Results:
 ${JSON.stringify(synthesizedResults, null, 2)}
 
 Search Results:
-${JSON.stringify(truncatedResults, null, 2)}
+${JSON.stringify(searchResults, null, 2)}
 
-Based on the above information, generate a final research report.`);
+Based on the above information, generate a final research report.`;
 
     try {
-      const finalReport = await generateObject({
-        model: this.aiProvider.getReasoningModel(),
-        output: 'object',
-        schema: z.object({
-          report: z.string().describe('The final research report'),
-        }),
+      const report = await generateText({
+        model: this.aiProvider.getOutputModel(),
         prompt: reportPrompt,
       });
 
-      return finalReport.object;
+      return { report: report.text };
     } catch (error: any) {
       console.warn('Error in generateFinalReport:', error.message || error);
 
-      // Check if the error has a text property (likely from generateObject)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'text' in error &&
-        typeof error.text === 'string'
-      ) {
-        console.warn('Attempting to extract JSON from error response');
-        try {
-          // Try to extract JSON from the response
-          const extracted = extractJSONFromResponse(error.text);
-          if (
-            extracted &&
-            'report' in extracted &&
-            typeof extracted.report === 'string'
-          ) {
-            return extracted;
-          }
-        } catch (extractError) {
-          console.error('Failed to extract JSON:', extractError);
-        }
-      }
-
-      // Fallback report when extraction fails
+      // Fallback report when generation fails
       return {
         report:
           'Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.',
@@ -681,73 +650,152 @@ Based on the above information, generate a final research report.`);
     results: WebSearchResult[],
     allQueries: string[]
   ) {
-    // Truncate results to fit within model's context length
-    const truncatedResults = this.truncateResultsForModelInput(results);
-
     try {
-      const parsedEvaluation = await generateObject({
-        model: this.aiProvider.getReasoningModel(),
-        output: 'object',
-        schema: z.object({
-          queries: z
-            .array(z.string())
-            .describe('Additional search queries needed'),
-          isComplete: z.boolean().describe('Whether research is complete'),
-          reason: z.string().describe('Reasoning for the decision'),
-        }),
-        prompt: createJsonPrompt(`${PROMPTS.evaluation}
+      console.log(`  Starting research completeness evaluation...`);
+      // Create a simplified summary of the search results
+      const topicsCovered = new Set<string>();
+      const domains = new Set<string>();
+      let totalSources = 0;
 
-Main Research Topic: ${prompt}
+      // Extract key information
+      results.forEach((result) => {
+        if (result.searchResults && result.searchResults.ai_overview) {
+          topicsCovered.add(result.question);
+        }
 
-Current Search Results:
-${JSON.stringify(truncatedResults, null, 2)}
+        if (result.searchResults && result.searchResults.results) {
+          totalSources += result.searchResults.results.length;
 
-Previous Search Queries Used:
-${allQueries.join('\n')}
-
-Research Plan:
-${researchPlan}
-
-Based on the above information, evaluate if we have sufficient research coverage or need additional queries.`),
+          result.searchResults.results.forEach((item) => {
+            if (item.domain) domains.add(item.domain);
+          });
+        }
       });
 
-      return parsedEvaluation.object;
-    } catch (error: any) {
-      console.warn(
-        'Error in evaluateResearchCompleteness:',
-        error.message || error
+      // Create a summary
+      const resultsSummary = `
+- Total queries completed: ${results.length}
+- Total sources found: ${totalSources}
+- Unique domains: ${domains.size}
+- Topics covered: ${Array.from(topicsCovered).join(', ')}
+
+Topics addressed in search:
+${Array.from(topicsCovered)
+  .map((topic) => `- ${topic}`)
+  .join('\n')}
+      `;
+
+      console.log(
+        `  Generated research summary with ${totalSources} sources from ${domains.size} domains`
       );
 
-      // Check if the error has a text property (likely from generateObject)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'text' in error &&
-        typeof error.text === 'string'
-      ) {
-        console.warn('Attempting to extract JSON from error response');
+      // Generate evaluation with clear instructions for formatting
+      console.log(`  Generating evaluation...`);
+      const evaluationResponse = await generateText({
+        model: this.aiProvider.getReasoningModel(),
+        prompt: `${PROMPTS.evaluation}
+
+<Research Topic>${prompt}</Research Topic>
+
+<Research Plan>${researchPlan}</Research Plan>
+
+<Search Queries Used>${allQueries.join(', ')}</Search Queries Used>
+
+<Current Search Results Summary>${resultsSummary}</Current Search Results Summary>
+
+Based on the above information, evaluate if we have sufficient research coverage or need additional queries.
+Identify which aspects of the research plan have been covered and which areas still need investigation.
+
+Your response MUST be formatted exactly as follows:
+
+IS_COMPLETE: [true or false]
+REASON: [Your detailed reasoning for why the research is complete or not]
+QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search queries like ["query1", "query2"]. If complete, use empty array []]
+
+Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`,
+      });
+
+      // Access the content, handling both text property and reasoning if available
+      let evaluationText = evaluationResponse.text;
+
+      // Log reasoning if it exists (some models provide this)
+      if (evaluationResponse.reasoning) {
+        console.log(
+          `  Model reasoning (not used in final output): ${evaluationResponse.reasoning.substring(
+            0,
+            100
+          )}...`
+        );
+      }
+
+      // Clean up the response: remove thinking/reasoning tags and other markup
+      evaluationText = evaluationText
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+
+      console.log(
+        `  Received clean evaluation text (${evaluationText.length} chars)`
+      );
+      console.log(
+        `  Evaluation preview: ${evaluationText.substring(0, 150)}...`
+      );
+
+      // Extract the formatted response using regex
+      const isCompleteMatch = evaluationText.match(
+        /IS_COMPLETE:\s*(true|false)/i
+      );
+      const isComplete = isCompleteMatch
+        ? isCompleteMatch[1].toLowerCase() === 'true'
+        : false;
+
+      // Extract reason
+      const reasonMatch = evaluationText.match(
+        /REASON:\s*(.*?)(?=QUERIES:|$)/s
+      );
+      const reason = reasonMatch ? reasonMatch[1].trim() : '';
+
+      // Extract queries array
+      const queriesMatch = evaluationText.match(/QUERIES:\s*(\[.*?\])/s);
+      let queries = [];
+
+      if (queriesMatch) {
         try {
-          // Try to extract JSON from the response
-          const extracted = extractJSONFromResponse(error.text);
-          if (
-            extracted &&
-            'queries' in extracted &&
-            'isComplete' in extracted &&
-            'reason' in extracted
-          ) {
-            return extracted;
+          // Try to parse the JSON array
+          queries = JSON.parse(queriesMatch[1]);
+        } catch (e: any) {
+          console.error(`  Error parsing queries JSON: ${e.message}`);
+          // Fallback to regex extraction of quoted strings
+          const quotedStrings = queriesMatch[1].match(/"([^"]*)"/g);
+          if (quotedStrings) {
+            queries = quotedStrings.map((str) => str.replace(/"/g, ''));
           }
-        } catch (extractError) {
-          console.error('Failed to extract JSON:', extractError);
         }
       }
 
-      // Fallback response when extraction fails
-      return {
-        queries: ['fallback query 1', 'fallback query 2'],
-        isComplete: false,
-        reason: 'Error parsing model response. Using fallback queries.',
+      const result = {
+        isComplete,
+        reason,
+        queries: Array.isArray(queries) ? queries : [],
       };
+
+      console.log(
+        `  Parsed evaluation result: isComplete=${result.isComplete}, queries=${result.queries.length}`
+      );
+      return result;
+    } catch (error: any) {
+      console.error(
+        'Fatal error in evaluateResearchCompleteness:',
+        error.message || error
+      );
+      console.error(`  Error details:`, error);
+
+      // Throw the error to terminate program execution
+      throw new Error(
+        `Research evaluation failed: ${error.message || 'Unknown error'}`
+      );
     }
   }
 
@@ -876,50 +924,62 @@ Based on the above information, evaluate if we have sufficient research coverage
     searchResults: WebSearchResult[];
   }) {
     // Truncate results to fit within model's context length
-    const truncatedResults = this.truncateResultsForModelInput(searchResults);
+    const summary = await this.summarizeResultsForSynthesis(searchResults);
 
     try {
-      const synthesizedResults = await generateObject({
+      console.log(`  Starting research synthesis...`);
+
+      const synthesisResponse = await generateText({
         model: this.aiProvider.getReasoningModel(),
-        output: 'object',
-        schema: z.object({
-          synthesis: z.string().describe('The synthesized results'),
-        }),
-        prompt: createJsonPrompt(`${PROMPTS.synthesis}
+        prompt: `${PROMPTS.synthesis}
 
 Current Search Results:
-${JSON.stringify(truncatedResults, null, 2)}`),
+${summary}
+
+Synthesize the key findings from these search results into a comprehensive summary.
+Focus on the most important and reliable information.
+Highlight areas of consensus and note any significant disagreements.
+
+Your response should be formatted as a clear, well-structured synthesis without any thinking tags, 
+reasoning sections, or other markup in your response.`,
       });
 
-      return synthesizedResults.object.synthesis;
-    } catch (error: any) {
-      console.warn('Error in synthesizeResults:', error.message || error);
+      // Access the content, handling both text property
+      let synthesisText = synthesisResponse.text;
 
-      // Check if the error has a text property (likely from generateObject)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'text' in error &&
-        typeof error.text === 'string'
-      ) {
-        console.warn('Attempting to extract JSON from error response');
-        try {
-          // Try to extract JSON from the response
-          const extracted = extractJSONFromResponse(error.text);
-          if (
-            extracted &&
-            'synthesis' in extracted &&
-            typeof extracted.synthesis === 'string'
-          ) {
-            return extracted.synthesis;
-          }
-        } catch (extractError) {
-          console.error('Failed to extract JSON:', extractError);
-        }
+      // Log reasoning if it exists (some models provide this)
+      if (synthesisResponse.reasoning) {
+        console.log(
+          `  Model reasoning (not used in final output): ${synthesisResponse.reasoning.substring(
+            0,
+            100
+          )}...`
+        );
       }
 
-      // Fallback synthesis message when extraction fails
-      return 'No synthesis could be generated due to a processing error. The research results contain information about the meaning of life in space from philosophical, psychological, and cultural perspectives.';
+      // Clean up the response: remove thinking/reasoning tags and other markup
+      synthesisText = synthesisText
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+
+      console.log(`  Synthesis complete (${synthesisText.length} chars)`);
+      console.log(`  Synthesis preview: ${synthesisText.substring(0, 150)}...`);
+
+      return synthesisText;
+    } catch (error: any) {
+      console.error(
+        'Fatal error in synthesizeResults:',
+        error.message || error
+      );
+      console.error(`  Error details:`, error);
+
+      // Throw the error to terminate program execution
+      throw new Error(
+        `Research synthesis failed: ${error.message || 'Unknown error'}`
+      );
     }
   }
 
