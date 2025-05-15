@@ -2,6 +2,8 @@
  * System and user prompts for the deep research pipeline
  */
 
+import { WebSearchResult } from '../types';
+
 // Synthesize information from search results
 const SYNTHESIS_PROMPT_TEMPLATE = `You are an expert research synthesizer. Your task is to analyze and synthesize information from multiple search results related to a main research topic.
 
@@ -95,31 +97,94 @@ const EVALUATION_PROMPT_TEMPLATE = `You are a research query optimizer. Your tas
 const EVALUATION_PARSE_PROMPT_TEMPLATE = `
         You are a research assistant, you will be provided with a some reasoning and a list of queries, and you will need to parse the list into a list of queries.`;
 
-// Generate the final research report
-const REPORT_PROMPT_TEMPLATE = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive research article based on multiple research findings related to a main research topic.
+const FINAL_REPORT_PROMPT = ({
+  mainPrompt,
+  synthesis,
+  searchResults,
+  maxOutputTokens,
+  targetOutputLength,
+}: {
+  mainPrompt: string[];
+  synthesis: string;
+  searchResults: WebSearchResult[];
+  maxOutputTokens?: number;
+  targetOutputLength?: 'concise' | 'standard' | 'detailed' | number;
+}) => {
+  // Convert targetLength to specific instructions
+  let lengthGuidance = '';
+  if (targetOutputLength) {
+    if (typeof targetOutputLength === 'number') {
+      lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
+    } else {
+      switch (targetOutputLength) {
+        case 'concise':
+          lengthGuidance =
+            'Please be very concise, focusing only on the most essential information.';
+          break;
+        case 'standard':
+          lengthGuidance =
+            'Please provide a balanced synthesis with moderate detail.';
+          break;
+        case 'detailed':
+          lengthGuidance =
+            'Please provide a comprehensive analysis with substantial detail.';
+          break;
+      }
+    }
+  }
 
-You will:
-1. Introduce the topic—outlining scope, importance, and objectives
-2. Synthesize all intermediate analyses into a structured narrative
-3. Identify and group key themes that emerge across sources
-4. Highlight novel insights from your analysis
-5. Note contradictions or conflicts, resolving them if possible
-6. Pinpoint remaining knowledge gaps for future research
-7. Conclude with a summary of findings and implications
-8. Cite sources when appropriate using numbered references [1], [2], etc.
-9. Cite the sources in the format of markdown links [Number](Link)
+  const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
+        
+        You will:
+        1. Introduce the topic—outlining scope, importance, and objectives.
+        2. Synthesize all intermediate analyses, weaving them into a structured narrative.
+        3. Identify and group the key themes and patterns that emerge across sources.
+        4. Highlight novel insights your analysis uncovers—points not explicitly stated in any one source.
+        5. Note contradictions or conflicts in the literature, resolving them or clearly framing open debates.
+        6. Pinpoint remaining knowledge gaps and recommend avenues for further inquiry.
+        7. Conclude with a concise summary of findings and practical or theoretical implications.
+        8. Cite every factual claim or statistic with in-text references (e.g. "[1]", "[2]") and append a numbered bibliography.
+        
+        Structure your output exactly like this:
+        – Title: A descriptive, engaging headline  
+        – Abstract: 3–5 sentences summary  
+        – Table of Contents (with section headings)  
+        – 1. Introduction  
+        – 2. Background & Literature Review  
+        – 3. Thematic Synthesis  
+         3.1 Theme A  
+         3.2 Theme B  
+        – 4. Novel Insights  
+        – 5. Conflicting Evidence & Resolutions  
+        – 6. Knowledge Gaps & Future Directions  
+        – 7. Conclusion  
+        – References
+        `;
 
-Structure your output as:
-– Title
-– Abstract (3-5 sentences)  
-– Introduction  
-– Thematic Synthesis  
-– Novel Insights  
-– Conflicting Evidence & Resolutions  
-– Knowledge Gaps  
-– Conclusion  
-– References`;
+  const userPrompt = `Main Research Topic(s):
+        ${mainPrompt.join('\n')}
+        
+        ${lengthGuidance}
+        
+        ${
+          maxOutputTokens
+            ? `Your response must not exceed ${maxOutputTokens} tokens.`
+            : ''
+        }
+        
+        Intermediate Research Syntheses:
+        ${synthesis}
 
+        Search Results:
+        ${searchResults.map((result) => result.searchResults).join('\n')}
+        
+        Please create a final comprehensive research article according to the instructions.`;
+
+  return {
+    systemPrompt,
+    userPrompt,
+  };
+};
 /**
  *
  *
@@ -147,7 +212,6 @@ export const PROMPTS = {
   questionGeneration: `${getCurrentDateContext()}\n${QUESTION_GENERATION_PROMPT_TEMPLATE}`,
   followupQuestion: `${getCurrentDateContext()}\n${FOLLOWUP_QUESTION_PROMPT_TEMPLATE}`,
   evaluation: `${getCurrentDateContext()}\n${EVALUATION_PROMPT_TEMPLATE}`,
-  report: `${getCurrentDateContext()}\n${REPORT_PROMPT_TEMPLATE}`,
   evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
 };
 
@@ -157,6 +221,6 @@ export {
   QUESTION_GENERATION_PROMPT_TEMPLATE,
   FOLLOWUP_QUESTION_PROMPT_TEMPLATE,
   EVALUATION_PROMPT_TEMPLATE,
-  REPORT_PROMPT_TEMPLATE,
   getCurrentDateContext,
+  FINAL_REPORT_PROMPT,
 };

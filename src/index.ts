@@ -11,7 +11,40 @@ import { JigsawProvider } from './provider/jigsaw';
 import fs from 'fs';
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
-import { PROMPTS } from './prompts/prompts';
+import { FINAL_REPORT_PROMPT, PROMPTS } from './prompts/prompts';
+
+// Add debug logging functions
+/**
+ * Helper function to write debug output to a file
+ * @param stage The stage of the pipeline
+ * @param filename The filename to write to
+ * @param content The content to write
+ */
+function writeDebugFile(stage: string, filename: string, content: any) {
+  // Create debug directory if it doesn't exist
+  const debugDir = 'debug';
+  if (!fs.existsSync(debugDir)) {
+    fs.mkdirSync(debugDir);
+  }
+
+  // Create stage directory if it doesn't exist
+  const stageDir = `${debugDir}/${stage}`;
+  if (!fs.existsSync(stageDir)) {
+    fs.mkdirSync(stageDir);
+  }
+
+  // Write the content to the file
+  if (typeof content === 'object') {
+    fs.writeFileSync(
+      `${stageDir}/${filename}`,
+      JSON.stringify(content, null, 2)
+    );
+  } else {
+    fs.writeFileSync(`${stageDir}/${filename}`, content);
+  }
+
+  console.log(`Debug file written: ${stageDir}/${filename}`);
+}
 
 /**
  * Helper function to safely extract JSON from a potentially contaminated response
@@ -231,13 +264,7 @@ export class DeepResearch {
     });
   }
 
-  /**
-   * Generate a research plan with focused search queries for a given topic
-   *
-   * @param topic The main research topic
-   * @param aiProvider The AI provider to use for generation
-   * @returns List of search queries
-   */
+  // Add debug logging to generateResearchPlan method
   private async generateResearchPlan(
     topic: string,
     aiProvider: AIProvider,
@@ -270,6 +297,18 @@ export class DeepResearch {
         queries = queries.slice(0, maxQueries);
       }
       console.log(`Generated ${queries.length} research queries`);
+
+      // Debug: Write the research plan to a file
+      writeDebugFile('research-plan', 'research-plan.json', result.object);
+      writeDebugFile(
+        'research-plan',
+        'research-plan.md',
+        `# Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${
+          result.object.plan
+        }\n\n## Queries\n${result.object.queries
+          .map((q: string, i: number) => `${i + 1}. ${q}`)
+          .join('\n')}`
+      );
 
       return {
         queries,
@@ -305,6 +344,21 @@ export class DeepResearch {
             console.log(
               `Generated ${queries.length} research queries from extracted JSON`
             );
+            // Debug: Write the extracted research plan to a file
+            writeDebugFile(
+              'research-plan',
+              'research-plan-extracted.json',
+              extracted
+            );
+            writeDebugFile(
+              'research-plan',
+              'research-plan-extracted.md',
+              `# Extracted Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${
+                extracted.plan
+              }\n\n## Queries\n${extracted.queries
+                .map((q: string, i: number) => `${i + 1}. ${q}`)
+                .join('\n')}`
+            );
             return {
               queries,
               plan: extracted.plan,
@@ -328,6 +382,20 @@ export class DeepResearch {
           ? defaultQueries.slice(0, maxQueries)
           : defaultQueries;
 
+      // Debug: Write the fallback research plan to a file
+      writeDebugFile('research-plan', 'research-plan-fallback.json', {
+        topic,
+        defaultQueries: limitedQueries,
+        plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
+      });
+      writeDebugFile(
+        'research-plan',
+        'research-plan-fallback.md',
+        `# Fallback Research Plan\n\n## Topic\n${topic}\n\n## Plan\nBasic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.\n\n## Queries\n${limitedQueries
+          .map((q, i) => `${i + 1}. ${q}`)
+          .join('\n')}`
+      );
+
       return {
         queries: limitedQueries, // Return topic and variations as fallback queries
         plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
@@ -335,6 +403,7 @@ export class DeepResearch {
     }
   }
 
+  // Add debug logging to summarizeResultsForSynthesis method
   private async summarizeResultsForSynthesis(
     results: WebSearchResult[]
   ): Promise<string> {
@@ -362,6 +431,33 @@ export class DeepResearch {
       console.log(
         `  Intelligent summary created (${summarizationResponse.text.length} chars)`
       );
+
+      // Debug: Write the search results and summary to files
+      writeDebugFile('search-results', 'search-results.json', results);
+      // Create markdown version of search results
+      let searchResultsMd = `# Search Results\n\n`;
+      results.forEach((result, idx) => {
+        searchResultsMd += `## Query ${idx + 1}: ${result.question}\n\n`;
+        if (result.searchResults && result.searchResults.ai_overview) {
+          searchResultsMd += `### Overview\n\n${result.searchResults.ai_overview}\n\n`;
+        }
+        if (result.searchResults && result.searchResults.results) {
+          searchResultsMd += `### Results\n\n`;
+          result.searchResults.results.forEach((item, i) => {
+            searchResultsMd += `#### [${i + 1}] ${
+              item.title || 'Untitled'
+            }\n\n`;
+            searchResultsMd += `- URL: ${item.url}\n`;
+            if (item.domain) searchResultsMd += `- Domain: ${item.domain}\n`;
+            if (item.ai_overview)
+              searchResultsMd += `\n${item.ai_overview}\n\n`;
+            searchResultsMd += `\n---\n\n`;
+          });
+        }
+        searchResultsMd += `\n\n`;
+      });
+      writeDebugFile('search-results', 'search-results.md', searchResultsMd);
+
       return summarizationResponse.text;
     } catch (error: any) {
       console.error(
@@ -379,6 +475,25 @@ export class DeepResearch {
           });
         }
       });
+
+      // Debug: Write the fallback summary to a file
+      writeDebugFile('search-results', 'search-results-fallback.json', {
+        topic: results.map((r) => r.question),
+        fallbackSummary: `Search results summary (fallback mode):
+  - Topics researched: ${simpleTopicList}
+  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Total search results: ${results.length}`,
+      });
+      writeDebugFile(
+        'search-results',
+        'search-results-fallback.md',
+        `# Fallback Search Results Summary\n\n## Topic\n${results
+          .map((r) => r.question)
+          .join(', ')}\n\n## Summary\nSearch results summary (fallback mode):
+  - Topics researched: ${simpleTopicList}
+  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Total search results: ${results.length}`
+      );
 
       return `Search results summary (fallback mode):
   - Topics researched: ${simpleTopicList}
@@ -586,64 +701,7 @@ export class DeepResearch {
     return finalReport;
   }
 
-  private async generateFinalReport({
-    prompt,
-    researchPlan,
-    searchResults,
-    synthesizedResults,
-  }: {
-    prompt: string;
-    researchPlan: string;
-    searchResults: WebSearchResult[];
-    synthesizedResults: string;
-  }) {
-    const reportPrompt = `${PROMPTS.report}
-    
-    DO NOT GO OVER THE MAX_OUTPUT_TOKEN ${
-      this.config.synthesis?.maxOutputTokens
-    } TOKENS
-    AND TRY TO AIM FOR ${this.config.synthesis?.targetOutputLength} TOKENS
-
-Main Research Topic: ${prompt}
-
-
-Research Plan:
-${researchPlan}
-
-Synthesized Results:
-${JSON.stringify(synthesizedResults, null, 2)}
-
-Search Results:
-${JSON.stringify(searchResults, null, 2)}
-
-Based on the above information, generate a final research report.`;
-
-    try {
-      const report = await generateText({
-        model: this.aiProvider.getOutputModel(),
-        prompt: reportPrompt,
-      });
-
-      return { report: report.text };
-    } catch (error: any) {
-      console.warn('Error in generateFinalReport:', error.message || error);
-
-      // Fallback report when generation fails
-      return {
-        report:
-          'Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.',
-      };
-    }
-  }
-
-  /**
-   * Evaluate if the current search results are sufficient or if more research is needed
-   *
-   * @param topic The research topic
-   * @param results Current search results
-   * @param allQueries List of queries already used
-   * @returns List of additional queries needed or empty list if research is complete
-   */
+  // Add debug logging to evaluateResearchCompleteness method
   private async evaluateResearchCompleteness(
     prompt: string,
     researchPlan: string,
@@ -691,9 +749,7 @@ ${Array.from(topicsCovered)
 
       // Generate evaluation with clear instructions for formatting
       console.log(`  Generating evaluation...`);
-      const evaluationResponse = await generateText({
-        model: this.aiProvider.getReasoningModel(),
-        prompt: `${PROMPTS.evaluation}
+      const evaluationPrompt = `${PROMPTS.evaluation}
 
 <Research Topic>${prompt}</Research Topic>
 
@@ -712,8 +768,26 @@ IS_COMPLETE: [true or false]
 REASON: [Your detailed reasoning for why the research is complete or not]
 QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search queries like ["query1", "query2"]. If complete, use empty array []]
 
-Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`,
+Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
+
+      // Debug: Write the evaluation prompt to a file
+      writeDebugFile(
+        'evaluation',
+        `evaluation-prompt-${Date.now()}.md`,
+        evaluationPrompt
+      );
+
+      const evaluationResponse = await generateText({
+        model: this.aiProvider.getReasoningModel(),
+        prompt: evaluationPrompt,
       });
+
+      // Debug: Write the evaluation response to a file
+      writeDebugFile(
+        'evaluation',
+        `evaluation-response-${Date.now()}.md`,
+        evaluationResponse.text
+      );
 
       // Access the content, handling both text property and reasoning if available
       let evaluationText = evaluationResponse.text;
@@ -780,6 +854,13 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
         reason,
         queries: Array.isArray(queries) ? queries : [],
       };
+
+      // Debug: Write the parsed evaluation result to a file
+      writeDebugFile(
+        'evaluation',
+        `evaluation-result-${Date.now()}.json`,
+        result
+      );
 
       console.log(
         `  Parsed evaluation result: isComplete=${result.isComplete}, queries=${result.queries.length}`
@@ -918,6 +999,7 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
     };
   }
 
+  // Add debug logging to synthesizeResults method
   private async synthesizeResults({
     searchResults,
   }: {
@@ -929,9 +1011,7 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
     try {
       console.log(`  Starting research synthesis...`);
 
-      const synthesisResponse = await generateText({
-        model: this.aiProvider.getReasoningModel(),
-        prompt: `${PROMPTS.synthesis}
+      const synthesisPrompt = `${PROMPTS.synthesis}
 
 Current Search Results:
 ${summary}
@@ -941,8 +1021,22 @@ Focus on the most important and reliable information.
 Highlight areas of consensus and note any significant disagreements.
 
 Your response should be formatted as a clear, well-structured synthesis without any thinking tags, 
-reasoning sections, or other markup in your response.`,
+reasoning sections, or other markup in your response.`;
+
+      // Debug: Write the synthesis prompt to a file
+      writeDebugFile('synthesis', 'synthesis-prompt.md', synthesisPrompt);
+
+      const synthesisResponse = await generateText({
+        model: this.aiProvider.getReasoningModel(),
+        prompt: synthesisPrompt,
       });
+
+      // Debug: Write the raw synthesis response to a file
+      writeDebugFile(
+        'synthesis',
+        'synthesis-raw-response.md',
+        synthesisResponse.text
+      );
 
       // Access the content, handling both text property
       let synthesisText = synthesisResponse.text;
@@ -968,6 +1062,9 @@ reasoning sections, or other markup in your response.`,
       console.log(`  Synthesis complete (${synthesisText.length} chars)`);
       console.log(`  Synthesis preview: ${synthesisText.substring(0, 150)}...`);
 
+      // Debug: Write the cleaned synthesis to a file
+      writeDebugFile('synthesis', 'synthesis-cleaned.md', synthesisText);
+
       return synthesisText;
     } catch (error: any) {
       console.error(
@@ -980,6 +1077,77 @@ reasoning sections, or other markup in your response.`,
       throw new Error(
         `Research synthesis failed: ${error.message || 'Unknown error'}`
       );
+    }
+  }
+
+  // Add debug logging to generateFinalReport method
+  private async generateFinalReport({
+    prompt,
+    researchPlan,
+    searchResults,
+    synthesizedResults,
+  }: {
+    prompt: string;
+    researchPlan: string;
+    searchResults: WebSearchResult[];
+    synthesizedResults: string;
+  }) {
+    // Use researchPlan in debug output to avoid "declared but never read" warning
+    writeDebugFile('final-report', 'research-plan.md', researchPlan);
+
+    const reportPrompt = FINAL_REPORT_PROMPT({
+      mainPrompt: [prompt],
+      searchResults,
+      synthesis: synthesizedResults,
+      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+      targetOutputLength: this.config.synthesis?.targetOutputLength,
+    });
+
+    // Debug: Write the final report system and user prompts to files
+    writeDebugFile(
+      'final-report',
+      'final-report-system-prompt.md',
+      reportPrompt.systemPrompt
+    );
+    writeDebugFile(
+      'final-report',
+      'final-report-user-prompt.md',
+      reportPrompt.userPrompt
+    );
+    writeDebugFile('final-report', 'final-report-config.json', {
+      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+      targetOutputLength: this.config.synthesis?.targetOutputLength,
+    });
+
+    try {
+      const report = await generateText({
+        model: this.aiProvider.getOutputModel(),
+        // Convert the reportPrompt object to a string by merging system and user prompts
+        prompt: `${reportPrompt.systemPrompt}\n\n${reportPrompt.userPrompt}`,
+        maxTokens: this.config.synthesis?.maxOutputTokens,
+        experimental_continueSteps: true,
+      });
+
+      // Debug: Write the final report raw response to a file
+      writeDebugFile(
+        'final-report',
+        'final-report-raw-response.md',
+        report.text
+      );
+      writeDebugFile('final-report', 'final-report-token-count.json', {
+        responseTextLength: report.text.length,
+        estimatedTokens: Math.round(report.text.length / 4), // Rough estimate of tokens
+      });
+
+      return { report: report.text };
+    } catch (error: any) {
+      console.warn('Error in generateFinalReport:', error.message || error);
+
+      // Fallback report when generation fails
+      return {
+        report:
+          'Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.',
+      };
     }
   }
 
