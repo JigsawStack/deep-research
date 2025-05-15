@@ -1,5 +1,4 @@
 import { ModelConfig } from '../types';
-import { ReportConfig } from '../types/synthesis';
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: 'gpt-4.1',
@@ -21,14 +20,8 @@ export const DEFAULT_BREADTH_CONFIG = {
   minRelevanceScore: 0.7,
 };
 
-export const DEFAULT_SYNTHESIS_CONFIG: ReportConfig = {
-  targetOutputLength: 5000,
-  formatAsMarkdown: true,
-};
-
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
-  synthesis: DEFAULT_SYNTHESIS_CONFIG,
 } as const;

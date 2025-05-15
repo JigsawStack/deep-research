@@ -1,7 +1,5 @@
 import { DEFAULT_DEPTH_CONFIG } from '../config/defaults';
 import { DEFAULT_BREADTH_CONFIG } from '../config/defaults';
-import { SubQuestion } from './generators';
-import { ReportConfig, SynthesisOutput } from './synthesis';
 import { LanguageModelV1 } from '@ai-sdk/provider';
 
 export interface ResearchBreadthConfig {
@@ -12,7 +10,7 @@ export interface ResearchBreadthConfig {
 
 export interface RecursiveResearchResult {
   isComplete: boolean;
-  synthesis?: SynthesisOutput;
+  synthesis: string;
   reason?: 'max_depth_reached' | 'sufficient_info' | 'research_complete';
 }
 
@@ -40,16 +38,16 @@ export interface DeepResearchConfig {
   depth?: Partial<typeof DEFAULT_DEPTH_CONFIG>;
   breadth?: Partial<typeof DEFAULT_BREADTH_CONFIG>;
   models?: Partial<ModelConfig>;
-  synthesis: ReportConfig;
+  synthesis?: Partial<SynthesisConfig>;
   jigsawApiKey: string;
   openaiApiKey: string;
   geminiApiKey: string;
   deepInfraApiKey: string;
 }
 
-export interface WebSearchResultItem {
-  url: string;
-  content: string;
+export interface SynthesisConfig {
+  maxOutputTokens: number;
+  targetOutputLength: number;
 }
 
 export interface ResearchSource {
@@ -62,7 +60,7 @@ export interface ResearchSource {
 }
 
 export interface WebSearchResult {
-  question: SubQuestion;
+  question: string;
   searchResults: {
     ai_overview: string;
     results: ResearchSource[];

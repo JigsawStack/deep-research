@@ -1,6 +1,6 @@
 import createDeepResearch from '../..';
 import 'dotenv/config';
-import { createOpenAI } from '@ai-sdk/openai';
+// import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createDeepInfra } from '@ai-sdk/deepinfra';
 
@@ -20,9 +20,9 @@ async function basicResearch() {
   }
 
   // Create model instances directly
-  const openai = createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  // const openai = createOpenAI({
+  //   apiKey: process.env.OPENAI_API_KEY,
+  // });
 
   const gemini = createGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -33,27 +33,29 @@ async function basicResearch() {
   });
 
   // Get model instances
-  const openaiModel = openai('gpt-4o');
+  // const openaiModel = openai('gpt-4o');
   const geminiModel = gemini('gemini-2.0-flash');
   const deepseekModel = deepinfra('deepseek-ai/DeepSeek-R1');
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
     depth: {
-      level: 3, // Detailed analysis
+      maxLevel: 3, // Detailed analysis
       includeReferences: true,
       confidenceThreshold: 0.9,
     },
     breadth: {
-      level: 2, // Main topic + direct relationships
       maxParallelTopics: 4,
       includeRelatedTopics: true,
       minRelevanceScore: 0.8,
     },
     synthesis: {
       maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 'standard',
-      formatAsMarkdown: true,
+      targetOutputLength: 5000,
+    },
+    models: {
+      output: geminiModel,
+      reasoning: deepseekModel,
     },
     // Pass API keys from environment variables to config
     openaiApiKey: process.env.OPENAI_API_KEY,
@@ -67,11 +69,11 @@ async function basicResearch() {
 
   try {
     console.log('Starting deep research...');
-    const result = await deepResearch.generate(prompts);
+    const result = await deepResearch.generate(prompts[0]);
 
     // Log research results
     console.log('\n=== RESEARCH SUMMARY ===');
-    console.log(`Research completed successfully: ${result.success}`);
+    console.log(`Research completed successfully: ${result.report}`);
 
     return result;
   } catch (error) {
