@@ -19,11 +19,8 @@ import {
  * Synthesize search results into a coherent analysis
  */
 export async function synthesize(
-  input: SynthesisInput,
-  provider: AIProvider
+  results: WebSearchResult[]
 ): Promise<SynthesisOutput> {
-  const { mainPrompt, results, currentDepth, parentSynthesis } = input;
-
   const { systemPrompt, userPrompt } = generateSynthesisPrompt({
     mainPrompt,
     results,

@@ -1,8 +1,4 @@
-import {
-  ModelConfig,
-  ResearchBreadthConfig,
-  ResearchDepthConfig,
-} from '../types';
+import { ModelConfig } from '../types';
 import { ReportConfig } from '../types/synthesis';
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
@@ -11,15 +7,15 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   reasoning: 'deepseek-r1',
 };
 
-export const DEFAULT_DEPTH_CONFIG: ResearchDepthConfig = {
-  level: 3,
+export const DEFAULT_DEPTH_CONFIG = {
+  maxLevel: 3,
   maxTokensPerAnalysis: 2048,
   includeReferences: true,
   confidenceThreshold: 0.9,
 };
 
-export const DEFAULT_BREADTH_CONFIG: ResearchBreadthConfig = {
-  level: 2,
+export const DEFAULT_BREADTH_CONFIG = {
+  maxLevel: 2,
   maxParallelTopics: 3,
   includeRelatedTopics: true,
   minRelevanceScore: 0.7,

@@ -21,11 +21,9 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  public async fireWebSearches(
-    subQuestions: SubQuestionGeneratorResult
-  ): Promise<WebSearchResult[]> {
-    // Map each question to a promise that resolves to a search result
-    const searchPromises = subQuestions.questions.map(async (question) => {
+  public async fireWebSearches(queries: string[]) {
+    // Map each query to a promise that resolves to a search result
+    const searchPromises = queries.map(async (query) => {
       try {
         // Add retry logic for API requests
         const maxRetries = 3;
@@ -35,7 +33,7 @@ export class JigsawProvider {
         while (retryCount < maxRetries) {
           try {
             results = await this.jigsawInstance.web.search({
-              query: question.question,
+              query,
               ai_overview: true,
             });
 
@@ -80,9 +78,8 @@ export class JigsawProvider {
             isAcademic: cleaned.isAcademic || false,
           } as CleanedSearchResult;
         });
-
         return {
-          question,
+          question: query,
           searchResults: {
             ai_overview: results.ai_overview || '',
             results: cleanedResults,
@@ -90,9 +87,8 @@ export class JigsawProvider {
         };
       } catch (error) {
         console.error('Full error details:', error);
-        // Return a default structure in case of error
         return {
-          question,
+          question: query,
           searchResults: {
             ai_overview: 'Error fetching results',
             results: [],

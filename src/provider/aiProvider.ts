@@ -130,6 +130,8 @@ export class AIProvider {
     return this.providers.get(name);
   }
 
+  
+
   /**
    * Generate text using a specified model
    * For reasoning models, this will extract the reasoning property or <thinking> content if available

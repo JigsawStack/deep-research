@@ -1,3 +1,5 @@
+import { DEFAULT_DEPTH_CONFIG } from '../config/defaults';
+import { DEFAULT_BREADTH_CONFIG } from '../config/defaults';
 import { SubQuestion } from './generators';
 import { ReportConfig, SynthesisOutput } from './synthesis';
 import { LanguageModelV1 } from '@ai-sdk/provider';
@@ -29,23 +31,9 @@ export interface ModelConfig {
   [key: string]: string | LanguageModelV1 | undefined;
 }
 
-export interface ResearchDepthConfig {
-  level: 1 | 2 | 3 | 4 | 5;
-  maxTokensPerAnalysis: number;
-  includeReferences: boolean;
-  confidenceThreshold: number;
-}
-
-export interface ResearchBreadthConfig {
-  level: 1 | 2 | 3 | 4 | 5;
-  maxParallelTopics: number;
-  includeRelatedTopics: boolean;
-  minRelevanceScore: number;
-}
-
 export interface DeepResearchConfig {
-  depth?: Partial<ResearchDepthConfig>;
-  breadth?: Partial<ResearchBreadthConfig>;
+  depth?: Partial<typeof DEFAULT_DEPTH_CONFIG>;
+  breadth?: Partial<typeof DEFAULT_BREADTH_CONFIG>;
   models?: Partial<ModelConfig>;
   synthesis: ReportConfig;
   jigsawApiKey: string;

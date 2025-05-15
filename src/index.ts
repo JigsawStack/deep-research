@@ -3,8 +3,8 @@ import {
   DeepResearchConfig,
   DeepResearchInstance,
   DeepResearchResponse,
-  RecursiveResearchResult,
   ResearchSource,
+  WebSearchResultItem,
 } from './types';
 import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
 import { generateSubQuestions } from './generators/subQuestionGenerator';
@@ -26,15 +26,18 @@ import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
 import { SynthesisOutput, ReportOutput } from './types/synthesis';
 import fs from 'fs';
-export class DeepResearch implements DeepResearchInstance {
+import { generateObject } from 'ai';
+import { z } from 'zod';
+import { PROMPTS } from './prompts';
+export class DeepResearch {
   public config: DeepResearchConfig;
   public prompts?: string[];
-  private depthSynthesis: Map<number, SynthesisOutput[]>;
   private aiProvider: AIProvider;
+  private jigsaw: JigsawProvider;
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateConfig(config);
-
+    this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     // Check if required API keys are provided
     if (
       !this.config.openaiApiKey ||
@@ -66,8 +69,6 @@ export class DeepResearch implements DeepResearchInstance {
         }
       });
     }
-
-    this.depthSynthesis = new Map();
   }
 
   private validateConfig(
@@ -110,10 +111,6 @@ export class DeepResearch implements DeepResearchInstance {
           throw new Error('DeepInfra API key must be provided in config');
         })(),
     };
-  }
-
-  public getSynthesis(): Map<number, SynthesisOutput[]> {
-    return this.depthSynthesis;
   }
 
   public async generateLogs(finalReport?: ReportOutput) {
@@ -271,6 +268,105 @@ export class DeepResearch implements DeepResearchInstance {
     }
   }
 
+  /**
+   * Generate a research plan with focused search queries for a given topic
+   *
+   * @param topic The main research topic
+   * @param aiProvider The AI provider to use for generation
+   * @returns List of search queries
+   */
+  private async generateResearchPlan(
+    topic: string,
+    aiProvider: AIProvider,
+    maxQueries?: number
+  ): Promise<{ queries: string[]; plan: string }> {
+    try {
+      // Generate the research plan using the AI provider
+      const result = await generateObject({
+        model: aiProvider.getDefaultModel(),
+        output: 'object',
+        schema: z.object({
+          queries: z
+            .array(z.string())
+            .describe(
+              'A list of search queries to thoroughly research the topic'
+            ),
+          plan: z
+            .string()
+            .describe(
+              'A detailed plan explaining the research approach and methodology'
+            ),
+        }),
+        prompt: `Generate a research plan and focused search queries to thoroughly research the following topic: ${topic}. Include both specific search queries and a detailed explanation of the research approach.`,
+      });
+
+      let queries = result.object.queries;
+
+      // Limit queries if maxQueries is specified
+      if (maxQueries && maxQueries > 0) {
+        queries = queries.slice(0, maxQueries);
+      }
+      console.log(`Generated ${queries.length} research queries`);
+
+      return {
+        queries,
+        plan: result.object.plan,
+      };
+    } catch (error) {
+      console.error(`Error generating research plan: ${error}`);
+      return {
+        queries: [topic], // Return just the topic as a fallback query
+        plan: `Basic research plan: Search directly for information about "${topic}"`,
+      };
+    }
+  }
+
+  public async runResearch(prompt: string) {
+    console.log(`Running research with prompt: ${prompt}`);
+
+    // step 1: generate research plan
+    const { queries, plan } = await this.generateResearchPlan(
+      prompt,
+      this.aiProvider
+    );
+
+    console.log(`Research plan: ${plan}`);
+    console.log(`Research queries: ${queries.join('\n')}`);
+
+    // step 2: fire web searches
+    const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+    const initialSearchResults = await jigsaw.fireWebSearches(queries);
+    console.log(
+      `Received ${initialSearchResults.length} initial search results`
+    );
+
+    // step 3: iteratively search until we have enough results
+    const iterativeResult = await this.performIterativeResearch({
+      prompt,
+      researchPlan: plan,
+      initialResults: initialSearchResults,
+      allQueries: queries,
+    });
+
+    // step 4: synthesize results
+    const synthesizedResults = await this.synthesizeResults({
+      searchResults: iterativeResult.finalSearchResults,
+    });
+
+    // step 5: generate a final report
+  }
+
+  private async generateFinalReport({
+    prompt,
+    researchPlan,
+    searchResults,
+    synthesizedResults,
+  }: {
+    prompt: string;
+    researchPlan: string;
+    searchResults: WebSearchResult[];
+    synthesizedResults: SynthesisOutput;
+  }) {}
   public async generate(prompt: string[]): Promise<DeepResearchResponse> {
     if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
       throw new Error('Prompt must be provided as a non-empty array');
@@ -455,185 +551,111 @@ export class DeepResearch implements DeepResearchInstance {
     };
   }
 
-  // We still need the recursive research method since it's complex and has internal state
-  private async performRecursiveResearch(
-    initialResults: WebSearchResult[],
-    currentDepth: number = 1,
-    parentSynthesis?: SynthesisOutput
-  ): Promise<RecursiveResearchResult> {
-    if (!this.prompts || this.prompts.length === 0) {
-      throw new Error('Prompts must be set before performing research');
-    }
+  /**
+   * Evaluate if the current search results are sufficient or if more research is needed
+   *
+   * @param topic The research topic
+   * @param results Current search results
+   * @param allQueries List of queries already used
+   * @returns List of additional queries needed or empty list if research is complete
+   */
+  private async evaluateResearchCompleteness(
+    prompt: string,
+    researchPlan: string,
+    results: WebSearchResult[],
+    allQueries: string[]
+  ) {
+    // Format results into a string representation
+    const formattedResults = results.map((r) => ({
+      question: r.question.question,
+      overview: r.searchResults.ai_overview,
+      sources: r.searchResults.results,
+    }));
 
-    // Store conditions in variables
-    const isMaxDepthReached =
-      currentDepth >= (this.config.depth?.level ?? DEFAULT_DEPTH_CONFIG.level);
+    const parsedEvaluation = await generateObject({
+      model: this.aiProvider.getReasoningModel(),
+      output: 'object',
+      schema: z.object({
+        queries: z
+          .array(z.string())
+          .describe('Additional search queries needed'),
+        isComplete: z.boolean().describe('Whether research is complete'),
+        reason: z.string().describe('Reasoning for the decision'),
+      }),
+      prompt: `${PROMPTS.evaluation}
 
-    console.log(`\n===== DEPTH LEVEL ${currentDepth} =====`);
-    console.log(`Initial web search results: ${initialResults.length}`);
+Main Research Topic: ${prompt}
 
-    // Check if we already have sufficient information
-    console.log(
-      `Checking if we have sufficient information at depth ${currentDepth}...`
-    );
-    const hasSufficientInfo = await hasSufficientInformation(
-      {
-        mainPrompt: this.prompts,
-        results: initialResults,
-        currentDepth,
-        parentSynthesis,
-      },
-      this.config.depth?.confidenceThreshold ||
-        DEFAULT_DEPTH_CONFIG.confidenceThreshold,
-      this.aiProvider
-    );
-    console.log(`Sufficient information check result: ${hasSufficientInfo}`);
+Current Search Results:
+${JSON.stringify(formattedResults, null, 2)}
 
-    // First, synthesize the current level results - always do this regardless of early termination
-    console.log(
-      `Starting synthesis at depth ${currentDepth} with ${initialResults.length} results...`
-    );
-    const synthesis = await synthesize(
-      {
-        mainPrompt: this.prompts,
-        results: initialResults,
-        currentDepth,
-        parentSynthesis,
-      },
-      this.aiProvider
-    );
-    console.log(`Synthesis at depth ${currentDepth} completed`);
+Previous Search Queries Used:
+${allQueries.join('\n')}
 
-    // Store the synthesis for this depth level
-    if (!this.depthSynthesis.has(currentDepth)) {
-      this.depthSynthesis.set(currentDepth, []);
-    }
-    this.depthSynthesis.get(currentDepth)?.push(synthesis);
+Research Plan:
+${researchPlan}
 
-    console.log(`Synthesis at depth ${currentDepth}:`, {
-      analysis: synthesis.analysis.substring(0, 100) + '...',
-      keyThemes: synthesis.keyThemes,
-      confidence: synthesis.confidence,
+Based on the above information, evaluate if we have sufficient research coverage or need additional queries.`,
     });
 
-    // Early return conditions - check after generating at least one synthesis
-    if (isMaxDepthReached) {
-      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
-      console.log(`Maximum depth level ${currentDepth} reached.`);
-      console.log(`Early termination due to max depth reached.`);
-      return {
-        isComplete: true,
-        reason: 'max_depth_reached',
-        synthesis, // Return the synthesis we just generated
-      };
-    }
+    return parsedEvaluation.object;
+  }
 
-    if (hasSufficientInfo) {
-      console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
-      console.log(`Sufficient information found at depth ${currentDepth}.`);
-      console.log(`Early termination due to sufficient information.`);
-      return {
-        isComplete: true,
-        reason: 'sufficient_info',
-        synthesis, // Return the synthesis we just generated
-      };
-    }
-
-    // For each search result, generate follow-up questions
-    let totalFollowUpQuestions = 0;
-    let totalWebSearches = 0;
-
-    console.log(
-      `\nProcessing ${initialResults.length} search results for follow-up questions at depth ${currentDepth}...`
-    );
-
-    for (const result of initialResults) {
-      console.log(
-        `Generating follow-up questions for result: "${result.question.question.substring(
-          0,
-          50
-        )}..."`
+  private async performIterativeResearch({
+    prompt,
+    researchPlan,
+    initialResults,
+    allQueries,
+  }: {
+    prompt: string;
+    researchPlan: string;
+    initialResults: WebSearchResult[];
+    allQueries: string[];
+  }) {
+    let searchResults = initialResults;
+    for (let i = 0; i < this.config.depth?.level; i++) {
+      const evaluation = await this.evaluateResearchCompleteness(
+        prompt,
+        researchPlan,
+        searchResults,
+        allQueries
       );
-      // Use the function directly
-      const followupQuestions = await generateFollowupQuestions(
-        this.prompts,
-        result,
-        this.config.breadth?.maxParallelTopics ||
-          DEFAULT_BREADTH_CONFIG.maxParallelTopics,
-        this.aiProvider
-      );
-      console.log(`Generated ${followupQuestions.length} follow-up questions`);
-      totalFollowUpQuestions += followupQuestions.length;
 
-      if (followupQuestions.length > 0) {
-        // Convert follow-up questions to SubQuestionGeneratorResult format
-        const subQuestions: SubQuestionGeneratorResult = {
-          questions: followupQuestions.map((question, index) => ({
-            id: `followup-${currentDepth}-${result.question.id}-${index}`,
-            question,
-            relevanceScore: 0.9, // Assuming high relevance for follow-up questions
-            parentTopicId: result.question.id,
-          })),
-          metadata: {
-            totalGenerated: followupQuestions.length,
-            averageRelevanceScore: 0.9,
-            generationTimestamp: new Date().toISOString(),
-          },
-        };
-
-        try {
-          // Fire web searches directly
-          console.log(
-            `Firing web searches for ${subQuestions.questions.length} follow-up questions...`
-          );
-          const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
-          const followupResults = await jigsaw.fireWebSearches(subQuestions);
-          console.log(
-            `Received ${followupResults.length} web search results for follow-up questions`
-          );
-          totalWebSearches += followupResults.length;
-
-          // Recursively process deeper results with the current synthesis
-          console.log(
-            `Starting recursive research at depth ${currentDepth + 1}...`
-          );
-          const deeperResult = await this.performRecursiveResearch(
-            followupResults,
-            currentDepth + 1,
-            synthesis
-          );
-          console.log(
-            `Returned from recursive research at depth ${currentDepth + 1}`
-          );
-
-          // If we got a result from deeper level (null means we should stop), return it
-          if (deeperResult !== null) {
-            return deeperResult;
-          }
-          // Otherwise we continue with the next result
-        } catch (error) {
-          console.error(
-            `Error processing follow-up at depth ${currentDepth}:`,
-            error
-          );
-          // If we encounter an error, we can still continue with other results
-        }
+      if (evaluation.isComplete) {
+        break;
       }
-    }
 
-    // If we get here, we've completed this depth but haven't triggered early termination
-    console.log(`\n===== DEPTH ${currentDepth} SUMMARY =====`);
-    console.log(
-      `Total follow-up questions generated: ${totalFollowUpQuestions}`
-    );
-    console.log(`Total web searches performed: ${totalWebSearches}`);
-    console.log(`Research at depth ${currentDepth} completed\n`);
+      const newQueries = evaluation.queries;
+      const newResults = await this.jigsaw.fireWebSearches(newQueries);
+
+      searchResults = [...searchResults, ...newResults];
+      allQueries = [...allQueries, ...newQueries];
+    }
 
     return {
-      isComplete: true,
-      reason: 'research_complete',
-      synthesis, // Return the synthesis we just generated
-    }; // Signal that we're done with research
+      finalSearchResults: searchResults,
+      queriesUsed: allQueries,
+    };
+  }
+
+  private async synthesizeResults({
+    searchResults,
+  }: {
+    searchResults: WebSearchResultItem[];
+  }) {
+    const synthesizedResults = await generateObject({
+      model: this.aiProvider.getReasoningModel(),
+      output: 'object',
+      schema: z.object({
+        synthesis: z.string().describe('The synthesized results'),
+      }),
+      prompt: `${PROMPTS.synthesis}
+
+Current Search Results:
+${JSON.stringify(searchResults, null, 2)}`,
+    });
+
+    return synthesizedResults.object;
   }
 }
 
