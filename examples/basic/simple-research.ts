@@ -1,21 +1,14 @@
-import createDeepResearch from '../..';
-import 'dotenv/config';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createDeepInfra } from '@ai-sdk/deepinfra';
+import createDeepResearch from "../..";
+import "dotenv/config";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
 
 // Basic usage example
 async function basicResearch() {
   // Check for required API keys
-  if (
-    !process.env.OPENAI_API_KEY ||
-    !process.env.GEMINI_API_KEY ||
-    !process.env.DEEPINFRA_API_KEY ||
-    !process.env.JIGSAW_API_KEY
-  ) {
-    console.error('Error: API keys are required for all models.');
-    console.error(
-      'Please set OPENAI_API_KEY, GEMINI_API_KEY, and DEEPINFRA_API_KEY in your environment variables.'
-    );
+  if (!process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY || !process.env.DEEPINFRA_API_KEY || !process.env.JIGSAW_API_KEY) {
+    console.error("Error: API keys are required for all models.");
+    console.error("Please set OPENAI_API_KEY, GEMINI_API_KEY, and DEEPINFRA_API_KEY in your environment variables.");
     process.exit(1);
   }
 
@@ -28,8 +21,8 @@ async function basicResearch() {
   });
 
   // Get model instances
-  const geminiModel = gemini('gemini-2.0-flash');
-  const deepseekModel = deepinfra('deepseek-ai/DeepSeek-R1');
+  const geminiModel = gemini("gemini-2.0-flash");
+  const deepseekModel = deepinfra("deepseek-ai/DeepSeek-R1");
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
@@ -59,19 +52,19 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ['what is quantum computing?'];
+  const prompts = ["what is quantum computing?"];
 
   try {
-    console.log('Starting deep research...');
+    console.log("Starting deep research...");
     const result = await deepResearch.generate(prompts[0]);
 
     // Log research results
-    console.log('\n=== RESEARCH SUMMARY ===');
+    console.log("\n=== RESEARCH SUMMARY ===");
     console.log(`Research completed successfully: ${result.report}`);
 
     return result;
   } catch (error) {
-    console.error('Research failed with error:', error);
+    console.error("Research failed with error:", error);
     process.exit(1);
   }
 }

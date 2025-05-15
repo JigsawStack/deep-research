@@ -1,9 +1,9 @@
-import { ModelConfig } from '../types';
+import { ModelConfig } from "../types";
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
-  default: 'gpt-4.1',
-  output: 'gemini-2-flash',
-  reasoning: 'deepseek-r1',
+  default: "gpt-4.1",
+  output: "gemini-2-flash",
+  reasoning: "deepseek-r1",
 };
 
 export const DEFAULT_DEPTH_CONFIG = {

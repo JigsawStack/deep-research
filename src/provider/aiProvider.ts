@@ -1,8 +1,8 @@
-import { generateText } from 'ai';
-import { ProviderV1, LanguageModelV1 } from '@ai-sdk/provider';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createDeepInfra } from '@ai-sdk/deepinfra';
+import { generateText } from "ai";
+import { ProviderV1, LanguageModelV1 } from "@ai-sdk/provider";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
 
 /**
  * AIProvider acts as an abstract factory for different AI model providers
@@ -36,9 +36,7 @@ export class AIProvider {
   }) {
     // Check for required API keys
     if (!openaiApiKey || !geminiApiKey || !deepInfraApiKey) {
-      throw new Error(
-        'Missing required API keys. Please provide openaiApiKey, geminiApiKey, and deepInfraApiKey.'
-      );
+      throw new Error("Missing required API keys. Please provide openaiApiKey, geminiApiKey, and deepInfraApiKey.");
     }
 
     // Initialize providers
@@ -55,16 +53,15 @@ export class AIProvider {
     });
 
     // Store providers
-    this.providers.set('openai', openai);
-    this.providers.set('gemini', gemini);
-    this.providers.set('deepinfra', deepinfra);
+    this.providers.set("openai", openai);
+    this.providers.set("gemini", gemini);
+    this.providers.set("deepinfra", deepinfra);
 
     // Set default models
     this.models = {
-      default: defaultModel || openai.languageModel('gpt-4o'),
-      reasoning:
-        reasoningModel || deepinfra.languageModel('deepseek-ai/DeepSeek-R1'),
-      output: outputModel || gemini.languageModel('gemini-2.0-flash'),
+      default: defaultModel || openai.languageModel("gpt-4o"),
+      reasoning: reasoningModel || deepinfra.languageModel("deepseek-ai/DeepSeek-R1"),
+      output: outputModel || gemini.languageModel("gemini-2.0-flash"),
     };
   }
 
@@ -114,11 +111,11 @@ export class AIProvider {
    * Add a direct model
    */
   addDirectModel(type: string, model: LanguageModelV1): void {
-    if (type === 'default') {
+    if (type === "default") {
       this.setDefaultModel(model);
-    } else if (type === 'reasoning') {
+    } else if (type === "reasoning") {
       this.setReasoningModel(model);
-    } else if (type === 'output') {
+    } else if (type === "output") {
       this.setOutputModel(model);
     }
   }
@@ -130,16 +127,11 @@ export class AIProvider {
     return this.providers.get(name);
   }
 
-  
-
   /**
    * Generate text using a specified model
    * For reasoning models, this will extract the reasoning property or <thinking> content if available
    */
-  async generateText(
-    prompt: string,
-    model: LanguageModelV1 = this.models.default
-  ): Promise<string> {
+  async generateText(prompt: string, model: LanguageModelV1 = this.models.default): Promise<string> {
     try {
       const result = await generateText({
         model,
@@ -147,12 +139,12 @@ export class AIProvider {
       });
 
       // First check if reasoning property exists (for models like deepseek-reasoner)
-      if ('reasoning' in result && result.reasoning) {
+      if ("reasoning" in result && result.reasoning) {
         return result.reasoning;
       }
 
       // Then check for <thinking> tags in the text output
-      if (result.text && result.text.includes('<thinking>')) {
+      if (result.text && result.text.includes("<thinking>")) {
         const thinkingMatch = result.text.match(/<thinking>(.*?)<\/thinking>/s);
         if (thinkingMatch && thinkingMatch[1]) {
           return thinkingMatch[1].trim();
@@ -162,11 +154,7 @@ export class AIProvider {
       // Default fallback to regular text output
       return result.text;
     } catch (error) {
-      throw new Error(
-        `Error generating text: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+      throw new Error(`Error generating text: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

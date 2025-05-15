@@ -1,4 +1,4 @@
-import { ResearchSource } from '../types';
+import { ResearchSource } from "../types";
 
 export class ContentCleaner {
   /**
@@ -15,7 +15,7 @@ export class ContentCleaner {
       content: cleanedContent,
       ai_overview: cleanedOverview,
       domain,
-      isAcademic
+      isAcademic,
     };
   }
 
@@ -47,10 +47,10 @@ export class ContentCleaner {
       /springer\.com$/,
       /ieee\.org$/,
       /jstor\.org$/,
-      /pubmed\.ncbi\.nlm\.nih\.gov$/
+      /pubmed\.ncbi\.nlm\.nih\.gov$/,
     ];
 
-    return academicDomains.some(pattern => pattern.test(domain));
+    return academicDomains.some((pattern) => pattern.test(domain));
   }
 
   /**
@@ -72,29 +72,30 @@ export class ContentCleaner {
    */
   private static contentSteps: Array<(text: string) => string> = [
     // Remove HTML tags
-    (text: string) => text.replace(/<[^>]*>/g, ' '),
+    (text: string) => text.replace(/<[^>]*>/g, " "),
 
     // Normalize whitespace
-    (text: string) => text.replace(/\s+/g, ' '),
+    (text: string) => text.replace(/\s+/g, " "),
 
     // Remove special characters but keep meaningful punctuation
-    (text: string) => text.replace(/[^\w\s.,!?;:()"'-]/g, ' '),
+    (text: string) => text.replace(/[^\w\s.,!?;:()"'-]/g, " "),
 
     // Normalize quotes
     (text: string) => text.replace(/[""]/g, '"').replace(/['']/g, "'"),
 
     // Fix common typographical issues
-    (text: string) => text
-      .replace(/(\d+)([a-zA-Z])/g, '$1 $2') // Add space between numbers and letters
-      .replace(/([a-zA-Z])(\d+)/g, '$1 $2') // Add space between letters and numbers
-      .replace(/\.{3,}/g, '...') // Normalize ellipsis
-      .replace(/\s*-\s*/g, ' - '), // Normalize dashes
+    (text: string) =>
+      text
+        .replace(/(\d+)([a-zA-Z])/g, "$1 $2") // Add space between numbers and letters
+        .replace(/([a-zA-Z])(\d+)/g, "$1 $2") // Add space between letters and numbers
+        .replace(/\.{3,}/g, "...") // Normalize ellipsis
+        .replace(/\s*-\s*/g, " - "), // Normalize dashes
 
     // Remove URLs
-    (text: string) => text.replace(/https?:\/\/\S+/g, ''),
+    (text: string) => text.replace(/https?:\/\/\S+/g, ""),
 
     // Fix sentence spacing
-    (text: string) => text.replace(/([.!?])\s*([A-Z])/g, '$1 $2'),
+    (text: string) => text.replace(/([.!?])\s*([A-Z])/g, "$1 $2"),
 
     // Trim extra whitespace
     (text: string) => text.trim(),
@@ -102,11 +103,11 @@ export class ContentCleaner {
     // Ensure proper sentence endings
     (text: string) => {
       const lastChar = text.slice(-1);
-      if (!'.,!?'.includes(lastChar)) {
-        return text + '.';
+      if (!".,!?".includes(lastChar)) {
+        return text + ".";
       }
       return text;
-    }
+    },
   ];
 
   /**
@@ -114,21 +115,21 @@ export class ContentCleaner {
    */
   private static markdownSteps: Array<(text: string) => string> = [
     // Remove HTML tags but preserve markdown
-    (text: string) => text.replace(/<[^>]*>/g, ' '),
+    (text: string) => text.replace(/<[^>]*>/g, " "),
 
     // Normalize markdown list items
-    (text: string) => text.replace(/^\s*[-*+]\s+/gm, '* '),
+    (text: string) => text.replace(/^\s*[-*+]\s+/gm, "* "),
 
     // Preserve markdown bold/italic
-    (text: string) => text.replace(/\*\*|\*/g, match => match),
+    (text: string) => text.replace(/\*\*|\*/g, (match) => match),
 
     // Normalize whitespace while preserving line breaks
-    (text: string) => text.replace(/[ \t]+/g, ' '),
+    (text: string) => text.replace(/[ \t]+/g, " "),
 
     // Fix markdown list spacing
-    (text: string) => text.replace(/\n\n\*/g, '\n*'),
+    (text: string) => text.replace(/\n\n\*/g, "\n*"),
 
     // Trim extra whitespace while preserving markdown structure
-    (text: string) => text.trim()
+    (text: string) => text.trim(),
   ];
-} 
+}

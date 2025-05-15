@@ -2,7 +2,7 @@
  * System and user prompts for the deep research pipeline
  */
 
-import { WebSearchResult } from '../types';
+import { WebSearchResult } from "../types";
 
 // Synthesize information from search results
 const SYNTHESIS_PROMPT_TEMPLATE = `You are an expert research synthesizer. Your task is to analyze and synthesize information from multiple search results related to a main research topic.
@@ -108,26 +108,23 @@ const FINAL_REPORT_PROMPT = ({
   synthesis: string;
   searchResults: WebSearchResult[];
   maxOutputTokens?: number;
-  targetOutputLength?: 'concise' | 'standard' | 'detailed' | number;
+  targetOutputLength?: "concise" | "standard" | "detailed" | number;
 }) => {
   // Convert targetLength to specific instructions
-  let lengthGuidance = '';
+  let lengthGuidance = "";
   if (targetOutputLength) {
-    if (typeof targetOutputLength === 'number') {
+    if (typeof targetOutputLength === "number") {
       lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
     } else {
       switch (targetOutputLength) {
-        case 'concise':
-          lengthGuidance =
-            'Please be very concise, focusing only on the most essential information.';
+        case "concise":
+          lengthGuidance = "Please be very concise, focusing only on the most essential information.";
           break;
-        case 'standard':
-          lengthGuidance =
-            'Please provide a balanced synthesis with moderate detail.';
+        case "standard":
+          lengthGuidance = "Please provide a balanced synthesis with moderate detail.";
           break;
-        case 'detailed':
-          lengthGuidance =
-            'Please provide a comprehensive analysis with substantial detail.';
+        case "detailed":
+          lengthGuidance = "Please provide a comprehensive analysis with substantial detail.";
           break;
       }
     }
@@ -162,21 +159,17 @@ const FINAL_REPORT_PROMPT = ({
         `;
 
   const userPrompt = `Main Research Topic(s):
-        ${mainPrompt.join('\n')}
+        ${mainPrompt.join("\n")}
         
         ${lengthGuidance}
         
-        ${
-          maxOutputTokens
-            ? `Your response must not exceed ${maxOutputTokens} tokens.`
-            : ''
-        }
+        ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens} tokens.` : ""}
         
         Intermediate Research Syntheses:
         ${synthesis}
 
         Search Results:
-        ${searchResults.map((result) => result.searchResults).join('\n')}
+        ${searchResults.map((result) => result.searchResults).join("\n")}
         
         Please create a final comprehensive research article according to the instructions.`;
 
@@ -196,11 +189,9 @@ const getCurrentDateContext = () => {
   const year = now.getFullYear();
   const month = now.getMonth() + 1; // JavaScript months are 0-indexed
   const day = now.getDate();
-  const monthName = now.toLocaleString('default', { month: 'long' });
+  const monthName = now.toLocaleString("default", { month: "long" });
 
-  return `Current date is ${year}-${month.toString().padStart(2, '0')}-${day
-    .toString()
-    .padStart(2, '0')} (${monthName} ${day}, ${year}).
+  return `Current date is ${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")} (${monthName} ${day}, ${year}).
 When searching for recent information, prioritize results from the current year (${year}) and month (${monthName} ${year}).
 For queries about recent developments, include the current year (${year}) in your search terms.
 When ranking search results, consider recency as a factor - newer information is generally more relevant for current topics.`;

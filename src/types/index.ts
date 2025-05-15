@@ -1,6 +1,6 @@
-import { DEFAULT_DEPTH_CONFIG } from '../config/defaults';
-import { DEFAULT_BREADTH_CONFIG } from '../config/defaults';
-import { LanguageModelV1 } from '@ai-sdk/provider';
+import { DEFAULT_DEPTH_CONFIG } from "../config/defaults";
+import { DEFAULT_BREADTH_CONFIG } from "../config/defaults";
+import { LanguageModelV1 } from "@ai-sdk/provider";
 
 export interface ResearchBreadthConfig {
   maxParallelTopics: number;
@@ -11,7 +11,7 @@ export interface ResearchBreadthConfig {
 export interface RecursiveResearchResult {
   isComplete: boolean;
   synthesis: string;
-  reason?: 'max_depth_reached' | 'sufficient_info' | 'research_complete';
+  reason?: "max_depth_reached" | "sufficient_info" | "research_complete";
 }
 
 export interface ResearchProvider {
