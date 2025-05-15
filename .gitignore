@@ -3,3 +3,25 @@ node_modules
 bun.lockb
 dist
 logs/
+debug/
+
+# Build output
+dist/
+build/
+lib/
+
+# Dependencies
+node_modules/
+bun.lockb
+yarn.lock
+package-lock.json
+
+# Environment and secrets
+.env
+.env.*
+*.env
+
+# Debug and logs
+logs/
+debug/
+*.log

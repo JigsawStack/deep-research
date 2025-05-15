@@ -1,17 +1,13 @@
-import AIProvider from './provider/aiProvider';
-import { DeepResearchConfig, ResearchSource, WebSearchResult } from './types';
+import AIProvider from "./provider/aiProvider";
+import { DeepResearchConfig, ResearchSource, WebSearchResult } from "./types";
 
-import {
-  DEFAULT_CONFIG,
-  DEFAULT_DEPTH_CONFIG,
-  DEFAULT_BREADTH_CONFIG,
-} from './config/defaults';
-import 'dotenv/config';
-import { JigsawProvider } from './provider/jigsaw';
-import fs from 'fs';
-import { generateObject, generateText } from 'ai';
-import { z } from 'zod';
-import { FINAL_REPORT_PROMPT, PROMPTS } from './prompts/prompts';
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG } from "./config/defaults";
+import "dotenv/config";
+import { JigsawProvider } from "./provider/jigsaw";
+import fs from "fs";
+import { generateObject, generateText } from "ai";
+import { z } from "zod";
+import { FINAL_REPORT_PROMPT, PROMPTS } from "./prompts/prompts";
 
 // Add debug logging functions
 /**
@@ -22,7 +18,7 @@ import { FINAL_REPORT_PROMPT, PROMPTS } from './prompts/prompts';
  */
 function writeDebugFile(stage: string, filename: string, content: any) {
   // Create debug directory if it doesn't exist
-  const debugDir = 'debug';
+  const debugDir = "debug";
   if (!fs.existsSync(debugDir)) {
     fs.mkdirSync(debugDir);
   }
@@ -34,11 +30,8 @@ function writeDebugFile(stage: string, filename: string, content: any) {
   }
 
   // Write the content to the file
-  if (typeof content === 'object') {
-    fs.writeFileSync(
-      `${stageDir}/${filename}`,
-      JSON.stringify(content, null, 2)
-    );
+  if (typeof content === "object") {
+    fs.writeFileSync(`${stageDir}/${filename}`, JSON.stringify(content, null, 2));
   } else {
     fs.writeFileSync(`${stageDir}/${filename}`, content);
   }
@@ -57,7 +50,7 @@ function extractJSONFromResponse(text: string) {
     try {
       return JSON.parse(jsonCodeBlockMatch[1]);
     } catch (e) {
-      console.error('Failed to parse JSON from code block:', e);
+      console.error("Failed to parse JSON from code block:", e);
     }
   }
 
@@ -69,12 +62,12 @@ function extractJSONFromResponse(text: string) {
   let startIdx = -1;
 
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
+    if (text[i] === "{") {
       if (stack === 0) {
         startIdx = i;
       }
       stack++;
-    } else if (text[i] === '}' && stack > 0) {
+    } else if (text[i] === "}" && stack > 0) {
       stack--;
       if (stack === 0 && startIdx !== -1) {
         potentialObjects.push(text.substring(startIdx, i + 1));
@@ -88,7 +81,7 @@ function extractJSONFromResponse(text: string) {
     try {
       const parsed = JSON.parse(objText);
       // Validate the object has the expected structure
-      if (parsed && typeof parsed === 'object') {
+      if (parsed && typeof parsed === "object") {
         return parsed;
       }
     } catch (e) {
@@ -97,7 +90,7 @@ function extractJSONFromResponse(text: string) {
   }
 
   // If we still couldn't extract JSON, throw an error
-  throw new Error('Could not extract valid JSON from response');
+  throw new Error("Could not extract valid JSON from response");
 }
 
 // Type definitions for the research log
@@ -147,14 +140,8 @@ export class DeepResearch {
     this.config = this.validateConfig(config);
     this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     // Check if required API keys are provided
-    if (
-      !this.config.openaiApiKey ||
-      !this.config.geminiApiKey ||
-      !this.config.deepInfraApiKey
-    ) {
-      throw new Error(
-        'All API keys (openaiApiKey, geminiApiKey, deepInfraApiKey) are required'
-      );
+    if (!this.config.openaiApiKey || !this.config.geminiApiKey || !this.config.deepInfraApiKey) {
+      throw new Error("All API keys (openaiApiKey, geminiApiKey, deepInfraApiKey) are required");
     }
 
     // Initialize AIProvider with API keys from config
@@ -169,7 +156,7 @@ export class DeepResearch {
       // For each model type (default, quick, reasoning, etc.)
       Object.entries(config.models).forEach(([modelType, modelValue]) => {
         if (modelValue) {
-          if (typeof modelValue !== 'string') {
+          if (typeof modelValue !== "string") {
             // It's a LanguageModelV1 instance, add it as a direct model
             this.aiProvider.addDirectModel(modelType, modelValue);
           }
@@ -179,9 +166,7 @@ export class DeepResearch {
     }
   }
 
-  private validateConfig(
-    config: Partial<DeepResearchConfig>
-  ): DeepResearchConfig {
+  private validateConfig(config: Partial<DeepResearchConfig>): DeepResearchConfig {
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models };
 
@@ -194,40 +179,34 @@ export class DeepResearch {
     }
 
     return {
-      depth: config.depth
-        ? { ...DEFAULT_DEPTH_CONFIG, ...config.depth }
-        : DEFAULT_DEPTH_CONFIG,
-      breadth: config.breadth
-        ? { ...DEFAULT_BREADTH_CONFIG, ...config.breadth }
-        : DEFAULT_BREADTH_CONFIG,
+      depth: config.depth ? { ...DEFAULT_DEPTH_CONFIG, ...config.depth } : DEFAULT_DEPTH_CONFIG,
+      breadth: config.breadth ? { ...DEFAULT_BREADTH_CONFIG, ...config.breadth } : DEFAULT_BREADTH_CONFIG,
       models: mergedModels,
       jigsawApiKey:
         config.jigsawApiKey ||
         (() => {
-          throw new Error('Jigsaw API key must be provided in config');
+          throw new Error("Jigsaw API key must be provided in config");
         })(),
       openaiApiKey:
         config.openaiApiKey ||
         (() => {
-          throw new Error('OpenAI API key must be provided in config');
+          throw new Error("OpenAI API key must be provided in config");
         })(),
       geminiApiKey:
         config.geminiApiKey ||
         (() => {
-          throw new Error('Gemini API key must be provided in config');
+          throw new Error("Gemini API key must be provided in config");
         })(),
       deepInfraApiKey:
         config.deepInfraApiKey ||
         (() => {
-          throw new Error('DeepInfra API key must be provided in config');
+          throw new Error("DeepInfra API key must be provided in config");
         })(),
     };
   }
 
   // Add this function to the DeepResearch class to summarize search results
-  private deduplicateSearchResults(
-    results: WebSearchResult[]
-  ): WebSearchResult[] {
+  private deduplicateSearchResults(results: WebSearchResult[]): WebSearchResult[] {
     // Create a map to deduplicate by URL
     const urlMap = new Map<string, boolean>();
 
@@ -250,9 +229,9 @@ export class DeepResearch {
             // Keep only essential information
             return {
               url: item.url,
-              title: item.title || '',
-              domain: item.domain || '',
-              ai_overview: item.ai_overview || '',
+              title: item.title || "",
+              domain: item.domain || "",
+              ai_overview: item.ai_overview || "",
               // Truncate content to reduce token count
               // content: item.content ? item.content.substring(0, 1000) : '',
             };
@@ -265,27 +244,15 @@ export class DeepResearch {
   }
 
   // Add debug logging to generateResearchPlan method
-  private async generateResearchPlan(
-    topic: string,
-    aiProvider: AIProvider,
-    maxQueries?: number
-  ): Promise<{ queries: string[]; plan: string }> {
+  private async generateResearchPlan(topic: string, aiProvider: AIProvider, maxQueries?: number): Promise<{ queries: string[]; plan: string }> {
     try {
       // Generate the research plan using the AI provider
       const result = await generateObject({
         model: aiProvider.getDefaultModel(),
-        output: 'object',
+        output: "object",
         schema: z.object({
-          queries: z
-            .array(z.string())
-            .describe(
-              'A list of search queries to thoroughly research the topic'
-            ),
-          plan: z
-            .string()
-            .describe(
-              'A detailed plan explaining the research approach and methodology'
-            ),
+          queries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
+          plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         }),
         prompt: `Generate a research plan and focused search queries to thoroughly research the following topic: ${topic}. Include both specific search queries and a detailed explanation of the research approach.`,
       });
@@ -299,15 +266,13 @@ export class DeepResearch {
       console.log(`Generated ${queries.length} research queries`);
 
       // Debug: Write the research plan to a file
-      writeDebugFile('research-plan', 'research-plan.json', result.object);
+      writeDebugFile("research-plan", "research-plan.json", result.object);
       writeDebugFile(
-        'research-plan',
-        'research-plan.md',
-        `# Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${
-          result.object.plan
-        }\n\n## Queries\n${result.object.queries
+        "research-plan",
+        "research-plan.md",
+        `# Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${result.object.plan}\n\n## Queries\n${result.object.queries
           .map((q: string, i: number) => `${i + 1}. ${q}`)
-          .join('\n')}`
+          .join("\n")}`
       );
 
       return {
@@ -315,49 +280,28 @@ export class DeepResearch {
         plan: result.object.plan,
       };
     } catch (error: any) {
-      console.error(
-        `Error generating research plan: ${error.message || error}`
-      );
+      console.error(`Error generating research plan: ${error.message || error}`);
 
       // Check if the error has a text property (likely from generateObject)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'text' in error &&
-        typeof error.text === 'string'
-      ) {
-        console.warn('Attempting to extract JSON from error response');
+      if (error && typeof error === "object" && "text" in error && typeof error.text === "string") {
+        console.warn("Attempting to extract JSON from error response");
         try {
           // Try to extract JSON from the response
           const extracted = extractJSONFromResponse(error.text);
-          if (
-            extracted &&
-            'queries' in extracted &&
-            Array.isArray(extracted.queries) &&
-            'plan' in extracted &&
-            typeof extracted.plan === 'string'
-          ) {
+          if (extracted && "queries" in extracted && Array.isArray(extracted.queries) && "plan" in extracted && typeof extracted.plan === "string") {
             let queries = extracted.queries;
             if (maxQueries && maxQueries > 0) {
               queries = queries.slice(0, maxQueries);
             }
-            console.log(
-              `Generated ${queries.length} research queries from extracted JSON`
-            );
+            console.log(`Generated ${queries.length} research queries from extracted JSON`);
             // Debug: Write the extracted research plan to a file
+            writeDebugFile("research-plan", "research-plan-extracted.json", extracted);
             writeDebugFile(
-              'research-plan',
-              'research-plan-extracted.json',
-              extracted
-            );
-            writeDebugFile(
-              'research-plan',
-              'research-plan-extracted.md',
-              `# Extracted Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${
-                extracted.plan
-              }\n\n## Queries\n${extracted.queries
+              "research-plan",
+              "research-plan-extracted.md",
+              `# Extracted Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${extracted.plan}\n\n## Queries\n${extracted.queries
                 .map((q: string, i: number) => `${i + 1}. ${q}`)
-                .join('\n')}`
+                .join("\n")}`
             );
             return {
               queries,
@@ -365,35 +309,26 @@ export class DeepResearch {
             };
           }
         } catch (extractError) {
-          console.error('Failed to extract JSON:', extractError);
+          console.error("Failed to extract JSON:", extractError);
         }
       }
 
       // Fallback response
-      const defaultQueries = [
-        topic,
-        `${topic} research`,
-        `${topic} analysis`,
-        `${topic} examples`,
-        `${topic} implications`,
-      ];
-      const limitedQueries =
-        maxQueries && maxQueries > 0
-          ? defaultQueries.slice(0, maxQueries)
-          : defaultQueries;
+      const defaultQueries = [topic, `${topic} research`, `${topic} analysis`, `${topic} examples`, `${topic} implications`];
+      const limitedQueries = maxQueries && maxQueries > 0 ? defaultQueries.slice(0, maxQueries) : defaultQueries;
 
       // Debug: Write the fallback research plan to a file
-      writeDebugFile('research-plan', 'research-plan-fallback.json', {
+      writeDebugFile("research-plan", "research-plan-fallback.json", {
         topic,
         defaultQueries: limitedQueries,
         plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
       });
       writeDebugFile(
-        'research-plan',
-        'research-plan-fallback.md',
+        "research-plan",
+        "research-plan-fallback.md",
         `# Fallback Research Plan\n\n## Topic\n${topic}\n\n## Plan\nBasic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.\n\n## Queries\n${limitedQueries
           .map((q, i) => `${i + 1}. ${q}`)
-          .join('\n')}`
+          .join("\n")}`
       );
 
       return {
@@ -404,9 +339,7 @@ export class DeepResearch {
   }
 
   // Add debug logging to summarizeResultsForSynthesis method
-  private async summarizeResultsForSynthesis(
-    results: WebSearchResult[]
-  ): Promise<string> {
+  private async summarizeResultsForSynthesis(results: WebSearchResult[]): Promise<string> {
     // Group results by related topics and extract key themes
     console.log(`  Creating intelligent summary of search results...`);
 
@@ -428,12 +361,10 @@ export class DeepResearch {
   Include source URLs when mentioning specific facts or claims to maintain traceability.`,
       });
 
-      console.log(
-        `  Intelligent summary created (${summarizationResponse.text.length} chars)`
-      );
+      console.log(`  Intelligent summary created (${summarizationResponse.text.length} chars)`);
 
       // Debug: Write the search results and summary to files
-      writeDebugFile('search-results', 'search-results.json', results);
+      writeDebugFile("search-results", "search-results.json", results);
       // Create markdown version of search results
       let searchResultsMd = `# Search Results\n\n`;
       results.forEach((result, idx) => {
@@ -444,28 +375,23 @@ export class DeepResearch {
         if (result.searchResults && result.searchResults.results) {
           searchResultsMd += `### Results\n\n`;
           result.searchResults.results.forEach((item, i) => {
-            searchResultsMd += `#### [${i + 1}] ${
-              item.title || 'Untitled'
-            }\n\n`;
+            searchResultsMd += `#### [${i + 1}] ${item.title || "Untitled"}\n\n`;
             searchResultsMd += `- URL: ${item.url}\n`;
             if (item.domain) searchResultsMd += `- Domain: ${item.domain}\n`;
-            if (item.ai_overview)
-              searchResultsMd += `\n${item.ai_overview}\n\n`;
+            if (item.ai_overview) searchResultsMd += `\n${item.ai_overview}\n\n`;
             searchResultsMd += `\n---\n\n`;
           });
         }
         searchResultsMd += `\n\n`;
       });
-      writeDebugFile('search-results', 'search-results.md', searchResultsMd);
+      writeDebugFile("search-results", "search-results.md", searchResultsMd);
 
       return summarizationResponse.text;
     } catch (error: any) {
-      console.error(
-        `  Error creating intelligent summary: ${error.message || error}`
-      );
+      console.error(`  Error creating intelligent summary: ${error.message || error}`);
 
       // Fallback to simpler approach if the summary generation fails
-      const simpleTopicList = results.map((r) => r.question).join(', ');
+      const simpleTopicList = results.map((r) => r.question).join(", ");
       const domainsList = new Set<string>();
 
       results.forEach((result) => {
@@ -477,27 +403,27 @@ export class DeepResearch {
       });
 
       // Debug: Write the fallback summary to a file
-      writeDebugFile('search-results', 'search-results-fallback.json', {
+      writeDebugFile("search-results", "search-results-fallback.json", {
         topic: results.map((r) => r.question),
         fallbackSummary: `Search results summary (fallback mode):
   - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Sources from domains: ${Array.from(domainsList).join(", ")}
   - Total search results: ${results.length}`,
       });
       writeDebugFile(
-        'search-results',
-        'search-results-fallback.md',
+        "search-results",
+        "search-results-fallback.md",
         `# Fallback Search Results Summary\n\n## Topic\n${results
           .map((r) => r.question)
-          .join(', ')}\n\n## Summary\nSearch results summary (fallback mode):
+          .join(", ")}\n\n## Summary\nSearch results summary (fallback mode):
   - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Sources from domains: ${Array.from(domainsList).join(", ")}
   - Total search results: ${results.length}`
       );
 
       return `Search results summary (fallback mode):
   - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(', ')}
+  - Sources from domains: ${Array.from(domainsList).join(", ")}
   - Total search results: ${results.length}`;
     }
   }
@@ -526,18 +452,14 @@ export class DeepResearch {
     // step 1: generate research plan
     console.log(`[Step 1] Generating research plan...`);
     researchLog.steps.push({
-      step: 'Research Plan Generation',
+      step: "Research Plan Generation",
       timestamp: new Date().toISOString(),
     });
 
-    const { queries, plan } = await this.generateResearchPlan(
-      prompt,
-      this.aiProvider,
-      this.config.breadth?.maxParallelTopics
-    );
+    const { queries, plan } = await this.generateResearchPlan(prompt, this.aiProvider, this.config.breadth?.maxParallelTopics);
 
     console.log(`Research plan: ${plan}`);
-    console.log(`Research queries: ${queries.join('\n')}`);
+    console.log(`Research queries: ${queries.join("\n")}`);
 
     researchLog.metrics.totalQueries += queries.length;
     researchLog.steps[researchLog.steps.length - 1].details = {
@@ -546,19 +468,15 @@ export class DeepResearch {
     };
 
     // step 2: fire web searches
-    console.log(
-      `[Step 2] Running initial web searches with ${queries.length} queries...`
-    );
+    console.log(`[Step 2] Running initial web searches with ${queries.length} queries...`);
     researchLog.steps.push({
-      step: 'Initial Web Searches',
+      step: "Initial Web Searches",
       timestamp: new Date().toISOString(),
     });
 
     const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     const initialSearchResults = await jigsaw.fireWebSearches(queries);
-    console.log(
-      `Received ${initialSearchResults.length} initial search results`
-    );
+    console.log(`Received ${initialSearchResults.length} initial search results`);
 
     // Count sources from initial results
     let initialSourceCount = 0;
@@ -583,8 +501,7 @@ export class DeepResearch {
 
     // step 2.5: deduplicate results
     console.log(`[Step 2.5] Deduplicating search results...`);
-    const deduplicatedResults =
-      this.deduplicateSearchResults(initialSearchResults);
+    const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
     // Count sources after deduplication
     let dedupSourceCount = 0;
@@ -598,12 +515,10 @@ export class DeepResearch {
       }
     });
 
-    console.log(
-      `After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`
-    );
+    console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
 
     researchLog.steps.push({
-      step: 'Deduplication',
+      step: "Deduplication",
       timestamp: new Date().toISOString(),
       details: {
         sourcesBefore: initialSourceCount,
@@ -615,7 +530,7 @@ export class DeepResearch {
     // step 3: iteratively search until we have enough results
     console.log(`[Step 3] Starting iterative research...`);
     researchLog.steps.push({
-      step: 'Iterative Research',
+      step: "Iterative Research",
       timestamp: new Date().toISOString(),
       iterations: [],
     });
@@ -628,13 +543,9 @@ export class DeepResearch {
       researchLog: researchLog,
     });
 
-    console.log(
-      `Iterative research completed with ${iterativeResult.iterationCount} iterations`
-    );
+    console.log(`Iterative research completed with ${iterativeResult.iterationCount} iterations`);
     console.log(`Total queries used: ${iterativeResult.queriesUsed.length}`);
-    console.log(
-      `Final search results: ${iterativeResult.finalSearchResults.length}`
-    );
+    console.log(`Final search results: ${iterativeResult.finalSearchResults.length}`);
 
     researchLog.metrics.iterations = iterativeResult.iterationCount;
     researchLog.metrics.totalQueries = iterativeResult.queriesUsed.length;
@@ -642,7 +553,7 @@ export class DeepResearch {
     // step 4: synthesize results
     console.log(`[Step 4] Synthesizing results...`);
     researchLog.steps.push({
-      step: 'Synthesis',
+      step: "Synthesis",
       timestamp: new Date().toISOString(),
     });
 
@@ -662,7 +573,7 @@ export class DeepResearch {
     // step 5: generate a final report
     console.log(`[Step 5] Generating final report...`);
     researchLog.steps.push({
-      step: 'Final Report Generation',
+      step: "Final Report Generation",
       timestamp: new Date().toISOString(),
     });
 
@@ -679,9 +590,7 @@ export class DeepResearch {
 
     // Complete metrics
     researchLog.metrics.processingTime.end = Date.now();
-    researchLog.metrics.processingTime.total =
-      researchLog.metrics.processingTime.end -
-      researchLog.metrics.processingTime.start;
+    researchLog.metrics.processingTime.total = researchLog.metrics.processingTime.end - researchLog.metrics.processingTime.start;
 
     researchLog.steps[researchLog.steps.length - 1].details = {
       reportTime: reportDuration,
@@ -689,10 +598,7 @@ export class DeepResearch {
     };
 
     // Save the research log
-    fs.writeFileSync(
-      'logs/research_log.json',
-      JSON.stringify(researchLog, null, 2)
-    );
+    fs.writeFileSync("logs/research_log.json", JSON.stringify(researchLog, null, 2));
     console.log(`Research log saved to logs/research_log.json`);
 
     // Write detailed logs
@@ -702,12 +608,7 @@ export class DeepResearch {
   }
 
   // Add debug logging to evaluateResearchCompleteness method
-  private async evaluateResearchCompleteness(
-    prompt: string,
-    researchPlan: string,
-    results: WebSearchResult[],
-    allQueries: string[]
-  ) {
+  private async evaluateResearchCompleteness(prompt: string, researchPlan: string, results: WebSearchResult[], allQueries: string[]) {
     try {
       console.log(`  Starting research completeness evaluation...`);
       // Create a simplified summary of the search results
@@ -735,17 +636,15 @@ export class DeepResearch {
 - Total queries completed: ${results.length}
 - Total sources found: ${totalSources}
 - Unique domains: ${domains.size}
-- Topics covered: ${Array.from(topicsCovered).join(', ')}
+- Topics covered: ${Array.from(topicsCovered).join(", ")}
 
 Topics addressed in search:
 ${Array.from(topicsCovered)
   .map((topic) => `- ${topic}`)
-  .join('\n')}
+  .join("\n")}
       `;
 
-      console.log(
-        `  Generated research summary with ${totalSources} sources from ${domains.size} domains`
-      );
+      console.log(`  Generated research summary with ${totalSources} sources from ${domains.size} domains`);
 
       // Generate evaluation with clear instructions for formatting
       console.log(`  Generating evaluation...`);
@@ -755,7 +654,7 @@ ${Array.from(topicsCovered)
 
 <Research Plan>${researchPlan}</Research Plan>
 
-<Search Queries Used>${allQueries.join(', ')}</Search Queries Used>
+<Search Queries Used>${allQueries.join(", ")}</Search Queries Used>
 
 <Current Search Results Summary>${resultsSummary}</Current Search Results Summary>
 
@@ -771,11 +670,7 @@ QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search que
 Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 
       // Debug: Write the evaluation prompt to a file
-      writeDebugFile(
-        'evaluation',
-        `evaluation-prompt-${Date.now()}.md`,
-        evaluationPrompt
-      );
+      writeDebugFile("evaluation", `evaluation-prompt-${Date.now()}.md`, evaluationPrompt);
 
       const evaluationResponse = await generateText({
         model: this.aiProvider.getReasoningModel(),
@@ -783,53 +678,34 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
       });
 
       // Debug: Write the evaluation response to a file
-      writeDebugFile(
-        'evaluation',
-        `evaluation-response-${Date.now()}.md`,
-        evaluationResponse.text
-      );
+      writeDebugFile("evaluation", `evaluation-response-${Date.now()}.md`, evaluationResponse.text);
 
       // Access the content, handling both text property and reasoning if available
       let evaluationText = evaluationResponse.text;
 
       // Log reasoning if it exists (some models provide this)
       if (evaluationResponse.reasoning) {
-        console.log(
-          `  Model reasoning (not used in final output): ${evaluationResponse.reasoning.substring(
-            0,
-            100
-          )}...`
-        );
+        console.log(`  Model reasoning (not used in final output): ${evaluationResponse.reasoning.substring(0, 100)}...`);
       }
 
       // Clean up the response: remove thinking/reasoning tags and other markup
       evaluationText = evaluationText
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
-        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
-        .replace(/<[^>]*>/g, '')
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, "")
+        .replace(/<[^>]*>/g, "")
         .trim();
 
-      console.log(
-        `  Received clean evaluation text (${evaluationText.length} chars)`
-      );
-      console.log(
-        `  Evaluation preview: ${evaluationText.substring(0, 150)}...`
-      );
+      console.log(`  Received clean evaluation text (${evaluationText.length} chars)`);
+      console.log(`  Evaluation preview: ${evaluationText.substring(0, 150)}...`);
 
       // Extract the formatted response using regex
-      const isCompleteMatch = evaluationText.match(
-        /IS_COMPLETE:\s*(true|false)/i
-      );
-      const isComplete = isCompleteMatch
-        ? isCompleteMatch[1].toLowerCase() === 'true'
-        : false;
+      const isCompleteMatch = evaluationText.match(/IS_COMPLETE:\s*(true|false)/i);
+      const isComplete = isCompleteMatch ? isCompleteMatch[1].toLowerCase() === "true" : false;
 
       // Extract reason
-      const reasonMatch = evaluationText.match(
-        /REASON:\s*(.*?)(?=QUERIES:|$)/s
-      );
-      const reason = reasonMatch ? reasonMatch[1].trim() : '';
+      const reasonMatch = evaluationText.match(/REASON:\s*(.*?)(?=QUERIES:|$)/s);
+      const reason = reasonMatch ? reasonMatch[1].trim() : "";
 
       // Extract queries array
       const queriesMatch = evaluationText.match(/QUERIES:\s*(\[.*?\])/s);
@@ -844,7 +720,7 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
           // Fallback to regex extraction of quoted strings
           const quotedStrings = queriesMatch[1].match(/"([^"]*)"/g);
           if (quotedStrings) {
-            queries = quotedStrings.map((str) => str.replace(/"/g, ''));
+            queries = quotedStrings.map((str) => str.replace(/"/g, ""));
           }
         }
       }
@@ -856,27 +732,16 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
       };
 
       // Debug: Write the parsed evaluation result to a file
-      writeDebugFile(
-        'evaluation',
-        `evaluation-result-${Date.now()}.json`,
-        result
-      );
+      writeDebugFile("evaluation", `evaluation-result-${Date.now()}.json`, result);
 
-      console.log(
-        `  Parsed evaluation result: isComplete=${result.isComplete}, queries=${result.queries.length}`
-      );
+      console.log(`  Parsed evaluation result: isComplete=${result.isComplete}, queries=${result.queries.length}`);
       return result;
     } catch (error: any) {
-      console.error(
-        'Fatal error in evaluateResearchCompleteness:',
-        error.message || error
-      );
+      console.error("Fatal error in evaluateResearchCompleteness:", error.message || error);
       console.error(`  Error details:`, error);
 
       // Throw the error to terminate program execution
-      throw new Error(
-        `Research evaluation failed: ${error.message || 'Unknown error'}`
-      );
+      throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -899,17 +764,10 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
 
     for (let i = 0; i < (this.config.depth?.maxLevel || 3); i++) {
       iterationCount++;
-      console.log(
-        `  [Iteration ${iterationCount}] Evaluating research completeness...`
-      );
+      console.log(`  [Iteration ${iterationCount}] Evaluating research completeness...`);
 
       const iterationStartTime = Date.now();
-      const evaluation = await this.evaluateResearchCompleteness(
-        prompt,
-        researchPlan,
-        searchResults,
-        allQueries
-      );
+      const evaluation = await this.evaluateResearchCompleteness(prompt, researchPlan, searchResults, allQueries);
 
       // Log iteration details
       const iterationLog = {
@@ -922,18 +780,14 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
       };
 
       if (researchLog.steps) {
-        const iterativeStep = researchLog.steps.find(
-          (s) => s.step === 'Iterative Research'
-        );
+        const iterativeStep = researchLog.steps.find((s) => s.step === "Iterative Research");
         if (iterativeStep && iterativeStep.iterations) {
           iterativeStep.iterations.push(iterationLog);
         }
       }
 
       if (evaluation.isComplete) {
-        console.log(
-          `  Research evaluation complete (iteration ${iterationCount}): No additional queries needed`
-        );
+        console.log(`  Research evaluation complete (iteration ${iterationCount}): No additional queries needed`);
         console.log(`  Reason: ${evaluation.reason}`);
         break;
       }
@@ -941,9 +795,7 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
       const newQueries = evaluation.queries;
       totalNewQueries += newQueries.length;
 
-      console.log(
-        `  Adding ${newQueries.length} new queries: ${newQueries.join(', ')}`
-      );
+      console.log(`  Adding ${newQueries.length} new queries: ${newQueries.join(", ")}`);
       console.log(`  Executing additional searches...`);
 
       const searchStartTime = Date.now();
@@ -962,21 +814,12 @@ Please ensure there are no thinking tags, reasoning sections, or other markup in
         }
       });
 
-      console.log(
-        `  Retrieved ${newResults.length} new search results with ${newSourceCount} sources in ${searchTime}ms`
-      );
+      console.log(`  Retrieved ${newResults.length} new search results with ${newSourceCount} sources in ${searchTime}ms`);
 
       if (researchLog.steps) {
-        const iterativeStep = researchLog.steps.find(
-          (s) => s.step === 'Iterative Research'
-        );
-        if (
-          iterativeStep &&
-          iterativeStep.iterations &&
-          iterativeStep.iterations.length > 0
-        ) {
-          const currentIteration =
-            iterativeStep.iterations[iterativeStep.iterations.length - 1];
+        const iterativeStep = researchLog.steps.find((s) => s.step === "Iterative Research");
+        if (iterativeStep && iterativeStep.iterations && iterativeStep.iterations.length > 0) {
+          const currentIteration = iterativeStep.iterations[iterativeStep.iterations.length - 1];
           currentIteration.newSearchResults = newResults.length;
           currentIteration.newSources = newSourceCount;
           currentIteration.searchTime = searchTime;
@@ -1024,7 +867,7 @@ Your response should be formatted as a clear, well-structured synthesis without 
 reasoning sections, or other markup in your response.`;
 
       // Debug: Write the synthesis prompt to a file
-      writeDebugFile('synthesis', 'synthesis-prompt.md', synthesisPrompt);
+      writeDebugFile("synthesis", "synthesis-prompt.md", synthesisPrompt);
 
       const synthesisResponse = await generateText({
         model: this.aiProvider.getReasoningModel(),
@@ -1032,51 +875,37 @@ reasoning sections, or other markup in your response.`;
       });
 
       // Debug: Write the raw synthesis response to a file
-      writeDebugFile(
-        'synthesis',
-        'synthesis-raw-response.md',
-        synthesisResponse.text
-      );
+      writeDebugFile("synthesis", "synthesis-raw-response.md", synthesisResponse.text);
 
       // Access the content, handling both text property
       let synthesisText = synthesisResponse.text;
 
       // Log reasoning if it exists (some models provide this)
       if (synthesisResponse.reasoning) {
-        console.log(
-          `  Model reasoning (not used in final output): ${synthesisResponse.reasoning.substring(
-            0,
-            100
-          )}...`
-        );
+        console.log(`  Model reasoning (not used in final output): ${synthesisResponse.reasoning.substring(0, 100)}...`);
       }
 
       // Clean up the response: remove thinking/reasoning tags and other markup
       synthesisText = synthesisText
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
-        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
-        .replace(/<[^>]*>/g, '')
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, "")
+        .replace(/<[^>]*>/g, "")
         .trim();
 
       console.log(`  Synthesis complete (${synthesisText.length} chars)`);
       console.log(`  Synthesis preview: ${synthesisText.substring(0, 150)}...`);
 
       // Debug: Write the cleaned synthesis to a file
-      writeDebugFile('synthesis', 'synthesis-cleaned.md', synthesisText);
+      writeDebugFile("synthesis", "synthesis-cleaned.md", synthesisText);
 
       return synthesisText;
     } catch (error: any) {
-      console.error(
-        'Fatal error in synthesizeResults:',
-        error.message || error
-      );
+      console.error("Fatal error in synthesizeResults:", error.message || error);
       console.error(`  Error details:`, error);
 
       // Throw the error to terminate program execution
-      throw new Error(
-        `Research synthesis failed: ${error.message || 'Unknown error'}`
-      );
+      throw new Error(`Research synthesis failed: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -1093,7 +922,7 @@ reasoning sections, or other markup in your response.`;
     synthesizedResults: string;
   }) {
     // Use researchPlan in debug output to avoid "declared but never read" warning
-    writeDebugFile('final-report', 'research-plan.md', researchPlan);
+    writeDebugFile("final-report", "research-plan.md", researchPlan);
 
     const reportPrompt = FINAL_REPORT_PROMPT({
       mainPrompt: [prompt],
@@ -1104,17 +933,9 @@ reasoning sections, or other markup in your response.`;
     });
 
     // Debug: Write the final report system and user prompts to files
-    writeDebugFile(
-      'final-report',
-      'final-report-system-prompt.md',
-      reportPrompt.systemPrompt
-    );
-    writeDebugFile(
-      'final-report',
-      'final-report-user-prompt.md',
-      reportPrompt.userPrompt
-    );
-    writeDebugFile('final-report', 'final-report-config.json', {
+    writeDebugFile("final-report", "final-report-system-prompt.md", reportPrompt.systemPrompt);
+    writeDebugFile("final-report", "final-report-user-prompt.md", reportPrompt.userPrompt);
+    writeDebugFile("final-report", "final-report-config.json", {
       maxOutputTokens: this.config.synthesis?.maxOutputTokens,
       targetOutputLength: this.config.synthesis?.targetOutputLength,
     });
@@ -1129,59 +950,50 @@ reasoning sections, or other markup in your response.`;
       });
 
       // Debug: Write the final report raw response to a file
-      writeDebugFile(
-        'final-report',
-        'final-report-raw-response.md',
-        report.text
-      );
-      writeDebugFile('final-report', 'final-report-token-count.json', {
+      writeDebugFile("final-report", "final-report-raw-response.md", report.text);
+      writeDebugFile("final-report", "final-report-token-count.json", {
         responseTextLength: report.text.length,
         estimatedTokens: Math.round(report.text.length / 4), // Rough estimate of tokens
       });
 
       return { report: report.text };
     } catch (error: any) {
-      console.warn('Error in generateFinalReport:', error.message || error);
+      console.warn("Error in generateFinalReport:", error.message || error);
 
       // Fallback report when generation fails
       return {
         report:
-          'Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.',
+          "Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.",
       };
     }
   }
 
   public async writeLogs(finalReport?: any) {
     // Create logs directory if it doesn't exist
-    if (!fs.existsSync('logs')) {
-      fs.mkdirSync('logs');
+    if (!fs.existsSync("logs")) {
+      fs.mkdirSync("logs");
     }
 
     // Write prompts if available
     if (this.prompts) {
-      fs.writeFileSync('logs/prompts.md', this.prompts.join('\n') || '');
+      fs.writeFileSync("logs/prompts.md", this.prompts.join("\n") || "");
     }
 
     // Write final report
     if (finalReport) {
-      fs.writeFileSync(
-        'logs/final_report.json',
-        JSON.stringify(finalReport, null, 2)
-      );
+      fs.writeFileSync("logs/final_report.json", JSON.stringify(finalReport, null, 2));
 
       if (finalReport.report) {
-        fs.writeFileSync('logs/final_report.md', finalReport.report);
+        fs.writeFileSync("logs/final_report.md", finalReport.report);
       }
     }
 
     // Log information about the research process
     try {
       // Look for search results data
-      const searchResultsPath = 'logs/search_results.json';
+      const searchResultsPath = "logs/search_results.json";
       if (fs.existsSync(searchResultsPath)) {
-        const searchResults = JSON.parse(
-          fs.readFileSync(searchResultsPath, 'utf8')
-        );
+        const searchResults = JSON.parse(fs.readFileSync(searchResultsPath, "utf8"));
 
         // Extract sources from search results
         const sources: ResearchSource[] = [];
@@ -1193,10 +1005,10 @@ reasoning sections, or other markup in your response.`;
                 if (source.url && !sources.some((s) => s.url === source.url)) {
                   sources.push({
                     url: source.url,
-                    title: source.title || 'Unknown Title',
+                    title: source.title || "Unknown Title",
                     domain: source.domain || new URL(source.url).hostname,
-                    ai_overview: source.ai_overview || '',
-                    content: source.content || '',
+                    ai_overview: source.ai_overview || "",
+                    content: source.content || "",
                     isAcademic: source.isAcademic,
                   });
                 }
@@ -1205,54 +1017,51 @@ reasoning sections, or other markup in your response.`;
           });
 
           // Write sources to file
-          fs.writeFileSync(
-            'logs/sources.json',
-            JSON.stringify(sources, null, 2)
-          );
+          fs.writeFileSync("logs/sources.json", JSON.stringify(sources, null, 2));
 
           // Create a markdown version of sources for easy reference
-          let sourcesMd = '# Research Sources\n\n';
+          let sourcesMd = "# Research Sources\n\n";
           sourcesMd += `Total sources: ${sources.length}\n\n`;
 
           sources.forEach((source, index) => {
             sourcesMd += `## [${index + 1}] ${source.title}\n\n`;
             sourcesMd += `- URL: ${source.url}\n`;
             sourcesMd += `- Domain: ${source.domain}\n`;
-            sourcesMd += `- Academic: ${source.isAcademic ? 'Yes' : 'No'}\n\n`;
+            sourcesMd += `- Academic: ${source.isAcademic ? "Yes" : "No"}\n\n`;
 
             if (source.ai_overview) {
               sourcesMd += `### Overview\n\n${source.ai_overview}\n\n`;
             }
 
-            sourcesMd += '---\n\n';
+            sourcesMd += "---\n\n";
           });
 
-          fs.writeFileSync('logs/sources.md', sourcesMd);
+          fs.writeFileSync("logs/sources.md", sourcesMd);
         }
       }
 
       // Create a research summary
-      let summaryMd = '# Research Summary\n\n';
+      let summaryMd = "# Research Summary\n\n";
 
       if (finalReport && finalReport.report) {
-        const reportPreview = finalReport.report.substring(0, 500) + '...';
+        const reportPreview = finalReport.report.substring(0, 500) + "...";
         summaryMd += `## Final Report Preview\n\n${reportPreview}\n\n`;
       }
 
       // Add information about sources if available
-      const sourcesPath = 'logs/sources.json';
+      const sourcesPath = "logs/sources.json";
       if (fs.existsSync(sourcesPath)) {
-        const sources = JSON.parse(fs.readFileSync(sourcesPath, 'utf8'));
+        const sources = JSON.parse(fs.readFileSync(sourcesPath, "utf8"));
         summaryMd += `## Sources\n\nTotal sources: ${sources.length}\n\n`;
 
         // Count domains
         const domains: Record<string, number> = {};
         sources.forEach((source: ResearchSource) => {
-          const domain = source.domain || 'unknown';
+          const domain = source.domain || "unknown";
           domains[domain] = (domains[domain] || 0) + 1;
         });
 
-        summaryMd += '### Top Domains\n\n';
+        summaryMd += "### Top Domains\n\n";
         Object.entries(domains)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 10)
@@ -1262,18 +1071,14 @@ reasoning sections, or other markup in your response.`;
       }
 
       // Add detailed stats from research log
-      if (fs.existsSync('logs/research_log.json')) {
-        const researchLog = JSON.parse(
-          fs.readFileSync('logs/research_log.json', 'utf8')
-        );
+      if (fs.existsSync("logs/research_log.json")) {
+        const researchLog = JSON.parse(fs.readFileSync("logs/research_log.json", "utf8"));
         if (researchLog.metrics) {
           const metrics = researchLog.metrics;
           const processingTime = metrics.processingTime;
 
           summaryMd += `\n## Performance Metrics\n\n`;
-          summaryMd += `- Total processing time: ${Math.round(
-            processingTime.total / 1000
-          )} seconds\n`;
+          summaryMd += `- Total processing time: ${Math.round(processingTime.total / 1000)} seconds\n`;
           summaryMd += `- Iterations: ${metrics.iterations}\n`;
           summaryMd += `- Total queries: ${metrics.totalQueries}\n`;
           summaryMd += `- Sources analyzed: ${metrics.totalSources}\n`;
@@ -1291,7 +1096,7 @@ reasoning sections, or other markup in your response.`;
             researchLog.steps.forEach((step: ResearchStep, index: number) => {
               const startTime = new Date(step.timestamp);
               let endTime;
-              let duration = 'N/A';
+              let duration = "N/A";
 
               if (index < researchLog.steps.length - 1) {
                 endTime = new Date(researchLog.steps[index + 1].timestamp);
@@ -1299,95 +1104,65 @@ reasoning sections, or other markup in your response.`;
                 duration = `${Math.round(durationMs / 1000)} seconds`;
               }
 
-              summaryMd += `| ${
-                step.step
-              } | ${startTime.toLocaleTimeString()} | ${duration} |\n`;
+              summaryMd += `| ${step.step} | ${startTime.toLocaleTimeString()} | ${duration} |\n`;
             });
 
             // Query details
             if (researchLog.steps[0]?.details?.queries) {
               summaryMd += `\n### Initial Queries\n\n`;
-              researchLog.steps[0].details.queries.forEach(
-                (query: string, index: number) => {
-                  summaryMd += `${index + 1}. ${query}\n`;
-                }
-              );
+              researchLog.steps[0].details.queries.forEach((query: string, index: number) => {
+                summaryMd += `${index + 1}. ${query}\n`;
+              });
             }
 
             // Iteration details
-            const iterativeStep = researchLog.steps.find(
-              (s: ResearchStep) => s.step === 'Iterative Research'
-            );
-            if (
-              iterativeStep &&
-              iterativeStep.iterations &&
-              iterativeStep.iterations.length > 0
-            ) {
+            const iterativeStep = researchLog.steps.find((s: ResearchStep) => s.step === "Iterative Research");
+            if (iterativeStep && iterativeStep.iterations && iterativeStep.iterations.length > 0) {
               summaryMd += `\n### Iterations\n\n`;
 
-              iterativeStep.iterations.forEach(
-                (iteration: ResearchIteration) => {
-                  summaryMd += `#### Iteration ${iteration.iterationNumber}\n\n`;
-                  summaryMd += `- Timestamp: ${new Date(
-                    iteration.timestamp
-                  ).toLocaleString()}\n`;
-                  summaryMd += `- Complete: ${
-                    iteration.isComplete ? 'Yes' : 'No'
-                  }\n`;
-                  summaryMd += `- Processing time: ${Math.round(
-                    iteration.evaluationTime / 1000
-                  )} seconds\n`;
+              iterativeStep.iterations.forEach((iteration: ResearchIteration) => {
+                summaryMd += `#### Iteration ${iteration.iterationNumber}\n\n`;
+                summaryMd += `- Timestamp: ${new Date(iteration.timestamp).toLocaleString()}\n`;
+                summaryMd += `- Complete: ${iteration.isComplete ? "Yes" : "No"}\n`;
+                summaryMd += `- Processing time: ${Math.round(iteration.evaluationTime / 1000)} seconds\n`;
 
-                  if (iteration.additionalQueries > 0) {
-                    summaryMd += `- Additional queries: ${iteration.additionalQueries}\n`;
-                  }
-
-                  if (iteration.newSearchResults !== undefined) {
-                    summaryMd += `- New search results: ${iteration.newSearchResults}\n`;
-                    summaryMd += `- New sources: ${iteration.newSources}\n`;
-                    summaryMd += `- Search time: ${Math.round(
-                      (iteration.searchTime || 0) / 1000
-                    )} seconds\n`;
-                  }
-
-                  summaryMd += `\n**Reasoning**: ${iteration.reason}\n\n`;
+                if (iteration.additionalQueries > 0) {
+                  summaryMd += `- Additional queries: ${iteration.additionalQueries}\n`;
                 }
-              );
+
+                if (iteration.newSearchResults !== undefined) {
+                  summaryMd += `- New search results: ${iteration.newSearchResults}\n`;
+                  summaryMd += `- New sources: ${iteration.newSources}\n`;
+                  summaryMd += `- Search time: ${Math.round((iteration.searchTime || 0) / 1000)} seconds\n`;
+                }
+
+                summaryMd += `\n**Reasoning**: ${iteration.reason}\n\n`;
+              });
             }
 
             // Synthesis and final report metrics
-            const synthesisStep = researchLog.steps.find(
-              (s: ResearchStep) => s.step === 'Synthesis'
-            );
+            const synthesisStep = researchLog.steps.find((s: ResearchStep) => s.step === "Synthesis");
             if (synthesisStep && synthesisStep.details) {
               summaryMd += `\n### Synthesis\n\n`;
-              summaryMd += `- Processing time: ${Math.round(
-                synthesisStep.details.synthesisTime / 1000
-              )} seconds\n`;
+              summaryMd += `- Processing time: ${Math.round(synthesisStep.details.synthesisTime / 1000)} seconds\n`;
               summaryMd += `- Synthesis length: ${synthesisStep.details.synthesisLength} characters\n`;
             }
 
-            const reportStep = researchLog.steps.find(
-              (s: ResearchStep) => s.step === 'Final Report Generation'
-            );
+            const reportStep = researchLog.steps.find((s: ResearchStep) => s.step === "Final Report Generation");
             if (reportStep && reportStep.details) {
               summaryMd += `\n### Final Report\n\n`;
-              summaryMd += `- Processing time: ${Math.round(
-                reportStep.details.reportTime / 1000
-              )} seconds\n`;
+              summaryMd += `- Processing time: ${Math.round(reportStep.details.reportTime / 1000)} seconds\n`;
               summaryMd += `- Report length: ${reportStep.details.reportLength} characters\n`;
             }
           }
         }
       }
 
-      fs.writeFileSync('logs/research_summary.md', summaryMd);
+      fs.writeFileSync("logs/research_summary.md", summaryMd);
 
       // Create a separate detailed stats file
-      if (fs.existsSync('logs/research_log.json')) {
-        const researchLog = JSON.parse(
-          fs.readFileSync('logs/research_log.json', 'utf8')
-        );
+      if (fs.existsSync("logs/research_log.json")) {
+        const researchLog = JSON.parse(fs.readFileSync("logs/research_log.json", "utf8"));
         const statsOutput = {
           summary: {
             prompt: researchLog.prompt,
@@ -1401,13 +1176,10 @@ reasoning sections, or other markup in your response.`;
           config: this.config,
         };
 
-        fs.writeFileSync(
-          'logs/research_stats.json',
-          JSON.stringify(statsOutput, null, 2)
-        );
+        fs.writeFileSync("logs/research_stats.json", JSON.stringify(statsOutput, null, 2));
       }
     } catch (error) {
-      console.error('Error generating log files:', error);
+      console.error("Error generating log files:", error);
     }
   }
 }
