@@ -354,6 +354,14 @@ export class DeepResearch {
     });
 
     // step 5: generate a final report
+    const finalReport = await this.generateFinalReport({
+      prompt,
+      researchPlan: plan,
+      searchResults: iterativeResult.finalSearchResults,
+      synthesizedResults,
+    });
+
+    return finalReport;
   }
 
   private async generateFinalReport({
@@ -366,190 +374,216 @@ export class DeepResearch {
     researchPlan: string;
     searchResults: WebSearchResult[];
     synthesizedResults: SynthesisOutput;
-  }) {}
-  public async generate(prompt: string[]): Promise<DeepResearchResponse> {
-    if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
-      throw new Error('Prompt must be provided as a non-empty array');
-    }
+  }) {
+    const reportPrompt = `${PROMPTS.report}
 
-    // Store the prompt in the class property
-    this.prompts = prompt;
+Main Research Topic: ${prompt}
 
-    // Generate sub-questions directly using the imported function
-    const subQuestions = await generateSubQuestions({
-      mainPrompt: this.prompts,
-      breadthConfig: {
-        ...DEFAULT_BREADTH_CONFIG,
-        ...this.config.breadth,
-      },
-      provider: this.aiProvider,
-      generationModel: this.config.models?.default as string,
-      relevanceCheckModel: this.config.models?.reasoning as string,
-    });
-    console.log(`Generated ${subQuestions.questions.length} sub-questions`);
+Research Plan:
+${researchPlan}
 
-    // Fire web searches directly
-    const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
-    const initialSearch = await jigsaw.fireWebSearches(subQuestions);
-    console.log(`Received ${initialSearch.length} initial search results`);
+Synthesized Results:
+${JSON.stringify(synthesizedResults, null, 2)}
 
-    // Perform recursive research
-    const recursiveResult = await this.performRecursiveResearch(initialSearch);
-    console.log(
-      `Recursive research completed with reason: ${recursiveResult.reason}`
-    );
+Search Results:
+${JSON.stringify(searchResults, null, 2)}
 
-    // Store the synthesis from the recursive result if available
-    if (recursiveResult.synthesis) {
-      const depth = recursiveResult.synthesis.depth || 1;
-      console.log(`Storing synthesis from recursive result at depth ${depth}`);
+Based on the above information, generate a final research report.`;
 
-      if (!this.depthSynthesis.has(depth)) {
-        this.depthSynthesis.set(depth, []);
-      }
-      this.depthSynthesis.get(depth)?.push(recursiveResult.synthesis);
-    }
-
-    // Get all the syntheses
-    const allDepthSynthesis = this.getSynthesis();
-    console.log(
-      `Synthesis map contains ${allDepthSynthesis.size} depth levels`
-    );
-
-    // Generate the final synthesis
-    const allSyntheses: SynthesisOutput[] = [];
-    this.depthSynthesis.forEach((syntheses) => {
-      allSyntheses.push(...syntheses);
+    const finalReport = await generateObject({
+      model: this.aiProvider.getReasoningModel(),
+      output: 'object',
+      schema: z.object({
+        report: z.string().describe('The final research report'),
+      }),
+      prompt: reportPrompt,
     });
 
-    // Collect sources from all search results
-    const sources: ResearchSource[] = [];
-
-    // Extract unique sources from initial search results
-    initialSearch.forEach((result) => {
-      if (result.searchResults && result.searchResults.results) {
-        result.searchResults.results.forEach((source) => {
-          // Only add unique URLs
-          if (source.url && !sources.some((s) => s.url === source.url)) {
-            // Create a source object with only properties from the ResearchSource interface
-            const researchSource: ResearchSource = {
-              url: source.url,
-              content: source.content || '',
-              ai_overview: source.ai_overview || '',
-              title: source.title || 'Unknown Title',
-              domain: source.domain || '',
-              isAcademic: source.isAcademic,
-            };
-
-            // Add domain if not present but URL is valid
-            if (!researchSource.domain && researchSource.url) {
-              try {
-                researchSource.domain = new URL(researchSource.url).hostname;
-              } catch (e) {
-                // Invalid URL, keep domain empty
-              }
-            }
-
-            sources.push(researchSource);
-          }
-        });
-      }
-    });
-
-    // Generate the final report with collected sources
-    const finalReport = await generateReport(
-      {
-        mainPrompt: this.prompts,
-        allSyntheses: allSyntheses,
-      },
-      {
-        maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-        targetOutputLength:
-          this.config.synthesis?.targetOutputLength ?? 'standard',
-        formatAsMarkdown: true,
-      },
-      this.aiProvider,
-      // Convert ResearchSource[] to the expected format
-      sources.map((source) => ({
-        url: source.url,
-        title: source.title || 'Unknown Title',
-        domain: source.domain || '',
-        ai_overview: source.ai_overview || '',
-        isAcademic: source.isAcademic,
-      }))
-    );
-
-    console.log(
-      `Final research report generated with ${
-        finalReport.analysis ? finalReport.analysis.length : 0
-      } characters`
-    );
-
-    console.log(`\n===== FINAL REPORT DEBUG =====`);
-    console.log(`Report object keys: ${Object.keys(finalReport).join(', ')}`);
-    console.log(`Report analysis exists: ${!!finalReport.analysis}`);
-    console.log(`Report analysis type: ${typeof finalReport.analysis}`);
-    console.log(
-      `Report analysis length: ${
-        finalReport.analysis ? finalReport.analysis.length : 0
-      }`
-    );
-    console.log(
-      `Report analysis preview: ${
-        finalReport.analysis
-          ? finalReport.analysis.substring(0, 200)
-          : 'No analysis'
-      }`
-    );
-
-    if (!finalReport.analysis || finalReport.analysis.length === 0) {
-      console.error(`WARNING: Final report analysis is empty or undefined!`);
-    }
-
-    // Calculate token usage (placeholder values - implement actual counting)
-    const inputTokens = 256; // Estimate based on prompt length
-    const outputTokens = 500; // Rough estimate
-    const inferenceTimeTokens = 975; // Placeholder
-    const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
-
-    // Ensure we have a valid research output
-    let research = finalReport.analysis || 'No research results available.';
-
-    console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
-    console.log(
-      `Research completed with ${this.depthSynthesis.size} depth levels`
-    );
-    console.log(`Final report length: ${research.length} characters`);
-    console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
-    console.log(`Sources collected: ${sources.length}`);
-
-    // Generate comprehensive test files with all the data
-    await this.generateLogs(finalReport);
-
-    // Write final report to output files
-    fs.writeFileSync(
-      'logs/final_report.json',
-      JSON.stringify(finalReport, null, 2)
-    );
-
-    fs.writeFileSync(
-      'logs/final_report.md',
-      finalReport.analysis || 'No analysis available'
-    );
-    fs.writeFileSync('logs/sources.json', JSON.stringify(sources, null, 2));
-
-    return {
-      success: true,
-      research: research,
-      _usage: {
-        input_tokens: Math.round(inputTokens),
-        output_tokens: Math.round(outputTokens),
-        inference_time_tokens: inferenceTimeTokens,
-        total_tokens: Math.round(totalTokens),
-      },
-      sources: sources,
-    };
+    return finalReport.object;
   }
+  // public async generate(prompt: string[]): Promise<DeepResearchResponse> {
+  //   if (!prompt || !Array.isArray(prompt) || prompt.length === 0) {
+  //     throw new Error('Prompt must be provided as a non-empty array');
+  //   }
+
+  //   // Store the prompt in the class property
+  //   this.prompts = prompt;
+
+  //   // Generate sub-questions directly using the imported function
+  //   const subQuestions = await generateSubQuestions({
+  //     mainPrompt: this.prompts,
+  //     breadthConfig: {
+  //       ...DEFAULT_BREADTH_CONFIG,
+  //       ...this.config.breadth,
+  //     },
+  //     provider: this.aiProvider,
+  //     generationModel: this.config.models?.default as string,
+  //     relevanceCheckModel: this.config.models?.reasoning as string,
+  //   });
+  //   console.log(`Generated ${subQuestions.questions.length} sub-questions`);
+
+  //   // Fire web searches directly
+  //   const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+  //   const initialSearch = await jigsaw.fireWebSearches(subQuestions);
+  //   console.log(`Received ${initialSearch.length} initial search results`);
+
+  //   // Perform recursive research
+  //   const recursiveResult = await this.performRecursiveResearch(initialSearch);
+  //   console.log(
+  //     `Recursive research completed with reason: ${recursiveResult.reason}`
+  //   );
+
+  //   // Store the synthesis from the recursive result if available
+  //   if (recursiveResult.synthesis) {
+  //     const depth = recursiveResult.synthesis.depth || 1;
+  //     console.log(`Storing synthesis from recursive result at depth ${depth}`);
+
+  //     if (!this.depthSynthesis.has(depth)) {
+  //       this.depthSynthesis.set(depth, []);
+  //     }
+  //     this.depthSynthesis.get(depth)?.push(recursiveResult.synthesis);
+  //   }
+
+  //   // Get all the syntheses
+  //   const allDepthSynthesis = this.getSynthesis();
+  //   console.log(
+  //     `Synthesis map contains ${allDepthSynthesis.size} depth levels`
+  //   );
+
+  //   // Generate the final synthesis
+  //   const allSyntheses: SynthesisOutput[] = [];
+  //   this.depthSynthesis.forEach((syntheses) => {
+  //     allSyntheses.push(...syntheses);
+  //   });
+
+  //   // Collect sources from all search results
+  //   const sources: ResearchSource[] = [];
+
+  //   // Extract unique sources from initial search results
+  //   initialSearch.forEach((result) => {
+  //     if (result.searchResults && result.searchResults.results) {
+  //       result.searchResults.results.forEach((source) => {
+  //         // Only add unique URLs
+  //         if (source.url && !sources.some((s) => s.url === source.url)) {
+  //           // Create a source object with only properties from the ResearchSource interface
+  //           const researchSource: ResearchSource = {
+  //             url: source.url,
+  //             content: source.content || '',
+  //             ai_overview: source.ai_overview || '',
+  //             title: source.title || 'Unknown Title',
+  //             domain: source.domain || '',
+  //             isAcademic: source.isAcademic,
+  //           };
+
+  //           // Add domain if not present but URL is valid
+  //           if (!researchSource.domain && researchSource.url) {
+  //             try {
+  //               researchSource.domain = new URL(researchSource.url).hostname;
+  //             } catch (e) {
+  //               // Invalid URL, keep domain empty
+  //             }
+  //           }
+
+  //           sources.push(researchSource);
+  //         }
+  //       });
+  //     }
+  //   });
+
+  //   // Generate the final report with collected sources
+  //   const finalReport = await generateReport(
+  //     {
+  //       mainPrompt: this.prompts,
+  //       allSyntheses: allSyntheses,
+  //     },
+  //     {
+  //       maxOutputTokens: this.config.synthesis?.maxOutputTokens,
+  //       targetOutputLength:
+  //         this.config.synthesis?.targetOutputLength ?? 'standard',
+  //       formatAsMarkdown: true,
+  //     },
+  //     this.aiProvider,
+  //     // Convert ResearchSource[] to the expected format
+  //     sources.map((source) => ({
+  //       url: source.url,
+  //       title: source.title || 'Unknown Title',
+  //       domain: source.domain || '',
+  //       ai_overview: source.ai_overview || '',
+  //       isAcademic: source.isAcademic,
+  //     }))
+  //   );
+
+  //   console.log(
+  //     `Final research report generated with ${
+  //       finalReport.analysis ? finalReport.analysis.length : 0
+  //     } characters`
+  //   );
+
+  //   console.log(`\n===== FINAL REPORT DEBUG =====`);
+  //   console.log(`Report object keys: ${Object.keys(finalReport).join(', ')}`);
+  //   console.log(`Report analysis exists: ${!!finalReport.analysis}`);
+  //   console.log(`Report analysis type: ${typeof finalReport.analysis}`);
+  //   console.log(
+  //     `Report analysis length: ${
+  //       finalReport.analysis ? finalReport.analysis.length : 0
+  //     }`
+  //   );
+  //   console.log(
+  //     `Report analysis preview: ${
+  //       finalReport.analysis
+  //         ? finalReport.analysis.substring(0, 200)
+  //         : 'No analysis'
+  //     }`
+  //   );
+
+  //   if (!finalReport.analysis || finalReport.analysis.length === 0) {
+  //     console.error(`WARNING: Final report analysis is empty or undefined!`);
+  //   }
+
+  //   // Calculate token usage (placeholder values - implement actual counting)
+  //   const inputTokens = 256; // Estimate based on prompt length
+  //   const outputTokens = 500; // Rough estimate
+  //   const inferenceTimeTokens = 975; // Placeholder
+  //   const totalTokens = inputTokens + outputTokens + inferenceTimeTokens;
+
+  //   // Ensure we have a valid research output
+  //   let research = finalReport.analysis || 'No research results available.';
+
+  //   console.log(`\n===== FINAL RESEARCH SUMMARY =====`);
+  //   console.log(
+  //     `Research completed with ${this.depthSynthesis.size} depth levels`
+  //   );
+  //   console.log(`Final report length: ${research.length} characters`);
+  //   console.log(`Key themes identified: ${finalReport.keyThemes.join(', ')}`);
+  //   console.log(`Sources collected: ${sources.length}`);
+
+  //   // Generate comprehensive test files with all the data
+  //   await this.generateLogs(finalReport);
+
+  //   // Write final report to output files
+  //   fs.writeFileSync(
+  //     'logs/final_report.json',
+  //     JSON.stringify(finalReport, null, 2)
+  //   );
+
+  //   fs.writeFileSync(
+  //     'logs/final_report.md',
+  //     finalReport.analysis || 'No analysis available'
+  //   );
+  //   fs.writeFileSync('logs/sources.json', JSON.stringify(sources, null, 2));
+
+  //   return {
+  //     success: true,
+  //     research: research,
+  //     _usage: {
+  //       input_tokens: Math.round(inputTokens),
+  //       output_tokens: Math.round(outputTokens),
+  //       inference_time_tokens: inferenceTimeTokens,
+  //       total_tokens: Math.round(totalTokens),
+  //     },
+  //     sources: sources,
+  //   };
+  // }
 
   /**
    * Evaluate if the current search results are sufficient or if more research is needed
@@ -613,7 +647,7 @@ Based on the above information, evaluate if we have sufficient research coverage
     allQueries: string[];
   }) {
     let searchResults = initialResults;
-    for (let i = 0; i < this.config.depth?.level; i++) {
+    for (let i = 0; i < (this.config.depth?.maxLevel || 3); i++) {
       const evaluation = await this.evaluateResearchCompleteness(
         prompt,
         researchPlan,
