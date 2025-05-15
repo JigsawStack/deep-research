@@ -33,7 +33,7 @@ export class DeepResearch implements DeepResearchInstance {
   private aiProvider: AIProvider;
 
   constructor(config: Partial<DeepResearchConfig>) {
-    this.config = this.validateAndMergeConfig(config);
+    this.config = this.validateConfig(config);
 
     // Check if required API keys are provided
     if (
@@ -70,7 +70,7 @@ export class DeepResearch implements DeepResearchInstance {
     this.depthSynthesis = new Map();
   }
 
-  private validateAndMergeConfig(
+  private validateConfig(
     config: Partial<DeepResearchConfig>
   ): DeepResearchConfig {
     // Merge models carefully to handle both string and LanguageModelV1 instances
@@ -85,27 +85,30 @@ export class DeepResearch implements DeepResearchInstance {
     }
 
     return {
-      depth: {
-        ...DEFAULT_DEPTH_CONFIG,
-        ...config.depth,
-      },
-      breadth: {
-        ...DEFAULT_BREADTH_CONFIG,
-        ...config.breadth,
-      },
-      synthesis: {
-        ...DEFAULT_SYNTHESIS_CONFIG,
-        ...config.synthesis,
-      },
+      depth: { ...DEFAULT_DEPTH_CONFIG, ...config.depth },
+      breadth: { ...DEFAULT_BREADTH_CONFIG, ...config.breadth },
+      synthesis: { ...DEFAULT_SYNTHESIS_CONFIG, ...config.synthesis },
       models: mergedModels,
       jigsawApiKey:
         config.jigsawApiKey ||
         (() => {
           throw new Error('Jigsaw API key must be provided in config');
         })(),
-      openaiApiKey: config.openaiApiKey || '',
-      geminiApiKey: config.geminiApiKey || '',
-      deepInfraApiKey: config.deepInfraApiKey || '',
+      openaiApiKey:
+        config.openaiApiKey ||
+        (() => {
+          throw new Error('OpenAI API key must be provided in config');
+        })(),
+      geminiApiKey:
+        config.geminiApiKey ||
+        (() => {
+          throw new Error('Gemini API key must be provided in config');
+        })(),
+      deepInfraApiKey:
+        config.deepInfraApiKey ||
+        (() => {
+          throw new Error('DeepInfra API key must be provided in config');
+        })(),
     };
   }
 
@@ -637,43 +640,7 @@ export class DeepResearch implements DeepResearchInstance {
 export function createDeepResearch(
   config: Partial<DeepResearchConfig>
 ): DeepResearchInstance {
-  // Set up default configs
-  const defaultConfig: DeepResearchConfig = {
-    depth: {
-      level: 3,
-      maxTokensPerAnalysis: 4000,
-      includeReferences: true,
-      confidenceThreshold: 0.7,
-    },
-    breadth: {
-      level: 2,
-      maxParallelTopics: 3,
-      includeRelatedTopics: true,
-      minRelevanceScore: 0.8,
-    },
-    synthesis: {
-      maxOutputTokens: 8000,
-      targetOutputLength: 5000,
-      formatAsMarkdown: true,
-    },
-    // Default empty values for API keys, they must be provided by user
-    openaiApiKey: '',
-    geminiApiKey: '',
-    deepInfraApiKey: '',
-    jigsawApiKey: '',
-  };
-
-  // Merge provided config with defaults
-  const mergedConfig = {
-    ...defaultConfig,
-    ...config,
-    depth: { ...defaultConfig.depth, ...config.depth },
-    breadth: { ...defaultConfig.breadth, ...config.breadth },
-    synthesis: { ...defaultConfig.synthesis, ...config.synthesis },
-  };
-
-  // Return new instance with merged config
-  return new DeepResearch(mergedConfig);
+  return new DeepResearch(config);
 }
 
 // Default export

@@ -33,9 +33,9 @@ async function basicResearch() {
   });
 
   // Get model instances
-  const openaiModel = openai.languageModel('gpt-4o');
-  const geminiModel = gemini.languageModel('gemini-2.0-flash');
-  const deepseekModel = deepinfra.languageModel('deepseek-ai/DeepSeek-R1');
+  const openaiModel = openai('gpt-4o');
+  const geminiModel = gemini('gemini-2.0-flash');
+  const deepseekModel = deepinfra('deepseek-ai/DeepSeek-R1');
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
@@ -68,7 +68,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ['what is the meaning of life?'];
+  const prompts = ['what is quantum computing?'];
 
   try {
     console.log('Starting deep research...');
