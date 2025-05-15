@@ -59,7 +59,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ['what is the meaning of life in space?'];
+  const prompts = ['what is quantum computing?'];
 
   try {
     console.log('Starting deep research...');
