@@ -1,4 +1,14 @@
-import { WebSearchResult } from '.';
+import { SubQuestion } from './generators';
+import { ResearchSource } from './index';
+
+// Interface for search results in a format usable for synthesis
+interface WebSearchResult {
+  question: SubQuestion;
+  searchResults: {
+    ai_overview: string;
+    results: ResearchSource[];
+  };
+}
 
 // Base interface for common synthesis properties
 export interface BaseSynthesisInput {

@@ -22,7 +22,7 @@ export const DEFAULT_BREADTH_CONFIG = {
 };
 
 export const DEFAULT_SYNTHESIS_CONFIG: ReportConfig = {
-  targetOutputLength: 'standard',
+  targetOutputLength: 5000,
   formatAsMarkdown: true,
 };
 

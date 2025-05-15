@@ -5,12 +5,6 @@ export interface SubQuestion {
   parentTopicId?: string;
 }
 
-export interface SubQuestionGeneratorConfig {
-  model: string;
-  temperature: number;
-  maxTokens: number;
-}
-
 export interface SubQuestionGeneratorResult {
   questions: SubQuestion[];
   metadata: {
@@ -18,4 +12,4 @@ export interface SubQuestionGeneratorResult {
     averageRelevanceScore: number;
     generationTimestamp: string;
   };
-} 
+}

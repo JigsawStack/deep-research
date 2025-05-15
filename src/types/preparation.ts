@@ -1,13 +1,5 @@
-import { SubQuestion } from '../types/generators';
-
-export interface ResearchSource {
-  url: string;
-  content: string;
-  title?: string;
-  domain?: string;
-  isAcademic?: boolean;
-  credibilityScore?: number;
-}
+import { SubQuestion } from './generators';
+import { ResearchSource } from './index';
 
 export interface ProcessedSearchResults {
   overview: string;

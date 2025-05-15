@@ -2,17 +2,8 @@ import AIProvider from './provider/aiProvider';
 import {
   DeepResearchConfig,
   DeepResearchInstance,
-  DeepResearchResponse,
-  ResearchSource,
   WebSearchResultItem,
 } from './types';
-import { generateFollowupQuestions } from './generators/followupQuestionGenerator';
-import { generateSubQuestions } from './generators/subQuestionGenerator';
-import {
-  synthesize,
-  generateReport,
-  hasSufficientInformation,
-} from './synthesis/synthesizer';
 
 import {
   DEFAULT_CONFIG,
@@ -20,7 +11,6 @@ import {
   DEFAULT_BREADTH_CONFIG,
   DEFAULT_SYNTHESIS_CONFIG,
 } from './config/defaults';
-import { SubQuestionGeneratorResult } from './types/generators';
 import { WebSearchResult } from './types';
 import 'dotenv/config';
 import { JigsawProvider } from './provider/jigsaw';
@@ -113,7 +103,7 @@ export class DeepResearch {
     };
   }
 
-  public async generateLogs(finalReport?: ReportOutput) {
+  public async writeLogs(finalReport?: ReportOutput) {
     // Create logs directory if it doesn't exist
     if (!fs.existsSync('logs')) {
       fs.mkdirSync('logs');
@@ -693,9 +683,7 @@ ${JSON.stringify(searchResults, null, 2)}`,
   }
 }
 
-export function createDeepResearch(
-  config: Partial<DeepResearchConfig>
-): DeepResearchInstance {
+export function createDeepResearch(config: Partial<DeepResearchConfig>) {
   return new DeepResearch(config);
 }
 

@@ -1,7 +1,6 @@
 import { JigsawStack } from 'jigsawstack';
 import 'dotenv/config';
-import { SubQuestionGeneratorResult } from '../types/generators';
-import { WebSearchResult, ResearchSource, CleanedSearchResult } from '../types';
+import { ResearchSource } from '../types';
 import { ContentCleaner } from '../preparation/contentCleaner';
 
 export class JigsawProvider {
@@ -76,7 +75,7 @@ export class JigsawProvider {
             ...cleaned,
             domain: cleaned.domain || '',
             isAcademic: cleaned.isAcademic || false,
-          } as CleanedSearchResult;
+          } as ResearchSource;
         });
         return {
           question: query,

@@ -52,13 +52,8 @@ async function basicResearch() {
     },
     synthesis: {
       maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 5000,
+      targetOutputLength: 'standard',
       formatAsMarkdown: true,
-    },
-    models: {
-      default: openaiModel, // OpenAI as default model
-      reasoning: deepseekModel, // DeepInfra for reasoning
-      output: geminiModel, // Gemini for output formatting
     },
     // Pass API keys from environment variables to config
     openaiApiKey: process.env.OPENAI_API_KEY,
