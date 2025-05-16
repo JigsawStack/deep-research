@@ -1,4 +1,4 @@
-import { ResearchSource } from "../types";
+import { ResearchSource } from "../types/types";
 
 export class ContentCleaner {
   /**

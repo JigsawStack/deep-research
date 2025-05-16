@@ -35,10 +35,10 @@ export interface ModelConfig {
 }
 
 export interface DeepResearchConfig {
-  depth?: Partial<typeof DEFAULT_DEPTH_CONFIG>;
-  breadth?: Partial<typeof DEFAULT_BREADTH_CONFIG>;
-  models?: Partial<ModelConfig>;
-  synthesis?: Partial<SynthesisConfig>;
+  depth: typeof DEFAULT_DEPTH_CONFIG;
+  breadth: typeof DEFAULT_BREADTH_CONFIG;
+  models: ModelConfig;
+  synthesis: SynthesisConfig;
   jigsawApiKey: string;
   openaiApiKey: string;
   geminiApiKey: string;
@@ -47,7 +47,7 @@ export interface DeepResearchConfig {
 
 export interface SynthesisConfig {
   maxOutputTokens: number;
-  targetOutputLength: number;
+  targetOutputLength: "concise" | "standard" | "detailed" | number;
 }
 
 export interface ResearchSource {

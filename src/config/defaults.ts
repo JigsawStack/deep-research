@@ -1,4 +1,4 @@
-import { ModelConfig } from "../types";
+import { ModelConfig } from "../types/types";
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: "gpt-4.1",
@@ -20,8 +20,14 @@ export const DEFAULT_BREADTH_CONFIG = {
   minRelevanceScore: 0.7,
 };
 
+export const DEFAULT_SYNTHESIS_CONFIG = {
+  maxOutputTokens: 8000,
+  targetOutputLength: 5000,
+};
+
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
+  synthesis: DEFAULT_SYNTHESIS_CONFIG,
 } as const;

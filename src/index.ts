@@ -1,7 +1,7 @@
 import AIProvider from "./provider/aiProvider";
-import { DeepResearchConfig, ResearchSource, WebSearchResult } from "./types";
+import { DeepResearchConfig, ResearchSource, WebSearchResult } from "./types/types";
 
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG } from "./config/defaults";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_SYNTHESIS_CONFIG } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
@@ -181,6 +181,10 @@ export class DeepResearch {
     return {
       depth: config.depth ? { ...DEFAULT_DEPTH_CONFIG, ...config.depth } : DEFAULT_DEPTH_CONFIG,
       breadth: config.breadth ? { ...DEFAULT_BREADTH_CONFIG, ...config.breadth } : DEFAULT_BREADTH_CONFIG,
+      synthesis: {
+        ...DEFAULT_SYNTHESIS_CONFIG,
+        ...(config.synthesis || {}),
+      },
       models: mergedModels,
       jigsawApiKey:
         config.jigsawApiKey ||
@@ -353,10 +357,10 @@ export class DeepResearch {
   // 3. Main findings and consensus points
   // 4. Areas of disagreement
   // 5. Most reliable information
-  
+
   // Search Results:
   // ${JSON.stringify(results, null, 2)}
-  
+
   // Your summary should preserve the most important information while reducing the token count.
   // Include source URLs when mentioning specific facts or claims to maintain traceability.`,
   //     });
@@ -579,6 +583,7 @@ export class DeepResearch {
     });
 
     const reportStartTime = Date.now();
+
     const finalReport = await this.generateFinalReport({
       prompt,
       researchPlan: plan,

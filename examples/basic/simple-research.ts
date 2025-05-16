@@ -27,11 +27,13 @@ async function basicResearch() {
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
     depth: {
-      maxLevel: 2, // Detailed analysis
+      maxLevel: 3, // Detailed analysis
+      maxTokensPerAnalysis: 2048,
       includeReferences: true,
       confidenceThreshold: 0.9,
     },
     breadth: {
+      maxLevel: 4,
       maxParallelTopics: 5,
       includeRelatedTopics: true,
       minRelevanceScore: 0.8,

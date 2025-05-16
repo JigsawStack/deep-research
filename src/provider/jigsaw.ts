@@ -1,6 +1,6 @@
 import { JigsawStack } from "jigsawstack";
 import "dotenv/config";
-import { ResearchSource } from "../types";
+import { ResearchSource } from "../types/types";
 import { ContentCleaner } from "../preparation/contentCleaner";
 
 export class JigsawProvider {

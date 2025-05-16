@@ -2,7 +2,7 @@
  * System and user prompts for the deep research pipeline
  */
 
-import { WebSearchResult } from "../types";
+import { WebSearchResult } from "../types/types";
 
 // Synthesize information from search results
 const SYNTHESIS_PROMPT_TEMPLATE = ({
@@ -137,8 +137,8 @@ const FINAL_REPORT_PROMPT = ({
   topic: string;
   synthesis: string;
   searchResults: WebSearchResult[];
-  maxOutputTokens?: number;
-  targetOutputLength?: "concise" | "standard" | "detailed" | number;
+  maxOutputTokens: number;
+  targetOutputLength: "concise" | "standard" | "detailed" | number;
 }) => {
   // Convert targetLength to specific instructions
   let lengthGuidance = "";
