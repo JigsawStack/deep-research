@@ -52,7 +52,6 @@ export interface SynthesisConfig {
 
 export interface ResearchSource {
   url: string;
-  content: string;
   ai_overview: string;
   title?: string;
   domain?: string;

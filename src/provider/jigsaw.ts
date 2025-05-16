@@ -61,7 +61,6 @@ export class JigsawProvider {
         const cleanedResults = results.results.map((result) => {
           const source: ResearchSource = {
             url: result.url || "",
-            content: result.content || "",
             title: result.title || "",
             ai_overview: results.ai_overview || "",
           };
