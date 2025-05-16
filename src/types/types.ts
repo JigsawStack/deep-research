@@ -34,20 +34,6 @@ export interface ModelConfig {
   [key: string]: string | LanguageModelV1 | undefined;
 }
 
-export interface DeepResearchConfig {
-  depth: typeof DEFAULT_DEPTH_CONFIG;
-  breadth: typeof DEFAULT_BREADTH_CONFIG;
-  models: ModelConfig;
-  report: {
-    targetOutputLength: number;
-    maxTokens: number;
-  };
-  jigsawApiKey: string;
-  openaiApiKey: string;
-  geminiApiKey: string;
-  deepInfraApiKey: string;
-}
-
 export interface ResearchSource {
   url: string;
   ai_overview: string;

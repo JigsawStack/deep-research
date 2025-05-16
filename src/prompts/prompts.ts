@@ -38,10 +38,14 @@ Format your response as a valid JSON object with the following structure:
   "relatedQuestions": ["Question 1", "Question 2", ...]
 }`;
 
-const RESEARCH_PROMPT_TEMPLATE = ({ topic }: { topic: string }) => `
+const RESEARCH_PROMPT_TEMPLATE = ({ topic, pastReasoning, pastQueries }: { topic: string; pastReasoning?: string; pastQueries?: string[] }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
 The topic for research is: ${topic}
+
+${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}
+
+${pastQueries ? `Past queries: ${pastQueries.join(", ")}` : ""}
 
 Please provide the following two components:
 
@@ -195,36 +199,22 @@ const EVALUATION_PROMPT = ({
 
 const FINAL_REPORT_PROMPT = ({
   topic,
-  synthesis,
-  searchResults,
-  maxOutputTokens,
+  latestResearchPlan,
+  sources,
+  queries,
   targetOutputLength,
+  maxOutputTokens,
+  latestReasoning,
 }: {
   topic: string;
-  synthesis: string;
-  searchResults: WebSearchResult[];
+  latestResearchPlan: string;
+  sources: WebSearchResult[];
+  queries: string[];
+  latestReasoning: string;
   maxOutputTokens: number;
-  targetOutputLength: "concise" | "standard" | "detailed" | number;
+  targetOutputLength: number;
 }) => {
-  // Convert targetLength to specific instructions
-  let lengthGuidance = "";
-  if (targetOutputLength) {
-    if (typeof targetOutputLength === "number") {
-      lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
-    } else {
-      switch (targetOutputLength) {
-        case "concise":
-          lengthGuidance = "Please be very concise, focusing only on the most essential information.";
-          break;
-        case "standard":
-          lengthGuidance = "Please provide a balanced synthesis with moderate detail.";
-          break;
-        case "detailed":
-          lengthGuidance = "Please provide a comprehensive analysis with substantial detail.";
-          break;
-      }
-    }
-  }
+  const lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
 
   const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
         
@@ -261,11 +251,18 @@ const FINAL_REPORT_PROMPT = ({
         
         ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens} tokens.` : ""}
         
-        Intermediate Research Syntheses:
-        ${synthesis}
+        Latest Research Plan:
+        ${latestResearchPlan}
+
+        Latest Reasoning:
+        ${latestReasoning}
+
+        Search Queries:
+        ${queries.join("\n")}
 
         Search Results:
-        ${searchResults.map((result) => result.searchResults).join("\n")}
+        ${sources.map((result) => result.searchResults).join("\n")}
+
         
         Please create a final comprehensive research article according to the instructions.`;
 

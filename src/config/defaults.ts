@@ -22,7 +22,7 @@ export const DEFAULT_BREADTH_CONFIG = {
 
 export const DEFAULT_REPORT_CONFIG = {
   targetOutputLength: 5000,
-  maxTokens: 8000,
+  maxOutputTokens: 8000,
 };
 
 export const DEFAULT_CONFIG = {
@@ -30,4 +30,8 @@ export const DEFAULT_CONFIG = {
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
   report: DEFAULT_REPORT_CONFIG,
+  jigsawApiKey: "",
+  openaiApiKey: "",
+  geminiApiKey: "",
+  deepInfraApiKey: "",
 };

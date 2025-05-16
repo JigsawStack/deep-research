@@ -1,7 +1,7 @@
 import AIProvider from "./provider/aiProvider";
-import { DeepResearchConfig, ResearchSource, WebSearchResult } from "./types/types";
+import { ResearchSource, WebSearchResult } from "./types/types";
 
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_SYNTHESIS_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
@@ -131,16 +131,19 @@ interface ResearchLog {
 }
 
 export class DeepResearch {
-  public config: DeepResearchConfig;
-  public prompts?: string;
-  public topic?: string;
-  public queries?: string[];
-  public researchPlan?: string;
+  public config: typeof DEFAULT_CONFIG;
+  public topic: string = "";
+  private latestResearchPlan: string = "";
+  private queries: string[] = [];
+
   private sources: WebSearchResult[] = [];
   private aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
+  private isComplete: boolean = false;
+  private iterationCount: number = 0;
+  private latestReasoning: string = "";
 
-  constructor(config: Partial<DeepResearchConfig>) {
+  constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
 
     // Initialize AIProvider with API keys from config
@@ -170,7 +173,7 @@ export class DeepResearch {
     }
   }
 
-  public validateConfig(config: Partial<DeepResearchConfig>): DeepResearchConfig {
+  public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
 
@@ -253,40 +256,39 @@ export class DeepResearch {
   }
 
   // Add debug logging to generateResearchPlan method
-  private async generateResearchPlan(topic: string, aiProvider: AIProvider, maxQueries?: number): Promise<{ queries: string[]; plan: string }> {
+  private async generateResearchPlan() {
     try {
       // Generate the research plan using the AI provider
       const result = await generateObject({
-        model: aiProvider.getDefaultModel(),
+        model: this.aiProvider.getDefaultModel(),
         output: "object",
         schema: z.object({
-          queries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
+          subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
           plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         }),
-        prompt: PROMPTS.research({ topic }),
+        prompt: PROMPTS.research({ topic: this.topic, pastReasoning: this.latestReasoning, pastQueries: this.queries }),
       });
 
-      let queries = result.object.queries;
+      let subQueries = result.object.subQueries;
 
       // Limit queries if maxQueries is specified
-      if (maxQueries && maxQueries > 0) {
-        queries = queries.slice(0, maxQueries);
+      if (this.config.breadth?.maxParallelTopics && this.config.breadth?.maxParallelTopics > 0) {
+        subQueries = subQueries.slice(0, this.config.breadth?.maxParallelTopics);
       }
 
-      console.log(`Generated ${queries.length} research queries`);
+      console.log(`Generated ${subQueries.length} research queries`);
 
       // Debug: Write the research plan to a file
       writeDebugFile("research-plan", "research-plan.json", result.object);
       writeDebugFile(
         "research-plan",
         "research-plan.md",
-        `# Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${result.object.plan}\n\n## Queries\n${result.object.queries
-          .map((q: string, i: number) => `${i + 1}. ${q}`)
-          .join("\n")}`
+        `# Research Plan\n\n## Topic\n${this.topic}\n\n## 
+        Plan\n${result.object.plan}\n\n## Queries\n${result.object.subQueries.map((q: string, i: number) => `${i + 1}. ${q}`).join("\n")}`
       );
 
       return {
-        queries,
+        subQueries,
         plan: result.object.plan,
       };
     } catch (error: any) {
@@ -298,23 +300,29 @@ export class DeepResearch {
         try {
           // Try to extract JSON from the response
           const extracted = extractJSONFromResponse(error.text);
-          if (extracted && "queries" in extracted && Array.isArray(extracted.queries) && "plan" in extracted && typeof extracted.plan === "string") {
-            let queries = extracted.queries;
-            if (maxQueries && maxQueries > 0) {
-              queries = queries.slice(0, maxQueries);
+          if (
+            extracted &&
+            "subQueries" in extracted &&
+            Array.isArray(extracted.subQueries) &&
+            "plan" in extracted &&
+            typeof extracted.plan === "string"
+          ) {
+            let subQueries = extracted.subQueries;
+            if (this.config.breadth?.maxParallelTopics && this.config.breadth?.maxParallelTopics > 0) {
+              subQueries = subQueries.slice(0, this.config.breadth?.maxParallelTopics);
             }
-            console.log(`Generated ${queries.length} research queries from extracted JSON`);
+            console.log(`Generated ${subQueries.length} research queries from extracted JSON`);
             // Debug: Write the extracted research plan to a file
             writeDebugFile("research-plan", "research-plan-extracted.json", extracted);
             writeDebugFile(
               "research-plan",
               "research-plan-extracted.md",
-              `# Extracted Research Plan\n\n## Topic\n${topic}\n\n## Plan\n${extracted.plan}\n\n## Queries\n${extracted.queries
+              `# Extracted Research Plan\n\n## Topic\n${this.topic}\n\n## Plan\n${extracted.plan}\n\n## Queries\n${extracted.queries
                 .map((q: string, i: number) => `${i + 1}. ${q}`)
                 .join("\n")}`
             );
             return {
-              queries,
+              subQueries,
               plan: extracted.plan,
             };
           }
@@ -324,25 +332,28 @@ export class DeepResearch {
       }
 
       // Fallback response
-      const defaultQueries = [topic, `${topic} research`, `${topic} analysis`, `${topic} examples`, `${topic} implications`];
-      const limitedQueries = maxQueries && maxQueries > 0 ? defaultQueries.slice(0, maxQueries) : defaultQueries;
+      const defaultQueries = [this.topic, `${this.topic} research`, `${this.topic} analysis`, `${this.topic} examples`, `${this.topic} implications`];
+      const limitedQueries =
+        this.config.breadth?.maxParallelTopics && this.config.breadth?.maxParallelTopics > 0
+          ? defaultQueries.slice(0, this.config.breadth?.maxParallelTopics)
+          : defaultQueries;
 
       // Debug: Write the fallback research plan to a file
       writeDebugFile("research-plan", "research-plan-fallback.json", {
-        topic,
+        topic: this.topic,
         defaultQueries: limitedQueries,
-        plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
+        plan: `Basic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.`,
       });
       writeDebugFile(
         "research-plan",
         "research-plan-fallback.md",
-        `# Fallback Research Plan\n\n## Topic\n${topic}\n\n## Plan\nBasic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.\n\n## Queries\n${limitedQueries
+        `# Fallback Research Plan\n\n## Topic\n${this.topic}\n\n## Plan\nBasic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.\n\n## Queries\n${limitedQueries
           .map((q, i) => `${i + 1}. ${q}`)
           .join("\n")}`
       );
 
       return {
-        queries: limitedQueries, // Return topic and variations as fallback queries
+        subQueries: limitedQueries, // Return topic and variations as fallback queries
         plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
       };
     }
@@ -351,96 +362,78 @@ export class DeepResearch {
   public async generate(prompt: string) {
     console.log(`Running research with prompt: ${prompt}`);
     this.topic = prompt;
-    this.prompts = prompt;
 
-    // step 1: generate research plan
-    console.log(`[Step 1] Generating research plan...`);
-    const { queries, plan } = await this.generateResearchPlan(prompt, this.aiProvider, this.config.breadth?.maxParallelTopics);
-    this.queries = queries;
-    this.researchPlan = plan;
+    while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel) {
+      this.iterationCount++;
+      // step 1: generate research plan
+      console.log(`[Step 1] Generating research plan...`);
+      const { subQueries, plan } = await this.generateResearchPlan();
 
-    console.log(`Research plan: ${plan}`);
-    console.log(`Research queries: ${queries.join("\n")}`);
+      this.queries = [...(this.queries || []), ...subQueries];
+      this.latestResearchPlan = plan;
 
-    // step 2: fire web searches
-    console.log(`[Step 2] Running initial web searches with ${queries.length} queries...`);
+      console.log(`Research plan: ${plan}`);
+      console.log(`Research queries: ${subQueries.join("\n")}`);
 
-    const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
-    const initialSearchResults = await jigsaw.fireWebSearches(queries);
-    console.log(`Received ${initialSearchResults.length} initial search results`);
+      // step 2: fire web searches
+      console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
 
-    // Count sources from initial results
-    // logging
-    let initialSourceCount = 0;
-    let uniqueUrls = new Set();
-    initialSearchResults.forEach((result) => {
-      if (result.searchResults && result.searchResults.results) {
-        initialSourceCount += result.searchResults.results.length;
-        result.searchResults.results.forEach((item) => {
-          if (item.url) uniqueUrls.add(item.url);
-        });
-      }
-    });
+      const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+      const initialSearchResults = await jigsaw.fireWebSearches(subQueries);
+      console.log(`Received ${initialSearchResults.length} initial search results`);
 
-    // step 2.5: deduplicate results
-    console.log(`[Step 2.5] Deduplicating search results...`);
-    const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
+      // Count sources from initial results
+      // logging
+      let initialSourceCount = 0;
+      let uniqueUrls = new Set();
+      initialSearchResults.forEach((result) => {
+        if (result.searchResults && result.searchResults.results) {
+          initialSourceCount += result.searchResults.results.length;
+          result.searchResults.results.forEach((item) => {
+            if (item.url) uniqueUrls.add(item.url);
+          });
+        }
+      });
 
-    // save it to the class for later use
-    this.sources = deduplicatedResults;
+      // step 2.5: deduplicate results
+      console.log(`[Step 2.5] Deduplicating search results...`);
+      const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
-    // logging
-    // Count sources after deduplication
-    let dedupSourceCount = 0;
-    uniqueUrls = new Set();
-    deduplicatedResults.forEach((result) => {
-      if (result.searchResults && result.searchResults.results) {
-        dedupSourceCount += result.searchResults.results.length;
-        result.searchResults.results.forEach((item) => {
-          if (item.url) uniqueUrls.add(item.url);
-        });
-      }
-    });
+      // save it to the class for later use
+      this.sources = deduplicatedResults;
 
-    console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
+      // logging
+      // Count sources after deduplication
+      let dedupSourceCount = 0;
+      uniqueUrls = new Set();
+      deduplicatedResults.forEach((result) => {
+        if (result.searchResults && result.searchResults.results) {
+          dedupSourceCount += result.searchResults.results.length;
+          result.searchResults.results.forEach((item) => {
+            if (item.url) uniqueUrls.add(item.url);
+          });
+        }
+      });
 
-    // step 3: reasoning about the search results
-    console.log(`[Step 3] Reasoning about the search results...`);
-    const reasoning = await this.reasoningSearchResults();
+      console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
 
-    // step 4: decision making
-    console.log(`[Step 4] Decision making...`);
-    const decisionMaking = await this.decisionMaking({ reasoning });
-    console.log(`Decision making: ${decisionMaking}`);
+      // step 3: reasoning about the search results
+      console.log(`[Step 3] Reasoning about the search results...`);
+      const reasoning = await this.reasoningSearchResults();
+      console.log(`Reasoning: ${reasoning}`);
 
-    console.log(`Reasoning: ${reasoning}`);
+      // step 4: decision making
+      console.log(`[Step 4] Decision making...`);
+      const decisionMaking = await this.decisionMaking({ reasoning });
+      console.log(`Decision making: ${decisionMaking}`);
 
-    // step 3: iteratively search until we have enough results
-    console.log(`[Step 3] Starting iterative research...`);
-    const iterativeResult = await this.performIterativeResearch({
-      prompt,
-      researchPlan: plan,
-      initialResults: deduplicatedResults,
-      allQueries: queries,
-    });
+      const { isComplete, reason } = decisionMaking;
+      this.isComplete = isComplete;
+      this.latestReasoning = reason;
+    }
 
-    console.log(`Iterative research completed with ${iterativeResult.iterationCount} iterations`);
-    console.log(`Total queries used: ${iterativeResult.queriesUsed.length}`);
-    console.log(`Final search results: ${iterativeResult.finalSearchResults.length}`);
-
-    // step 4: synthesize results
-    console.log(`[Step 4] Synthesizing results...`);
-
-    const synthesisStartTime = Date.now();
-    const synthesizedResults = await this.synthesizeResults({
-      searchResults: iterativeResult.finalSearchResults,
-    });
-
-    const synthesisDuration = Date.now() - synthesisStartTime;
-    console.log(`Synthesis completed in ${synthesisDuration}ms`);
-
-    // step 5: generate a final report
-    console.log(`[Step 5] Generating final report...`);
+    // step 5: generating report
+    console.log(`[Step 5] Generating report...`);
 
     const reportStartTime = Date.now();
 
@@ -483,7 +476,7 @@ export class DeepResearch {
     try {
       const reasoningPrompt = PROMPTS.reasoningSearchResults({
         topic: this.topic || "",
-        researchPlan: this.researchPlan || "",
+        researchPlan: this.latestResearchPlan || "",
         searchResults: this.sources,
         allQueries: this.queries || [],
       });
@@ -766,34 +759,23 @@ ${Array.from(topicsCovered)
   }
 
   // Add debug logging to generateFinalReport method
-  private async generateFinalReport({
-    prompt,
-    researchPlan,
-    searchResults,
-    synthesizedResults,
-  }: {
-    prompt: string;
-    researchPlan: string;
-    searchResults: WebSearchResult[];
-    synthesizedResults: string;
-  }) {
-    // Use researchPlan in debug output to avoid "declared but never read" warning
-    writeDebugFile("final-report", "research-plan.md", researchPlan);
-
+  private async generateFinalReport() {
     const reportPrompt = PROMPTS.finalReport({
-      topic: prompt,
-      searchResults,
-      synthesis: synthesizedResults,
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength: this.config.synthesis?.targetOutputLength,
+      topic: this.topic,
+      sources: this.sources,
+      latestResearchPlan: this.latestResearchPlan,
+      latestReasoning: this.latestReasoning,
+      queries: this.queries,
+      maxOutputTokens: this.config.report.maxOutputTokens,
+      targetOutputLength: this.config.report.targetOutputLength,
     });
 
     // Debug: Write the final report system and user prompts to files
     writeDebugFile("final-report", "final-report-system-prompt.md", reportPrompt.systemPrompt);
     writeDebugFile("final-report", "final-report-user-prompt.md", reportPrompt.userPrompt);
     writeDebugFile("final-report", "final-report-config.json", {
-      maxOutputTokens: this.config.synthesis?.maxOutputTokens,
-      targetOutputLength: this.config.synthesis?.targetOutputLength,
+      maxOutputTokens: this.config.report.maxOutputTokens,
+      targetOutputLength: this.config.report.targetOutputLength,
     });
 
     try {
@@ -1157,7 +1139,7 @@ IMPORTANT: If you cannot complete the entire report within the token limit, end 
   }
 }
 
-export function createDeepResearch(config: Partial<DeepResearchConfig>) {
+export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
   return new DeepResearch(config);
 }
 
