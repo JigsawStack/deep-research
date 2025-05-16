@@ -7,7 +7,7 @@ import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
-import { FINAL_REPORT_PROMPT, PROMPTS } from "./prompts/prompts";
+import { PROMPTS } from "./prompts/prompts";
 
 // Add debug logging functions
 /**
@@ -648,26 +648,12 @@ ${Array.from(topicsCovered)
 
       // Generate evaluation with clear instructions for formatting
       console.log(`  Generating evaluation...`);
-      const evaluationPrompt = `${PROMPTS.evaluation}
-
-<Research Topic>${prompt}</Research Topic>
-
-<Research Plan>${researchPlan}</Research Plan>
-
-<Search Queries Used>${allQueries.join(", ")}</Search Queries Used>
-
-<Current Search Results Summary>${resultsSummary}</Current Search Results Summary>
-
-Based on the above information, evaluate if we have sufficient research coverage or need additional queries.
-Identify which aspects of the research plan have been covered and which areas still need investigation.
-
-Your response MUST be formatted exactly as follows:
-
-IS_COMPLETE: [true or false]
-REASON: [Your detailed reasoning for why the research is complete or not]
-QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search queries like ["query1", "query2"]. If complete, use empty array []]
-
-Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
+      const evaluationPrompt = PROMPTS.evaluation({
+        prompt,
+        researchPlan,
+        allQueries,
+        resultsSummary,
+      });
 
       // Debug: Write the evaluation prompt to a file
       writeDebugFile("evaluation", `evaluation-prompt-${Date.now()}.md`, evaluationPrompt);
@@ -924,7 +910,7 @@ reasoning sections, or other markup in your response.`;
     // Use researchPlan in debug output to avoid "declared but never read" warning
     writeDebugFile("final-report", "research-plan.md", researchPlan);
 
-    const reportPrompt = FINAL_REPORT_PROMPT({
+    const reportPrompt = PROMPTS.finalReport({
       mainPrompt: [prompt],
       searchResults,
       synthesis: synthesizedResults,
@@ -1001,7 +987,7 @@ reasoning sections, or other markup in your response.`;
           searchResults.forEach((result) => {
             if (result.searchResults && result.searchResults.results) {
               result.searchResults.results.forEach((source: ResearchSource) => {
-                // Only add unique URLs
+                // Only add unique s
                 if (source.url && !sources.some((s) => s.url === source.url)) {
                   sources.push({
                     url: source.url,

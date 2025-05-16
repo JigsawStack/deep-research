@@ -25,31 +25,7 @@ Format your response as a valid JSON object with the following structure:
   "relatedQuestions": ["Question 1", "Question 2", ...]
 }`;
 
-// Generate sub-questions for the main topic
-const QUESTION_GENERATION_PROMPT_TEMPLATE = `You are an expert research planner. Your task is to create a set of specific, targeted sub-questions that will help thoroughly explore a main research topic.
-
-For the given research topic, generate 3-5 well-formulated sub-questions that:
-1. Break down complex aspects of the main topic
-2. Cover different important dimensions of the topic
-3. Are specific enough to yield focused search results
-4. Together provide comprehensive coverage of the main topic
-5. Are phrased as clear, direct questions (not statements)
-
-Return your response as a valid JSON object with the following structure:
-{
-  "questions": [
-    {
-      "id": "q1",
-      "question": "First sub-question here?",
-      "relevanceScore": 0.95
-    },
-    {
-      "id": "q2",
-      "question": "Second sub-question here?",
-      "relevanceScore": 0.9
-    }
-  ]
-}`;
+const RESEARCH_PROMPT_TEMPLATE = "";
 
 // Generate follow-up questions based on search results
 const FOLLOWUP_QUESTION_PROMPT_TEMPLATE = `You are an expert research planner. Your task is to analyze search results for a question and generate targeted follow-up questions to explore knowledge gaps or go deeper into interesting aspects.
@@ -64,9 +40,19 @@ Based on the search results provided, generate 2-3 follow-up questions that:
 
 Format each question as a single string.`;
 
-// Evaluate if current information is sufficient
-// Completeness Evaluation: Determines if more research is needed
-const EVALUATION_PROMPT_TEMPLATE = `You are a research query optimizer. Your task is to analyze search results against the original research goal and generate follow-up queries to fill in missing information.
+const EVALUATION_PROMPT = ({
+  prompt,
+  researchPlan,
+  allQueries,
+  resultsSummary,
+}: {
+  prompt: string;
+  researchPlan: string;
+  allQueries: string[];
+  resultsSummary: string;
+}) => {
+  return `
+    ${getCurrentDateContext()}
 
     PROCESS:
     1. Identify ALL information explicitly requested in the original research goal
@@ -91,7 +77,27 @@ const EVALUATION_PROMPT_TEMPLATE = `You are a research query optimizer. Your tas
     3. What type of knowledge gaps exist (entity-specific or general knowledge)
 
     Then provide up to 5 targeted queries that directly address the identified gaps, ordered by importance. Please consider that you
-    need to generate queries that tackle a single goal at a time (searching for A AND B will return bad results). Be specific!`;
+    need to generate queries that tackle a single goal at a time (searching for A AND B will return bad results). Be specific!
+
+    <Research Topic>${prompt}</Research Topic>
+
+    <Research Plan>${researchPlan}</Research Plan>
+
+    <Search Queries Used>${allQueries.join(", ")}</Search Queries Used>
+    
+    <Current Search Results Summary>${resultsSummary}</Current Search Results Summary>
+    
+    Based on the above information, evaluate if we have sufficient research coverage or need additional queries.
+    Identify which aspects of the research plan have been covered and which areas still need investigation.
+    
+    Your response MUST be formatted exactly as follows:
+    
+    IS_COMPLETE: [true or false]
+    REASON: [Your detailed reasoning for why the research is complete or not]
+    QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search queries like ["query1", "query2"]. If complete, use empty array []]
+    
+    Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
+};
 
 // Evaluation Parsing: Extracts structured data from evaluation output
 const EVALUATION_PARSE_PROMPT_TEMPLATE = `
@@ -200,18 +206,8 @@ When ranking search results, consider recency as a factor - newer information is
 // Export all prompts together with date context
 export const PROMPTS = {
   synthesis: `${getCurrentDateContext()}\n${SYNTHESIS_PROMPT_TEMPLATE}`,
-  questionGeneration: `${getCurrentDateContext()}\n${QUESTION_GENERATION_PROMPT_TEMPLATE}`,
   followupQuestion: `${getCurrentDateContext()}\n${FOLLOWUP_QUESTION_PROMPT_TEMPLATE}`,
-  evaluation: `${getCurrentDateContext()}\n${EVALUATION_PROMPT_TEMPLATE}`,
+  evaluation: EVALUATION_PROMPT,
   evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
-};
-
-// Export individual templates and utility function for more flexibility
-export {
-  SYNTHESIS_PROMPT_TEMPLATE,
-  QUESTION_GENERATION_PROMPT_TEMPLATE,
-  FOLLOWUP_QUESTION_PROMPT_TEMPLATE,
-  EVALUATION_PROMPT_TEMPLATE,
-  getCurrentDateContext,
-  FINAL_REPORT_PROMPT,
+  finalReport: FINAL_REPORT_PROMPT,
 };
