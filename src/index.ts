@@ -164,7 +164,7 @@ export class DeepResearch {
 
   public validateConfig(config: Partial<DeepResearchConfig>): DeepResearchConfig {
     // Merge models carefully to handle both string and LanguageModelV1 instances
-    const mergedModels = { ...DEFAULT_CONFIG.models };
+    const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
 
     if (config.models) {
       Object.entries(config.models).forEach(([key, value]) => {
@@ -175,8 +175,14 @@ export class DeepResearch {
     }
 
     return {
-      depth: config.depth ? { ...DEFAULT_DEPTH_CONFIG, ...config.depth } : DEFAULT_DEPTH_CONFIG,
-      breadth: config.breadth ? { ...DEFAULT_BREADTH_CONFIG, ...config.breadth } : DEFAULT_BREADTH_CONFIG,
+      depth: {
+        ...DEFAULT_DEPTH_CONFIG,
+        ...(config.depth || {}),
+      },
+      breadth: {
+        ...DEFAULT_BREADTH_CONFIG,
+        ...(config.breadth || {}),
+      },
       synthesis: {
         ...DEFAULT_SYNTHESIS_CONFIG,
         ...(config.synthesis || {}),
@@ -232,8 +238,6 @@ export class DeepResearch {
               title: item.title || "",
               domain: item.domain || "",
               ai_overview: item.ai_overview || "",
-              // Truncate content to reduce token count
-              // content: item.content ? item.content.substring(0, 1000) : '',
             };
           }),
         },
