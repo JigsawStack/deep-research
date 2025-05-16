@@ -133,15 +133,19 @@ interface ResearchLog {
 export class DeepResearch {
   public config: typeof DEFAULT_CONFIG;
   public topic: string = "";
-  private latestResearchPlan: string = "";
-  private queries: string[] = [];
+  public finalReport: string = "";
 
-  private sources: WebSearchResult[] = [];
+  public latestResearchPlan: string = "";
+  public queries: string[] = [];
+
+  public sources: WebSearchResult[] = [];
+
   private aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
   private isComplete: boolean = false;
   private iterationCount: number = 0;
   private latestReasoning: string = "";
+  private currentOutputLength: number = 0;
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -174,6 +178,11 @@ export class DeepResearch {
   }
 
   public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
+    // maxOutputTokens must be greater than targetOutputLength
+    if (config.report && config.report.maxOutputTokens < config.report.targetOutputLength) {
+      throw new Error("maxOutputTokens must be greater than targetOutputLength");
+    }
+
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
 
@@ -354,7 +363,7 @@ export class DeepResearch {
 
       return {
         subQueries: limitedQueries, // Return topic and variations as fallback queries
-        plan: `Basic research plan: Conduct a thorough search for information about "${topic}" using multiple angles and perspectives.`,
+        plan: `Basic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.`,
       };
     }
   }
@@ -378,8 +387,7 @@ export class DeepResearch {
       // step 2: fire web searches
       console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
 
-      const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
-      const initialSearchResults = await jigsaw.fireWebSearches(subQueries);
+      const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
       console.log(`Received ${initialSearchResults.length} initial search results`);
 
       // Count sources from initial results
@@ -437,12 +445,7 @@ export class DeepResearch {
 
     const reportStartTime = Date.now();
 
-    const finalReport = await this.generateFinalReport({
-      prompt,
-      researchPlan: plan,
-      searchResults: iterativeResult.finalSearchResults,
-      synthesizedResults,
-    });
+    const finalReport = await this.generateFinalReport();
 
     const reportDuration = Date.now() - reportStartTime;
     console.log(`Final report generated in ${reportDuration}ms`);
@@ -508,266 +511,20 @@ export class DeepResearch {
     }
   }
 
-  // Add debug logging to evaluateResearchCompleteness method
-  private async evaluateResearchCompleteness(prompt: string, researchPlan: string, results: WebSearchResult[], allQueries: string[]) {
-    try {
-      console.log(`  Starting research completeness evaluation...`);
-      // Create a simplified summary of the search results
-      const topicsCovered = new Set<string>();
-      const domains = new Set<string>();
-      let totalSources = 0;
-
-      // Extract key information
-      results.forEach((result) => {
-        if (result.searchResults && result.searchResults.ai_overview) {
-          topicsCovered.add(result.question);
-        }
-
-        if (result.searchResults && result.searchResults.results) {
-          totalSources += result.searchResults.results.length;
-
-          result.searchResults.results.forEach((item) => {
-            if (item.domain) domains.add(item.domain);
-          });
-        }
-      });
-
-      // Create a summary
-      const resultsSummary = `
-- Total queries completed: ${results.length}
-- Total sources found: ${totalSources}
-- Unique domains: ${domains.size}
-- Topics covered: ${Array.from(topicsCovered).join(", ")}
-
-Topics addressed in search:
-${Array.from(topicsCovered)
-  .map((topic) => `- ${topic}`)
-  .join("\n")}
-      `;
-
-      console.log(`  Generated research summary with ${totalSources} sources from ${domains.size} domains`);
-
-      // Generate evaluation with clear instructions for formatting
-      console.log(`  Generating evaluation...`);
-      const evaluationPrompt = PROMPTS.evaluation({
-        prompt,
-        researchPlan,
-        allQueries,
-        resultsSummary,
-      });
-
-      // Debug: Write the evaluation prompt to a file
-      writeDebugFile("evaluation", `evaluation-prompt-${Date.now()}.md`, evaluationPrompt);
-
-      const evaluationResponse = await generateText({
-        model: this.aiProvider.getReasoningModel(),
-        prompt: evaluationPrompt,
-      });
-
-      // Debug: Write the evaluation response to a file
-      writeDebugFile("evaluation", `evaluation-response-${Date.now()}.md`, evaluationResponse.text);
-
-      // Access the content, handling both text property and reasoning if available
-      let evaluationText = evaluationResponse.text;
-
-      // Log reasoning if it exists (some models provide this)
-      if (evaluationResponse.reasoning) {
-        console.log(`  Model reasoning (not used in final output): ${evaluationResponse.reasoning.substring(0, 100)}...`);
-      }
-
-      // Clean up the response: remove thinking/reasoning tags and other markup
-      evaluationText = evaluationText
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
-        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, "")
-        .replace(/<[^>]*>/g, "")
-        .trim();
-
-      console.log(`  Received clean evaluation text (${evaluationText.length} chars)`);
-      console.log(`  Evaluation preview: ${evaluationText.substring(0, 150)}...`);
-
-      // Extract the formatted response using regex
-      const isCompleteMatch = evaluationText.match(/IS_COMPLETE:\s*(true|false)/i);
-      const isComplete = isCompleteMatch ? isCompleteMatch[1].toLowerCase() === "true" : false;
-
-      // Extract reason
-      const reasonMatch = evaluationText.match(/REASON:\s*(.*?)(?=QUERIES:|$)/s);
-      const reason = reasonMatch ? reasonMatch[1].trim() : "";
-
-      // Extract queries array
-      const queriesMatch = evaluationText.match(/QUERIES:\s*(\[.*?\])/s);
-      let queries = [];
-
-      if (queriesMatch) {
-        try {
-          // Try to parse the JSON array
-          queries = JSON.parse(queriesMatch[1]);
-        } catch (e: any) {
-          console.error(`  Error parsing queries JSON: ${e.message}`);
-          // Fallback to regex extraction of quoted strings
-          const quotedStrings = queriesMatch[1].match(/"([^"]*)"/g);
-          if (quotedStrings) {
-            queries = quotedStrings.map((str) => str.replace(/"/g, ""));
-          }
-        }
-      }
-
-      const result = {
-        isComplete,
-        reason,
-        queries: Array.isArray(queries) ? queries : [],
-      };
-
-      // Debug: Write the parsed evaluation result to a file
-      writeDebugFile("evaluation", `evaluation-result-${Date.now()}.json`, result);
-
-      console.log(`  Parsed evaluation result: isComplete=${result.isComplete}, queries=${result.queries.length}`);
-      return result;
-    } catch (error: any) {
-      console.error("Fatal error in evaluateResearchCompleteness:", error.message || error);
-      console.error(`  Error details:`, error);
-
-      // Throw the error to terminate program execution
-      throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
-    }
-  }
-
-  private async performIterativeResearch({
-    prompt,
-    researchPlan,
-    initialResults,
-    allQueries,
-  }: {
-    prompt: string;
-    researchPlan: string;
-    initialResults: WebSearchResult[];
-    allQueries: string[];
-  }) {
-    let searchResults = initialResults;
-    let iterationCount = 0;
-    let totalNewQueries = 0;
-
-    for (let i = 0; i < (this.config.depth?.maxLevel || 3); i++) {
-      iterationCount++;
-      console.log(`  [Iteration ${iterationCount}] Evaluating research completeness...`);
-
-      const evaluation = await this.evaluateResearchCompleteness(prompt, researchPlan, searchResults, allQueries);
-
-      if (evaluation.isComplete) {
-        console.log(`  Research evaluation complete (iteration ${iterationCount}): No additional queries needed`);
-        console.log(`  Reason: ${evaluation.reason}`);
-        break;
-      }
-
-      const newQueries = evaluation.queries;
-      totalNewQueries += newQueries.length;
-
-      console.log(`  Adding ${newQueries.length} new queries: ${newQueries.join(", ")}`);
-      console.log(`  Executing additional searches...`);
-
-      const searchStartTime = Date.now();
-      const newResults = await this.jigsaw.fireWebSearches(newQueries);
-      const searchTime = Date.now() - searchStartTime;
-
-      // Count new sources
-      let newSourceCount = 0;
-      let uniqueUrls = new Set();
-      newResults.forEach((result) => {
-        if (result.searchResults && result.searchResults.results) {
-          newSourceCount += result.searchResults.results.length;
-          result.searchResults.results.forEach((item) => {
-            if (item.url) uniqueUrls.add(item.url);
-          });
-        }
-      });
-
-      console.log(`  Retrieved ${newResults.length} new search results with ${newSourceCount} sources in ${searchTime}ms`);
-
-      searchResults = [...searchResults, ...newResults];
-      allQueries = [...allQueries, ...newQueries];
-    }
-
-    return {
-      finalSearchResults: searchResults,
-      queriesUsed: allQueries,
-      iterationCount,
-    };
-  }
-
-  // Add debug logging to synthesizeResults method
-  private async synthesizeResults({
-    searchResults,
-  }: {
-    searchResults: WebSearchResult[];
-  }) {
-    // Truncate results to fit within model's context length
-    // const summary = await this.summarizeResultsForSynthesis(searchResults);
-
-    try {
-      console.log(`  Starting research synthesis...`);
-
-      if (!this.prompts) {
-        throw new Error("No prompts provided");
-      }
-
-      const synthesisPrompt = PROMPTS.synthesis({
-        topic: this.prompts,
-        searchResults,
-      });
-
-      // Debug: Write the synthesis prompt to a file
-      writeDebugFile("synthesis", "synthesis-prompt.md", synthesisPrompt);
-
-      const synthesisResponse = await generateText({
-        model: this.aiProvider.getReasoningModel(),
-        prompt: synthesisPrompt,
-      });
-
-      // Debug: Write the raw synthesis response to a file
-      writeDebugFile("synthesis", "synthesis-raw-response.md", synthesisResponse.text);
-
-      // Access the content, handling both text property
-      let synthesisText = synthesisResponse.text;
-
-      // Log reasoning if it exists (some models provide this)
-      if (synthesisResponse.reasoning) {
-        console.log(`  Model reasoning (not used in final output): ${synthesisResponse.reasoning.substring(0, 100)}...`);
-      }
-
-      // Clean up the response: remove thinking/reasoning tags and other markup
-      synthesisText = synthesisText
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .replace(/<thinking>[\s\S]*?<\/thinking>/g, "")
-        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, "")
-        .replace(/<[^>]*>/g, "")
-        .trim();
-
-      console.log(`  Synthesis complete (${synthesisText.length} chars)`);
-      console.log(`  Synthesis preview: ${synthesisText.substring(0, 150)}...`);
-
-      // Debug: Write the cleaned synthesis to a file
-      writeDebugFile("synthesis", "synthesis-cleaned.md", synthesisText);
-
-      return synthesisText;
-    } catch (error: any) {
-      console.error("Fatal error in synthesizeResults:", error.message || error);
-      console.error(`  Error details:`, error);
-
-      // Throw the error to terminate program execution
-      throw new Error(`Research synthesis failed: ${error.message || "Unknown error"}`);
-    }
-  }
-
   // Add debug logging to generateFinalReport method
   private async generateFinalReport() {
+    const continuationMarker = "[###CONTINUE###]";
     const reportPrompt = PROMPTS.finalReport({
       topic: this.topic,
-      sources: this.sources,
       latestResearchPlan: this.latestResearchPlan,
-      latestReasoning: this.latestReasoning,
+      sources: this.sources,
       queries: this.queries,
+      latestReasoning: this.latestReasoning,
       maxOutputTokens: this.config.report.maxOutputTokens,
       targetOutputLength: this.config.report.targetOutputLength,
+      continuationMarker: continuationMarker,
+      currentReport: this.finalReport,
+      currentOutputLength: this.currentOutputLength,
     });
 
     // Debug: Write the final report system and user prompts to files
@@ -778,125 +535,22 @@ ${Array.from(topicsCovered)
       targetOutputLength: this.config.report.targetOutputLength,
     });
 
-    try {
-      // Use the streaming continuation approach
-      const fullReport = await this.generateReportWithContinuation({
-        systemPrompt: reportPrompt.systemPrompt,
-        userPrompt: reportPrompt.userPrompt,
-        maxTokensPerRequest: 7000, // Safe limit for most models
-      });
-
-      // Debug: Write the final report raw response to a file
-      writeDebugFile("final-report", "final-report-raw-response.md", fullReport);
-      writeDebugFile("final-report", "final-report-token-count.json", {
-        responseTextLength: fullReport.length,
-        estimatedTokens: Math.round(fullReport.length / 4), // Rough estimate of tokens
-      });
-
-      return { report: fullReport };
-    } catch (error: any) {
-      console.warn("Error in generateFinalReport:", error.message || error);
-
-      // Fallback report when generation fails
-      return {
-        report:
-          "Unable to generate a complete research report due to a processing error. The research covered the meaning of life in space from philosophical, existential, psychological, and cultural perspectives.",
-      };
-    }
-  }
-
-  // Helper method to generate a long report with continuation markers
-  private async generateReportWithContinuation({
-    systemPrompt,
-    userPrompt,
-    maxTokensPerRequest = 7000,
-    continuationMarker = "[###CONTINUE###]",
-  }: {
-    systemPrompt: string;
-    userPrompt: string;
-    maxTokensPerRequest?: number;
-    continuationMarker?: string;
-  }): Promise<string> {
-    let fullReport = "";
     let isComplete = false;
-    let partCount = 0;
 
-    console.log("Generating report with continuation approach...");
-
-    // Add continuation instructions to initial prompt
-    const initialPrompt = `${userPrompt}
-    
-IMPORTANT: If you cannot complete the entire report within the token limit, end your response with ${continuationMarker} to indicate that continuation is needed. Do not write partial sentences - stop at a logical breaking point.`;
-
-    while (!isComplete && partCount < 10) {
-      partCount++;
-      console.log(`Generating report part ${partCount}...`);
-
-      // Choose the appropriate prompt based on whether this is the first part
-      const currentPrompt =
-        partCount === 1
-          ? initialPrompt
-          : `
-This is a continuation of a research report. The previous content ends with:
-
-${this.getLastContentForContinuation(fullReport, 1000)}
-
-Please continue the report from this point. Maintain the same style, tone, and formatting as before. 
-Do not repeat information already covered. Do not start with phrases like "Continuing from" or acknowledgments that this is a continuation.
-If you're in the middle of a section, continue with that section. If you're at a logical breaking point, proceed to the next appropriate section.
-
-IMPORTANT: If you cannot complete the entire report within the token limit, end your response with ${continuationMarker} to indicate that continuation is needed.`;
-
-      // Generate the next part
-      const reportPart = await generateText({
+    while (!isComplete) {
+      const report = await generateText({
         model: this.aiProvider.getOutputModel(),
-        prompt: `${systemPrompt}\n\n${currentPrompt}`,
-        maxTokens: maxTokensPerRequest,
+        prompt: `${reportPrompt.systemPrompt}\n\n${reportPrompt.userPrompt}`,
+        maxTokens: this.config.report.maxOutputTokens,
       });
 
-      // Debug: Write the part to a file
-      writeDebugFile("final-report", `final-report-part-${partCount}.md`, reportPart.text);
+      this.finalReport += report.text;
+      this.currentOutputLength += report.text.length;
 
-      // Add to the full report
-      let partText = reportPart.text;
-
-      // Check if this part contains a continuation marker
-      if (partText.includes(continuationMarker)) {
-        // Remove the marker and everything after it
-        partText = partText.split(continuationMarker)[0].trim();
-        isComplete = false;
-      } else {
-        // Only mark as complete if target length is reached or report structure indicates completion
-        isComplete = fullReport.length + partText.length >= (this.config.synthesis?.targetOutputLength || 30000);
-      }
-
-      fullReport += partText;
-
-      // Check if structural indicators suggest the report is complete
-      const structurallyComplete = this.isReportComplete({ report: fullReport, continuationMarker });
-
-      // Only stop if we've reached the target length or the report is structurally complete
-      isComplete = isComplete || structurallyComplete;
-
-      console.log(`Part ${partCount} generated (${partText.length} chars), cumulative length: ${fullReport.length}`);
+      isComplete = this.isReportComplete({ report: this.finalReport, continuationMarker: continuationMarker });
     }
 
-    console.log(`Report generation complete with ${partCount} parts, total length: ${fullReport.length} characters`);
-    return fullReport;
-  }
-
-  // Helper method to extract the last N characters of content for continuation context
-  private getLastContentForContinuation(text: string, length: number): string {
-    if (text.length <= length) return text;
-
-    const excerpt = text.slice(text.length - length);
-    // Find the first paragraph or sentence break to make a clean cut
-    const breakMatches = excerpt.match(/(\n\n|\.\s+)/);
-    if (breakMatches && breakMatches.index) {
-      // Start from the next character after the break
-      return excerpt.slice(breakMatches.index + breakMatches[0].length);
-    }
-    return excerpt;
+    return this.finalReport;
   }
 
   // Helper to check if the report seems complete based on content
@@ -906,27 +560,12 @@ IMPORTANT: If you cannot complete the entire report within the token limit, end 
       return false;
     }
 
-    // Check for length-based completion first - this is the primary goal
-    if (this.config.synthesis?.targetOutputLength && report.length >= this.config.synthesis.targetOutputLength) {
-      return true;
-    }
-
-    // Only check for structural completion if we're at least 80% of the target length
-    // This prevents early termination when sections appear too soon
-    const minAcceptableLength = (this.config.synthesis?.targetOutputLength || 30000) * 0.8;
-    if (report.length < minAcceptableLength) {
+    // check if the report reaches the target output length
+    if (this.config.report.targetOutputLength && this.finalReport.length <= this.config.report.targetOutputLength) {
       return false;
     }
 
-    // Now check if the report contains concluding sections or phrases
-    const completionIndicators = ["Conclusion", "References", "Bibliography", "In conclusion"];
-
-    // Look for completion indicators in the last 20% of the document
-    const lastSection = report.slice(report.length * 0.8);
-    return completionIndicators.some(
-      (indicator) =>
-        lastSection.includes(`## ${indicator}`) || lastSection.includes(`# ${indicator}`) || lastSection.match(new RegExp(`\\d+\\.\\s+${indicator}`))
-    );
+    return true;
   }
 
   public async writeLogs(finalReport?: any) {

@@ -196,15 +196,17 @@ const EVALUATION_PROMPT = ({
 };
 // ^^ reasoning should be in the same model
 // ^^ put is_complete and queries into another model
-
 const FINAL_REPORT_PROMPT = ({
   topic,
   latestResearchPlan,
   sources,
   queries,
-  targetOutputLength,
-  maxOutputTokens,
   latestReasoning,
+  maxOutputTokens,
+  continuationMarker,
+  targetOutputLength,
+  currentReport,
+  currentOutputLength,
 }: {
   topic: string;
   latestResearchPlan: string;
@@ -212,10 +214,11 @@ const FINAL_REPORT_PROMPT = ({
   queries: string[];
   latestReasoning: string;
   maxOutputTokens: number;
+  continuationMarker: string;
   targetOutputLength: number;
+  currentReport?: string;
+  currentOutputLength?: number;
 }) => {
-  const lengthGuidance = `CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.`;
-
   const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
         
         You will:
@@ -227,27 +230,15 @@ const FINAL_REPORT_PROMPT = ({
         6. Pinpoint remaining knowledge gaps and recommend avenues for further inquiry.
         7. Conclude with a concise summary of findings and practical or theoretical implications.
         8. Cite every factual claim or statistic with in-text references (e.g. "[1](https://www.source.com)", "[2](https://www.source2.com)") and append a numbered bibliography.
-        
-        Structure your output exactly like this:
-        – Title: A descriptive, engaging headline  
-        – Abstract: 3–5 sentences summary  
-        – Table of Contents (with section headings)  
-        – 1. Introduction  
-        – 2. Background & Literature Review  
-        – 3. Thematic Synthesis  
-         3.1 Theme A  
-         3.2 Theme B  
-        – 4. Novel Insights  
-        – 5. Conflicting Evidence & Resolutions  
-        – 6. Knowledge Gaps & Future Directions  
-        – 7. Conclusion  
-        – References
+        9. If you cannot complete the full report in this response, **YOU MUST** append the continuation marker: ${continuationMarker}
+
+        If there is an existing draft or “Current Report,” seamlessly continue from it—preserve its content and structure, and build upon it rather than starting over.
         `;
 
   const userPrompt = `Main Research Topic(s):
         ${topic}
         
-        ${lengthGuidance}
+        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
         
         ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens} tokens.` : ""}
         
@@ -263,6 +254,11 @@ const FINAL_REPORT_PROMPT = ({
         Search Results:
         ${sources.map((result) => result.searchResults).join("\n")}
 
+        Current Report:
+        ${currentReport}
+
+        Current Output Length:
+        ${currentOutputLength}
         
         Please create a final comprehensive research article according to the instructions.`;
 
