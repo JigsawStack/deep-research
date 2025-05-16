@@ -30,4 +30,4 @@ export const DEFAULT_CONFIG = {
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
   synthesis: DEFAULT_SYNTHESIS_CONFIG,
-} as const;
+};

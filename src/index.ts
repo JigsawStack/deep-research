@@ -138,13 +138,9 @@ export class DeepResearch {
 
   constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateConfig(config);
-    this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
-    // Check if required API keys are provided
-    if (!this.config.openaiApiKey || !this.config.geminiApiKey || !this.config.deepInfraApiKey) {
-      throw new Error("All API keys (openaiApiKey, geminiApiKey, deepInfraApiKey) are required");
-    }
 
     // Initialize AIProvider with API keys from config
+    this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     this.aiProvider = new AIProvider({
       openaiApiKey: this.config.openaiApiKey,
       geminiApiKey: this.config.geminiApiKey,
@@ -166,7 +162,7 @@ export class DeepResearch {
     }
   }
 
-  private validateConfig(config: Partial<DeepResearchConfig>): DeepResearchConfig {
+  public validateConfig(config: Partial<DeepResearchConfig>): DeepResearchConfig {
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models };
 
