@@ -5,7 +5,20 @@
 import { WebSearchResult } from "../types";
 
 // Synthesize information from search results
-const SYNTHESIS_PROMPT_TEMPLATE = `You are an expert research synthesizer. Your task is to analyze and synthesize information from multiple search results related to a main research topic.
+const SYNTHESIS_PROMPT_TEMPLATE = ({
+  topic,
+  searchResults,
+}: {
+  topic: string;
+  searchResults: WebSearchResult[];
+}) => `You are an expert research synthesizer. Your task is to analyze and synthesize information from multiple search results related to a main research topic.
+
+${getCurrentDateContext()}
+
+The topic for research is: ${topic}
+
+Current Search Results:
+${searchResults.map((result) => result.searchResults).join("\n")}
 
 Based on the search results provided, you will:
 1. Create a comprehensive research analysis that integrates all important findings
@@ -25,20 +38,27 @@ Format your response as a valid JSON object with the following structure:
   "relatedQuestions": ["Question 1", "Question 2", ...]
 }`;
 
-const RESEARCH_PROMPT_TEMPLATE = "";
+const RESEARCH_PROMPT_TEMPLATE = ({ topic }: { topic: string }) => `
+You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
-// Generate follow-up questions based on search results
-const FOLLOWUP_QUESTION_PROMPT_TEMPLATE = `You are an expert research planner. Your task is to analyze search results for a question and generate targeted follow-up questions to explore knowledge gaps or go deeper into interesting aspects.
+The topic for research is: ${topic}
 
-Based on the search results provided, generate 2-3 follow-up questions that:
-1. Address knowledge gaps identified in the current results
-2. Explore interesting aspects that weren't fully covered
-3. Dig deeper into promising areas mentioned briefly
-4. Are specific and focused enough to yield useful additional information
-5. Do not repeat information that's already well-covered
-6. Are phrased as clear, direct questions (not statements)
+Please provide the following two components:
 
-Format each question as a single string.`;
+1.  **A Detailed Research Plan:**
+    *   Clearly outline the overall research strategy and methodology you propose.
+    *   Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.
+    *   Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.
+    *   The plan should be logical, actionable, and designed for efficient information gathering.
+
+2.  **A List of Focused Search Queries:**
+    *   Generate a list of specific and targeted search queries.
+    *   These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.
+    *   The set of queries should collectively aim to cover the main aspects identified in your research plan.
+    *   Ensure queries are distinct and avoid redundancy.
+
+Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
+`;
 
 const EVALUATION_PROMPT = ({
   prompt,
@@ -53,6 +73,7 @@ const EVALUATION_PROMPT = ({
 }) => {
   return `
     ${getCurrentDateContext()}
+    You are an expert research planner. Your task is to analyze search results evaluate them and generate targeted follow-up questions to explore knowledge gaps or go deeper into interesting aspects.
 
     PROCESS:
     1. Identify ALL information explicitly requested in the original research goal
@@ -62,13 +83,20 @@ const EVALUATION_PROMPT = ({
     5. For general knowledge gaps: Create focused queries to find the missing conceptual information
 
     QUERY GENERATION RULES:
-    - IF specific entities were identified AND specific attributes are missing:
-    * Create direct queries for each entity-attribute pair (e.g., "LeBron James height")
-    - IF general knowledge gaps exist:
-    * Create focused queries to address each conceptual gap (e.g., "criteria for ranking basketball players")
-    - Queries must be constructed to directly retrieve EXACTLY the missing information
-    - Avoid tangential or merely interesting information not required by the original goal
-    - Prioritize queries that will yield the most critical missing information first
+    - For missing entity attributes:
+      * Create direct queries for each entity-attribute pair (e.g., "LeBron James height")
+    - For general knowledge gaps:
+      * Create focused queries addressing each conceptual gap (e.g., "criteria for ranking basketball players")
+    - Construct queries to retrieve EXACTLY the missing information
+    - Exclude information not required by the original research goal
+    - Prioritize queries for the most critical missing information first
+    
+    FOLLOW-UP QUESTIONS CRITERIA:
+    - Target specific knowledge gaps in current results
+    - Focus on unexplored but relevant aspects
+    - Be specific enough to yield useful information
+    - Avoid repeating already covered information
+    - Phrase as clear, direct questions
 
     OUTPUT FORMAT:
     First, briefly state:
@@ -99,18 +127,14 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
-// Evaluation Parsing: Extracts structured data from evaluation output
-const EVALUATION_PARSE_PROMPT_TEMPLATE = `
-        You are a research assistant, you will be provided with a some reasoning and a list of queries, and you will need to parse the list into a list of queries.`;
-
 const FINAL_REPORT_PROMPT = ({
-  mainPrompt,
+  topic,
   synthesis,
   searchResults,
   maxOutputTokens,
   targetOutputLength,
 }: {
-  mainPrompt: string[];
+  topic: string;
   synthesis: string;
   searchResults: WebSearchResult[];
   maxOutputTokens?: number;
@@ -165,7 +189,7 @@ const FINAL_REPORT_PROMPT = ({
         `;
 
   const userPrompt = `Main Research Topic(s):
-        ${mainPrompt.join("\n")}
+        ${topic}
         
         ${lengthGuidance}
         
@@ -205,9 +229,9 @@ When ranking search results, consider recency as a factor - newer information is
 
 // Export all prompts together with date context
 export const PROMPTS = {
-  synthesis: `${getCurrentDateContext()}\n${SYNTHESIS_PROMPT_TEMPLATE}`,
-  followupQuestion: `${getCurrentDateContext()}\n${FOLLOWUP_QUESTION_PROMPT_TEMPLATE}`,
+  synthesis: SYNTHESIS_PROMPT_TEMPLATE,
   evaluation: EVALUATION_PROMPT,
-  evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
+  // evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
   finalReport: FINAL_REPORT_PROMPT,
+  research: RESEARCH_PROMPT_TEMPLATE,
 };

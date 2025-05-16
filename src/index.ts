@@ -132,7 +132,7 @@ interface ResearchLog {
 
 export class DeepResearch {
   public config: DeepResearchConfig;
-  public prompts?: string[];
+  public prompts?: string;
   private aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
 
@@ -254,7 +254,7 @@ export class DeepResearch {
           queries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
           plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         }),
-        prompt: `Generate a research plan and focused search queries to thoroughly research the following topic: ${topic}. Include both specific search queries and a detailed explanation of the research approach.`,
+        prompt: PROMPTS.research({ topic }),
       });
 
       let queries = result.object.queries;
@@ -339,97 +339,98 @@ export class DeepResearch {
   }
 
   // Add debug logging to summarizeResultsForSynthesis method
-  private async summarizeResultsForSynthesis(results: WebSearchResult[]): Promise<string> {
-    // Group results by related topics and extract key themes
-    console.log(`  Creating intelligent summary of search results...`);
+  // private async summarizeResultsForSynthesis(results: WebSearchResult[]): Promise<string> {
+  //   // Group results by related topics and extract key themes
+  //   console.log(`  Creating intelligent summary of search results...`);
 
-    try {
-      const summarizationResponse = await generateText({
-        model: this.aiProvider.getOutputModel(),
-        prompt: `Summarize the following search results for research synthesis.
-  Focus on extracting:
-  1. Key themes and concepts
-  2. Important sources with citations
-  3. Main findings and consensus points
-  4. Areas of disagreement
-  5. Most reliable information
+  //   try {
+  //     const summarizationResponse = await generateText({
+  //       model: this.aiProvider.getOutputModel(),
+  //       prompt: `Summarize the following search results for research synthesis.
+  // Focus on extracting:
+  // 1. Key themes and concepts
+  // 2. Important sources with citations
+  // 3. Main findings and consensus points
+  // 4. Areas of disagreement
+  // 5. Most reliable information
   
-  Search Results:
-  ${JSON.stringify(results, null, 2)}
+  // Search Results:
+  // ${JSON.stringify(results, null, 2)}
   
-  Your summary should preserve the most important information while reducing the token count.
-  Include source URLs when mentioning specific facts or claims to maintain traceability.`,
-      });
+  // Your summary should preserve the most important information while reducing the token count.
+  // Include source URLs when mentioning specific facts or claims to maintain traceability.`,
+  //     });
 
-      console.log(`  Intelligent summary created (${summarizationResponse.text.length} chars)`);
+  //     console.log(`  Intelligent summary created (${summarizationResponse.text.length} chars)`);
 
-      // Debug: Write the search results and summary to files
-      writeDebugFile("search-results", "search-results.json", results);
-      // Create markdown version of search results
-      let searchResultsMd = `# Search Results\n\n`;
-      results.forEach((result, idx) => {
-        searchResultsMd += `## Query ${idx + 1}: ${result.question}\n\n`;
-        if (result.searchResults && result.searchResults.ai_overview) {
-          searchResultsMd += `### Overview\n\n${result.searchResults.ai_overview}\n\n`;
-        }
-        if (result.searchResults && result.searchResults.results) {
-          searchResultsMd += `### Results\n\n`;
-          result.searchResults.results.forEach((item, i) => {
-            searchResultsMd += `#### [${i + 1}] ${item.title || "Untitled"}\n\n`;
-            searchResultsMd += `- URL: ${item.url}\n`;
-            if (item.domain) searchResultsMd += `- Domain: ${item.domain}\n`;
-            if (item.ai_overview) searchResultsMd += `\n${item.ai_overview}\n\n`;
-            searchResultsMd += `\n---\n\n`;
-          });
-        }
-        searchResultsMd += `\n\n`;
-      });
-      writeDebugFile("search-results", "search-results.md", searchResultsMd);
+  //     // Debug: Write the search results and summary to files
+  //     writeDebugFile("search-results", "search-results.json", results);
+  //     // Create markdown version of search results
+  //     let searchResultsMd = `# Search Results\n\n`;
+  //     results.forEach((result, idx) => {
+  //       searchResultsMd += `## Query ${idx + 1}: ${result.question}\n\n`;
+  //       if (result.searchResults && result.searchResults.ai_overview) {
+  //         searchResultsMd += `### Overview\n\n${result.searchResults.ai_overview}\n\n`;
+  //       }
+  //       if (result.searchResults && result.searchResults.results) {
+  //         searchResultsMd += `### Results\n\n`;
+  //         result.searchResults.results.forEach((item, i) => {
+  //           searchResultsMd += `#### [${i + 1}] ${item.title || "Untitled"}\n\n`;
+  //           searchResultsMd += `- URL: ${item.url}\n`;
+  //           if (item.domain) searchResultsMd += `- Domain: ${item.domain}\n`;
+  //           if (item.ai_overview) searchResultsMd += `\n${item.ai_overview}\n\n`;
+  //           searchResultsMd += `\n---\n\n`;
+  //         });
+  //       }
+  //       searchResultsMd += `\n\n`;
+  //     });
+  //     writeDebugFile("search-results", "search-results.md", searchResultsMd);
 
-      return summarizationResponse.text;
-    } catch (error: any) {
-      console.error(`  Error creating intelligent summary: ${error.message || error}`);
+  //     return summarizationResponse.text;
+  //   } catch (error: any) {
+  //     console.error(`  Error creating intelligent summary: ${error.message || error}`);
 
-      // Fallback to simpler approach if the summary generation fails
-      const simpleTopicList = results.map((r) => r.question).join(", ");
-      const domainsList = new Set<string>();
+  //     // Fallback to simpler approach if the summary generation fails
+  //     const simpleTopicList = results.map((r) => r.question).join(", ");
+  //     const domainsList = new Set<string>();
 
-      results.forEach((result) => {
-        if (result.searchResults?.results) {
-          result.searchResults.results.forEach((item) => {
-            if (item.domain) domainsList.add(item.domain);
-          });
-        }
-      });
+  //     results.forEach((result) => {
+  //       if (result.searchResults?.results) {
+  //         result.searchResults.results.forEach((item) => {
+  //           if (item.domain) domainsList.add(item.domain);
+  //         });
+  //       }
+  //     });
 
-      // Debug: Write the fallback summary to a file
-      writeDebugFile("search-results", "search-results-fallback.json", {
-        topic: results.map((r) => r.question),
-        fallbackSummary: `Search results summary (fallback mode):
-  - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(", ")}
-  - Total search results: ${results.length}`,
-      });
-      writeDebugFile(
-        "search-results",
-        "search-results-fallback.md",
-        `# Fallback Search Results Summary\n\n## Topic\n${results
-          .map((r) => r.question)
-          .join(", ")}\n\n## Summary\nSearch results summary (fallback mode):
-  - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(", ")}
-  - Total search results: ${results.length}`
-      );
+  //     // Debug: Write the fallback summary to a file
+  //     writeDebugFile("search-results", "search-results-fallback.json", {
+  //       topic: results.map((r) => r.question),
+  //       fallbackSummary: `Search results summary (fallback mode):
+  // - Topics researched: ${simpleTopicList}
+  // - Sources from domains: ${Array.from(domainsList).join(", ")}
+  // - Total search results: ${results.length}`,
+  //     });
+  //     writeDebugFile(
+  //       "search-results",
+  //       "search-results-fallback.md",
+  //       `# Fallback Search Results Summary\n\n## Topic\n${results
+  //         .map((r) => r.question)
+  //         .join(", ")}\n\n## Summary\nSearch results summary (fallback mode):
+  // - Topics researched: ${simpleTopicList}
+  // - Sources from domains: ${Array.from(domainsList).join(", ")}
+  // - Total search results: ${results.length}`
+  //     );
 
-      return `Search results summary (fallback mode):
-  - Topics researched: ${simpleTopicList}
-  - Sources from domains: ${Array.from(domainsList).join(", ")}
-  - Total search results: ${results.length}`;
-    }
-  }
+  //     return `Search results summary (fallback mode):
+  // - Topics researched: ${simpleTopicList}
+  // - Sources from domains: ${Array.from(domainsList).join(", ")}
+  // - Total search results: ${results.length}`;
+  //   }
+  // }
 
   public async generate(prompt: string) {
     console.log(`Running research with prompt: ${prompt}`);
+    this.prompts = prompt;
 
     // Initialize research log
     const researchLog: ResearchLog = {
@@ -835,22 +836,19 @@ ${Array.from(topicsCovered)
     searchResults: WebSearchResult[];
   }) {
     // Truncate results to fit within model's context length
-    const summary = await this.summarizeResultsForSynthesis(searchResults);
+    // const summary = await this.summarizeResultsForSynthesis(searchResults);
 
     try {
       console.log(`  Starting research synthesis...`);
 
-      const synthesisPrompt = `${PROMPTS.synthesis}
+      if (!this.prompts) {
+        throw new Error("No prompts provided");
+      }
 
-Current Search Results:
-${summary}
-
-Synthesize the key findings from these search results into a comprehensive summary.
-Focus on the most important and reliable information.
-Highlight areas of consensus and note any significant disagreements.
-
-Your response should be formatted as a clear, well-structured synthesis without any thinking tags, 
-reasoning sections, or other markup in your response.`;
+      const synthesisPrompt = PROMPTS.synthesis({
+        topic: this.prompts,
+        searchResults,
+      });
 
       // Debug: Write the synthesis prompt to a file
       writeDebugFile("synthesis", "synthesis-prompt.md", synthesisPrompt);
@@ -911,7 +909,7 @@ reasoning sections, or other markup in your response.`;
     writeDebugFile("final-report", "research-plan.md", researchPlan);
 
     const reportPrompt = PROMPTS.finalReport({
-      mainPrompt: [prompt],
+      topic: prompt,
       searchResults,
       synthesis: synthesizedResults,
       maxOutputTokens: this.config.synthesis?.maxOutputTokens,
@@ -958,11 +956,6 @@ reasoning sections, or other markup in your response.`;
     // Create logs directory if it doesn't exist
     if (!fs.existsSync("logs")) {
       fs.mkdirSync("logs");
-    }
-
-    // Write prompts if available
-    if (this.prompts) {
-      fs.writeFileSync("logs/prompts.md", this.prompts.join("\n") || "");
     }
 
     // Write final report
