@@ -133,6 +133,8 @@ interface ResearchLog {
 export class DeepResearch {
   public config: DeepResearchConfig;
   public prompts?: string;
+  public topic?: string;
+  private sources: WebSearchResult[] = [];
   private aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
 
@@ -147,10 +149,14 @@ export class DeepResearch {
       deepInfraApiKey: this.config.deepInfraApiKey,
     });
 
+    this.initModels();
+  }
+
+  private initModels() {
     // Add models from config.models if available
-    if (config.models) {
+    if (this.config.models) {
       // For each model type (default, quick, reasoning, etc.)
-      Object.entries(config.models).forEach(([modelType, modelValue]) => {
+      Object.entries(this.config.models).forEach(([modelType, modelValue]) => {
         if (modelValue) {
           if (typeof modelValue !== "string") {
             // It's a LanguageModelV1 instance, add it as a direct model
@@ -344,50 +350,18 @@ export class DeepResearch {
 
   public async generate(prompt: string) {
     console.log(`Running research with prompt: ${prompt}`);
+    this.topic = prompt;
     this.prompts = prompt;
-
-    // Initialize research log
-    const researchLog: ResearchLog = {
-      timestamp: new Date().toISOString(),
-      prompt,
-      steps: [],
-      metrics: {
-        totalQueries: 0,
-        iterations: 0,
-        totalSources: 0,
-        uniqueSources: 0,
-        processingTime: {
-          start: Date.now(),
-          end: 0,
-          total: 0,
-        },
-      },
-    };
 
     // step 1: generate research plan
     console.log(`[Step 1] Generating research plan...`);
-    researchLog.steps.push({
-      step: "Research Plan Generation",
-      timestamp: new Date().toISOString(),
-    });
-
     const { queries, plan } = await this.generateResearchPlan(prompt, this.aiProvider, this.config.breadth?.maxParallelTopics);
 
     console.log(`Research plan: ${plan}`);
     console.log(`Research queries: ${queries.join("\n")}`);
 
-    researchLog.metrics.totalQueries += queries.length;
-    researchLog.steps[researchLog.steps.length - 1].details = {
-      queriesGenerated: queries.length,
-      queries,
-    };
-
     // step 2: fire web searches
     console.log(`[Step 2] Running initial web searches with ${queries.length} queries...`);
-    researchLog.steps.push({
-      step: "Initial Web Searches",
-      timestamp: new Date().toISOString(),
-    });
 
     const jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
     const initialSearchResults = await jigsaw.fireWebSearches(queries);
@@ -404,15 +378,6 @@ export class DeepResearch {
         });
       }
     });
-
-    researchLog.steps[researchLog.steps.length - 1].details = {
-      resultsReceived: initialSearchResults.length,
-      sourcesFound: initialSourceCount,
-      uniqueSources: uniqueUrls.size,
-    };
-
-    researchLog.metrics.totalSources += initialSourceCount;
-    researchLog.metrics.uniqueSources = uniqueUrls.size;
 
     // step 2.5: deduplicate results
     console.log(`[Step 2.5] Deduplicating search results...`);
@@ -432,45 +397,21 @@ export class DeepResearch {
 
     console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
 
-    researchLog.steps.push({
-      step: "Deduplication",
-      timestamp: new Date().toISOString(),
-      details: {
-        sourcesBefore: initialSourceCount,
-        sourcesAfter: dedupSourceCount,
-        uniqueSourcesAfter: uniqueUrls.size,
-      },
-    });
-
     // step 3: iteratively search until we have enough results
     console.log(`[Step 3] Starting iterative research...`);
-    researchLog.steps.push({
-      step: "Iterative Research",
-      timestamp: new Date().toISOString(),
-      iterations: [],
-    });
-
     const iterativeResult = await this.performIterativeResearch({
       prompt,
       researchPlan: plan,
       initialResults: deduplicatedResults,
       allQueries: queries,
-      researchLog: researchLog,
     });
 
     console.log(`Iterative research completed with ${iterativeResult.iterationCount} iterations`);
     console.log(`Total queries used: ${iterativeResult.queriesUsed.length}`);
     console.log(`Final search results: ${iterativeResult.finalSearchResults.length}`);
 
-    researchLog.metrics.iterations = iterativeResult.iterationCount;
-    researchLog.metrics.totalQueries = iterativeResult.queriesUsed.length;
-
     // step 4: synthesize results
     console.log(`[Step 4] Synthesizing results...`);
-    researchLog.steps.push({
-      step: "Synthesis",
-      timestamp: new Date().toISOString(),
-    });
 
     const synthesisStartTime = Date.now();
     const synthesizedResults = await this.synthesizeResults({
@@ -480,17 +421,8 @@ export class DeepResearch {
     const synthesisDuration = Date.now() - synthesisStartTime;
     console.log(`Synthesis completed in ${synthesisDuration}ms`);
 
-    researchLog.steps[researchLog.steps.length - 1].details = {
-      synthesisTime: synthesisDuration,
-      synthesisLength: synthesizedResults.length,
-    };
-
     // step 5: generate a final report
     console.log(`[Step 5] Generating final report...`);
-    researchLog.steps.push({
-      step: "Final Report Generation",
-      timestamp: new Date().toISOString(),
-    });
 
     const reportStartTime = Date.now();
 
@@ -503,23 +435,6 @@ export class DeepResearch {
 
     const reportDuration = Date.now() - reportStartTime;
     console.log(`Final report generated in ${reportDuration}ms`);
-
-    // Complete metrics
-    researchLog.metrics.processingTime.end = Date.now();
-    researchLog.metrics.processingTime.total = researchLog.metrics.processingTime.end - researchLog.metrics.processingTime.start;
-
-    researchLog.steps[researchLog.steps.length - 1].details = {
-      reportTime: reportDuration,
-      reportLength: finalReport.report ? finalReport.report : 0,
-    };
-
-    // Save the research log
-    // Create logs directory if it doesn't exist
-    if (!fs.existsSync("logs")) {
-      fs.mkdirSync("logs", { recursive: true });
-    }
-    fs.writeFileSync("logs/research_log.json", JSON.stringify(researchLog, null, 2));
-    console.log(`Research log saved to logs/research_log.json`);
 
     // Write detailed logs
     this.writeLogs(finalReport);
@@ -656,13 +571,11 @@ ${Array.from(topicsCovered)
     researchPlan,
     initialResults,
     allQueries,
-    researchLog,
   }: {
     prompt: string;
     researchPlan: string;
     initialResults: WebSearchResult[];
     allQueries: string[];
-    researchLog: ResearchLog;
   }) {
     let searchResults = initialResults;
     let iterationCount = 0;
@@ -672,25 +585,7 @@ ${Array.from(topicsCovered)
       iterationCount++;
       console.log(`  [Iteration ${iterationCount}] Evaluating research completeness...`);
 
-      const iterationStartTime = Date.now();
       const evaluation = await this.evaluateResearchCompleteness(prompt, researchPlan, searchResults, allQueries);
-
-      // Log iteration details
-      const iterationLog = {
-        iterationNumber: iterationCount,
-        timestamp: new Date().toISOString(),
-        isComplete: evaluation.isComplete,
-        reason: evaluation.reason,
-        additionalQueries: evaluation.queries.length,
-        evaluationTime: Date.now() - iterationStartTime,
-      };
-
-      if (researchLog.steps) {
-        const iterativeStep = researchLog.steps.find((s) => s.step === "Iterative Research");
-        if (iterativeStep && iterativeStep.iterations) {
-          iterativeStep.iterations.push(iterationLog);
-        }
-      }
 
       if (evaluation.isComplete) {
         console.log(`  Research evaluation complete (iteration ${iterationCount}): No additional queries needed`);
@@ -722,23 +617,8 @@ ${Array.from(topicsCovered)
 
       console.log(`  Retrieved ${newResults.length} new search results with ${newSourceCount} sources in ${searchTime}ms`);
 
-      if (researchLog.steps) {
-        const iterativeStep = researchLog.steps.find((s) => s.step === "Iterative Research");
-        if (iterativeStep && iterativeStep.iterations && iterativeStep.iterations.length > 0) {
-          const currentIteration = iterativeStep.iterations[iterativeStep.iterations.length - 1];
-          currentIteration.newSearchResults = newResults.length;
-          currentIteration.newSources = newSourceCount;
-          currentIteration.searchTime = searchTime;
-        }
-      }
-
       searchResults = [...searchResults, ...newResults];
       allQueries = [...allQueries, ...newQueries];
-
-      // Update research log metrics
-      if (researchLog.metrics) {
-        researchLog.metrics.totalSources += newSourceCount;
-      }
     }
 
     return {
