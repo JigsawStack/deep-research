@@ -1,7 +1,7 @@
 import AIProvider from "./provider/aiProvider";
 import { DeepResearchConfig, ResearchSource, WebSearchResult } from "./types/types";
 
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_SYNTHESIS_CONFIG } from "./config/defaults";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_SYNTHESIS_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
@@ -134,6 +134,8 @@ export class DeepResearch {
   public config: DeepResearchConfig;
   public prompts?: string;
   public topic?: string;
+  public queries?: string[];
+  public researchPlan?: string;
   private sources: WebSearchResult[] = [];
   private aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
@@ -189,9 +191,9 @@ export class DeepResearch {
         ...DEFAULT_BREADTH_CONFIG,
         ...(config.breadth || {}),
       },
-      synthesis: {
-        ...DEFAULT_SYNTHESIS_CONFIG,
-        ...(config.synthesis || {}),
+      report: {
+        ...DEFAULT_REPORT_CONFIG,
+        ...(config.report || {}),
       },
       models: mergedModels,
       jigsawApiKey:
@@ -270,6 +272,7 @@ export class DeepResearch {
       if (maxQueries && maxQueries > 0) {
         queries = queries.slice(0, maxQueries);
       }
+
       console.log(`Generated ${queries.length} research queries`);
 
       // Debug: Write the research plan to a file
@@ -353,6 +356,8 @@ export class DeepResearch {
     // step 1: generate research plan
     console.log(`[Step 1] Generating research plan...`);
     const { queries, plan } = await this.generateResearchPlan(prompt, this.aiProvider, this.config.breadth?.maxParallelTopics);
+    this.queries = queries;
+    this.researchPlan = plan;
 
     console.log(`Research plan: ${plan}`);
     console.log(`Research queries: ${queries.join("\n")}`);
@@ -365,6 +370,7 @@ export class DeepResearch {
     console.log(`Received ${initialSearchResults.length} initial search results`);
 
     // Count sources from initial results
+    // logging
     let initialSourceCount = 0;
     let uniqueUrls = new Set();
     initialSearchResults.forEach((result) => {
@@ -380,6 +386,10 @@ export class DeepResearch {
     console.log(`[Step 2.5] Deduplicating search results...`);
     const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
+    // save it to the class for later use
+    this.sources = deduplicatedResults;
+
+    // logging
     // Count sources after deduplication
     let dedupSourceCount = 0;
     uniqueUrls = new Set();
@@ -393,6 +403,17 @@ export class DeepResearch {
     });
 
     console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
+
+    // step 3: reasoning about the search results
+    console.log(`[Step 3] Reasoning about the search results...`);
+    const reasoning = await this.reasoningSearchResults();
+
+    // step 4: decision making
+    console.log(`[Step 4] Decision making...`);
+    const decisionMaking = await this.decisionMaking({ reasoning });
+    console.log(`Decision making: ${decisionMaking}`);
+
+    console.log(`Reasoning: ${reasoning}`);
 
     // step 3: iteratively search until we have enough results
     console.log(`[Step 3] Starting iterative research...`);
@@ -437,6 +458,61 @@ export class DeepResearch {
     this.writeLogs(finalReport);
 
     return finalReport;
+  }
+
+  private async decisionMaking({ reasoning }: { reasoning: string }) {
+    const decisionMakingPrompt = PROMPTS.decisionMaking({
+      reasoning,
+      totalOutputLength: this.config.report.targetOutputLength,
+    });
+
+    const decisionMakingResponse = await generateObject({
+      model: this.aiProvider.getDefaultModel(),
+      output: "object",
+      schema: z.object({
+        isComplete: z.boolean().describe("Whether the research is complete"),
+        reason: z.string().describe("The reason for the decision"),
+      }),
+      prompt: decisionMakingPrompt,
+    });
+
+    return decisionMakingResponse.object;
+  }
+
+  private async reasoningSearchResults() {
+    try {
+      const reasoningPrompt = PROMPTS.reasoningSearchResults({
+        topic: this.topic || "",
+        researchPlan: this.researchPlan || "",
+        searchResults: this.sources,
+        allQueries: this.queries || [],
+      });
+
+      const reasoningResponse = await generateText({
+        model: this.aiProvider.getReasoningModel(),
+        prompt: reasoningPrompt,
+      });
+
+      // Option 1: Return reasoning property if available
+      if (reasoningResponse.reasoning) {
+        return reasoningResponse.reasoning;
+      }
+
+      // Option 2: Extract content between <think> or <thinking> tags
+      const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
+      if (thinkingMatch) {
+        return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
+      }
+
+      // Option 3: If no structured reasoning available, return the full text
+      return reasoningResponse.text;
+    } catch (error: any) {
+      console.error("Fatal error in reasoningSearchResults:", error.message || error);
+      console.error(`  Error details:`, error);
+
+      // Throw the error to terminate program execution
+      throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
+    }
   }
 
   // Add debug logging to evaluateResearchCompleteness method

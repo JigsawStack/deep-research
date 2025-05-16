@@ -59,6 +59,70 @@ Please provide the following two components:
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
+const DECISION_MAKING_PROMPT = ({
+  reasoning,
+  totalOutputLength,
+}: {
+  reasoning: string;
+  totalOutputLength: number;
+}) => `
+You are a decision-making assistant.
+
+Your job is to decide whether the provided chain-of-thought reasoning gives enough context to start writing the final report of approximately ${totalOutputLength} words.
+
+Chain of Thought:
+"""${reasoning}"""
+
+Instructions:
+- If the reasoning is sufficient to cover all major sub-topics at the planned length, set “isComplete” to true.
+- Otherwise set “isComplete” to false.
+- In either case, provide a brief explanation in “reason” describing your judgement.
+- **Output only** a JSON object with exactly these two keys and no extra text, for example:
+  {
+    "isComplete": true,
+    "reason": "The reasoning covers all identified gaps and the target length is adequate."
+  }
+`;
+
+const REASONING_SEARCH_RESULTS_PROMPT = ({
+  topic,
+  researchPlan,
+  searchResults,
+  allQueries,
+}: {
+  topic: string;
+  researchPlan: string;
+  searchResults: WebSearchResult[];
+  allQueries: string[];
+}) => `
+You are an expert reasoning assistant. Given:
+
+  • Topic to address:
+    “${topic}”
+
+  • Proposed research plan:
+    """${researchPlan}"""
+
+  • Search results obtained (array of { title, snippet, url }):
+    ${JSON.stringify(searchResults, null, 2)}
+
+  • All queries used:
+    ${JSON.stringify(allQueries, null, 2)}
+
+Your task is to evaluate whether this set of inputs collectively provides enough coverage and context to write a thorough, deep-dive research report on the topic. Think step by step and show your full chain-of-thought. Specifically:
+
+1. **Decompose** the topic into its major sub-topics or dimensions.
+2. **Map** each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.
+3. **Identify** gaps—sub-topics not covered or weakly supported.
+4. **Assess** the quality, relevance, and diversity of the sources provided.
+5. **Recommend** additional queries, source types, or angles needed to fill those gaps.
+6. **Summarize** at the end with a JSON object containing:
+   - sufficiency: “sufficient” or “insufficient”
+   - missingAreas: [list of uncovered sub-topics]
+   - suggestions: [list of concrete next queries or source types]
+
+Begin by stating “Let me think through this step by step,” then proceed with your reasoning.  
+`;
 
 const EVALUATION_PROMPT = ({
   prompt,
@@ -126,8 +190,8 @@ const EVALUATION_PROMPT = ({
     
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
-// ^^ reasoning should be in the same model 
-// ^^ put is_complete and queries into another model 
+// ^^ reasoning should be in the same model
+// ^^ put is_complete and queries into another model
 
 const FINAL_REPORT_PROMPT = ({
   topic,
@@ -236,4 +300,6 @@ export const PROMPTS = {
   // evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
   finalReport: FINAL_REPORT_PROMPT,
   research: RESEARCH_PROMPT_TEMPLATE,
+  reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
+  decisionMaking: DECISION_MAKING_PROMPT,
 };

@@ -38,16 +38,14 @@ export interface DeepResearchConfig {
   depth: typeof DEFAULT_DEPTH_CONFIG;
   breadth: typeof DEFAULT_BREADTH_CONFIG;
   models: ModelConfig;
-  synthesis: SynthesisConfig;
+  report: {
+    targetOutputLength: number;
+    maxTokens: number;
+  };
   jigsawApiKey: string;
   openaiApiKey: string;
   geminiApiKey: string;
   deepInfraApiKey: string;
-}
-
-export interface SynthesisConfig {
-  maxOutputTokens: number;
-  targetOutputLength: number;
 }
 
 export interface ResearchSource {

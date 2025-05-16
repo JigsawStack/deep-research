@@ -20,14 +20,14 @@ export const DEFAULT_BREADTH_CONFIG = {
   minRelevanceScore: 0.7,
 };
 
-export const DEFAULT_SYNTHESIS_CONFIG = {
-  maxOutputTokens: 8000,
+export const DEFAULT_REPORT_CONFIG = {
   targetOutputLength: 5000,
+  maxTokens: 8000,
 };
 
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
-  synthesis: DEFAULT_SYNTHESIS_CONFIG,
+  report: DEFAULT_REPORT_CONFIG,
 };
