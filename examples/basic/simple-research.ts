@@ -38,7 +38,7 @@ async function basicResearch() {
       includeRelatedTopics: true,
       minRelevanceScore: 0.8,
     },
-    synthesis: {
+    report: {
       maxOutputTokens: 8000, // Hard upper limit of tokens
       targetOutputLength: 5000,
     },
@@ -62,7 +62,7 @@ async function basicResearch() {
 
     // Log research results
     console.log("\n=== RESEARCH SUMMARY ===");
-    console.log(`Research completed successfully: ${result.report}`);
+    console.log(`Research completed successfully: ${result}`);
 
     return result;
   } catch (error) {

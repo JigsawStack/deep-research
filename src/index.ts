@@ -565,6 +565,11 @@ export class DeepResearch {
       return false;
     }
 
+    // check if the report reaches the max output tokens
+    if (this.config.report.maxOutputTokens && this.finalReport.length >= this.config.report.maxOutputTokens) {
+      return true;
+    }
+
     return true;
   }
 
