@@ -39,8 +39,8 @@ async function basicResearch() {
       minRelevanceScore: 0.8,
     },
     report: {
-      maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 5000,
+      maxOutputTokens: 50000, // Hard upper limit of tokens
+      targetOutputLength: 30000,
     },
     models: {
       output: geminiModel,
@@ -54,7 +54,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is quantum computing?"];
+  const prompts = ["what is true happiness?"];
 
   try {
     console.log("Starting deep research...");

@@ -369,26 +369,27 @@ export class DeepResearch {
   }
 
   public async generate(prompt: string) {
-    console.log(`Running research with prompt: ${prompt}`);
+    const debugLog: string[] = [];
+    debugLog.push(`Running research with prompt: ${prompt}`);
     this.topic = prompt;
 
     while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel) {
       this.iterationCount++;
       // step 1: generate research plan
-      console.log(`[Step 1] Generating research plan...`);
+      debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
       const { subQueries, plan } = await this.generateResearchPlan();
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
 
-      console.log(`Research plan: ${plan}`);
-      console.log(`Research queries: ${subQueries.join("\n")}`);
+      debugLog.push(`Research plan: ${plan}`);
+      debugLog.push(`Research queries: ${subQueries.join("\n")}`);
 
       // step 2: fire web searches
-      console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
+      debugLog.push(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
 
       const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
-      console.log(`Received ${initialSearchResults.length} initial search results`);
+      debugLog.push(`Received ${initialSearchResults.length} initial search results`);
 
       // Count sources from initial results
       // logging
@@ -404,7 +405,7 @@ export class DeepResearch {
       });
 
       // step 2.5: deduplicate results
-      console.log(`[Step 2.5] Deduplicating search results...`);
+      debugLog.push(`[Step 2.5] Deduplicating search results...`);
       const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
       // save it to the class for later use
@@ -423,17 +424,17 @@ export class DeepResearch {
         }
       });
 
-      console.log(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
+      debugLog.push(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
 
       // step 3: reasoning about the search results
-      console.log(`[Step 3] Reasoning about the search results...`);
+      debugLog.push(`[Step 3] Reasoning about the search results...`);
       const reasoning = await this.reasoningSearchResults();
-      console.log(`Reasoning: ${reasoning}`);
+      debugLog.push(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
-      console.log(`[Step 4] Decision making...`);
+      debugLog.push(`[Step 4] Decision making...`);
       const decisionMaking = await this.decisionMaking({ reasoning });
-      console.log(`Decision making: ${decisionMaking}`);
+      debugLog.push(`Decision making: ${decisionMaking.isComplete} ${decisionMaking.reason}`);
 
       const { isComplete, reason } = decisionMaking;
       this.isComplete = isComplete;
@@ -441,17 +442,12 @@ export class DeepResearch {
     }
 
     // step 5: generating report
-    console.log(`[Step 5] Generating report...`);
+    debugLog.push(`[Step 5] Generating report...`);
 
-    const reportStartTime = Date.now();
+    const finalReport = await this.generateFinalReport(debugLog);
 
-    const finalReport = await this.generateFinalReport();
-
-    const reportDuration = Date.now() - reportStartTime;
-    console.log(`Final report generated in ${reportDuration}ms`);
-
-    // Write detailed logs
-    this.writeLogs(finalReport);
+    // Write debug log to file
+    fs.writeFileSync("logs/debug.md", debugLog.join("\n"));
 
     return finalReport;
   }
@@ -512,7 +508,7 @@ export class DeepResearch {
   }
 
   // Add debug logging to generateFinalReport method
-  private async generateFinalReport() {
+  private async generateFinalReport(debugLog: string[]) {
     const continuationMarker = "[###CONTINUE###]";
     const reportPrompt = PROMPTS.finalReport({
       topic: this.topic,
@@ -527,13 +523,8 @@ export class DeepResearch {
       currentOutputLength: this.currentOutputLength,
     });
 
-    // Debug: Write the final report system and user prompts to files
-    writeDebugFile("final-report", "final-report-system-prompt.md", reportPrompt.systemPrompt);
-    writeDebugFile("final-report", "final-report-user-prompt.md", reportPrompt.userPrompt);
-    writeDebugFile("final-report", "final-report-config.json", {
-      maxOutputTokens: this.config.report.maxOutputTokens,
-      targetOutputLength: this.config.report.targetOutputLength,
-    });
+    debugLog.push(`Final report system prompt: ${reportPrompt.systemPrompt}`);
+    debugLog.push(`Final report user prompt: ${reportPrompt.userPrompt}`);
 
     let isComplete = false;
 
@@ -547,8 +538,15 @@ export class DeepResearch {
       this.finalReport += report.text;
       this.currentOutputLength += report.text.length;
 
+      debugLog.push(`Final report: ${report.text}`);
+      debugLog.push(`Current output length: ${this.currentOutputLength}`);
+
       isComplete = this.isReportComplete({ report: this.finalReport, continuationMarker: continuationMarker });
+
+      debugLog.push(`Is complete: ${isComplete}`);
     }
+
+    fs.writeFileSync("logs/final-report.md", this.finalReport);
 
     return this.finalReport;
   }
@@ -571,215 +569,6 @@ export class DeepResearch {
     }
 
     return true;
-  }
-
-  public async writeLogs(finalReport?: any) {
-    // Create logs directory if it doesn't exist
-    if (!fs.existsSync("logs")) {
-      fs.mkdirSync("logs", { recursive: true });
-    }
-
-    // Write final report
-    if (finalReport) {
-      fs.writeFileSync("logs/final_report.json", JSON.stringify(finalReport, null, 2));
-
-      if (finalReport.report) {
-        fs.writeFileSync("logs/final_report.md", finalReport.report);
-      }
-    }
-
-    // Log information about the research process
-    try {
-      // Look for search results data
-      const searchResultsPath = "logs/search_results.json";
-      if (fs.existsSync(searchResultsPath)) {
-        const searchResults = JSON.parse(fs.readFileSync(searchResultsPath, "utf8"));
-
-        // Extract sources from search results
-        const sources: ResearchSource[] = [];
-        if (Array.isArray(searchResults)) {
-          searchResults.forEach((result) => {
-            if (result.searchResults && result.searchResults.results) {
-              result.searchResults.results.forEach((source: ResearchSource) => {
-                // Only add unique s
-                if (source.url && !sources.some((s) => s.url === source.url)) {
-                  sources.push({
-                    url: source.url,
-                    title: source.title || "Unknown Title",
-                    domain: source.domain || new URL(source.url).hostname,
-                    ai_overview: source.ai_overview || "",
-                    isAcademic: source.isAcademic,
-                  });
-                }
-              });
-            }
-          });
-
-          // Write sources to file
-          fs.writeFileSync("logs/sources.json", JSON.stringify(sources, null, 2));
-
-          // Create a markdown version of sources for easy reference
-          let sourcesMd = "# Research Sources\n\n";
-          sourcesMd += `Total sources: ${sources.length}\n\n`;
-
-          sources.forEach((source, index) => {
-            sourcesMd += `## [${index + 1}] ${source.title}\n\n`;
-            sourcesMd += `- URL: ${source.url}\n`;
-            sourcesMd += `- Domain: ${source.domain}\n`;
-            sourcesMd += `- Academic: ${source.isAcademic ? "Yes" : "No"}\n\n`;
-
-            if (source.ai_overview) {
-              sourcesMd += `### Overview\n\n${source.ai_overview}\n\n`;
-            }
-
-            sourcesMd += "---\n\n";
-          });
-
-          fs.writeFileSync("logs/sources.md", sourcesMd);
-        }
-      }
-
-      // Create a research summary
-      let summaryMd = "# Research Summary\n\n";
-
-      if (finalReport && finalReport.report) {
-        const reportPreview = finalReport.report.substring(0, 500) + "...";
-        summaryMd += `## Final Report Preview\n\n${reportPreview}\n\n`;
-      }
-
-      // Add information about sources if available
-      const sourcesPath = "logs/sources.json";
-      if (fs.existsSync(sourcesPath)) {
-        const sources = JSON.parse(fs.readFileSync(sourcesPath, "utf8"));
-        summaryMd += `## Sources\n\nTotal sources: ${sources.length}\n\n`;
-
-        // Count domains
-        const domains: Record<string, number> = {};
-        sources.forEach((source: ResearchSource) => {
-          const domain = source.domain || "unknown";
-          domains[domain] = (domains[domain] || 0) + 1;
-        });
-
-        summaryMd += "### Top Domains\n\n";
-        Object.entries(domains)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .forEach(([domain, count]) => {
-            summaryMd += `- ${domain}: ${count}\n`;
-          });
-      }
-
-      // Add detailed stats from research log
-      if (fs.existsSync("logs/research_log.json")) {
-        const researchLog = JSON.parse(fs.readFileSync("logs/research_log.json", "utf8"));
-        if (researchLog.metrics) {
-          const metrics = researchLog.metrics;
-          const processingTime = metrics.processingTime;
-
-          summaryMd += `\n## Performance Metrics\n\n`;
-          summaryMd += `- Total processing time: ${Math.round(processingTime.total / 1000)} seconds\n`;
-          summaryMd += `- Iterations: ${metrics.iterations}\n`;
-          summaryMd += `- Total queries: ${metrics.totalQueries}\n`;
-          summaryMd += `- Sources analyzed: ${metrics.totalSources}\n`;
-          summaryMd += `- Unique sources: ${metrics.uniqueSources}\n`;
-
-          // Add detailed breakdown of steps
-          if (researchLog.steps && researchLog.steps.length > 0) {
-            summaryMd += `\n## Research Process Breakdown\n\n`;
-
-            // Timeline of steps
-            summaryMd += `### Timeline\n\n`;
-            summaryMd += `| Step | Start Time | Duration |\n`;
-            summaryMd += `| ---- | ---------- | -------- |\n`;
-
-            researchLog.steps.forEach((step: ResearchStep, index: number) => {
-              const startTime = new Date(step.timestamp);
-              let endTime;
-              let duration = "N/A";
-
-              if (index < researchLog.steps.length - 1) {
-                endTime = new Date(researchLog.steps[index + 1].timestamp);
-                const durationMs = endTime.getTime() - startTime.getTime();
-                duration = `${Math.round(durationMs / 1000)} seconds`;
-              }
-
-              summaryMd += `| ${step.step} | ${startTime.toLocaleTimeString()} | ${duration} |\n`;
-            });
-
-            // Query details
-            if (researchLog.steps[0]?.details?.queries) {
-              summaryMd += `\n### Initial Queries\n\n`;
-              researchLog.steps[0].details.queries.forEach((query: string, index: number) => {
-                summaryMd += `${index + 1}. ${query}\n`;
-              });
-            }
-
-            // Iteration details
-            const iterativeStep = researchLog.steps.find((s: ResearchStep) => s.step === "Iterative Research");
-            if (iterativeStep && iterativeStep.iterations && iterativeStep.iterations.length > 0) {
-              summaryMd += `\n### Iterations\n\n`;
-
-              iterativeStep.iterations.forEach((iteration: ResearchIteration) => {
-                summaryMd += `#### Iteration ${iteration.iterationNumber}\n\n`;
-                summaryMd += `- Timestamp: ${new Date(iteration.timestamp).toLocaleString()}\n`;
-                summaryMd += `- Complete: ${iteration.isComplete ? "Yes" : "No"}\n`;
-                summaryMd += `- Processing time: ${Math.round(iteration.evaluationTime / 1000)} seconds\n`;
-
-                if (iteration.additionalQueries > 0) {
-                  summaryMd += `- Additional queries: ${iteration.additionalQueries}\n`;
-                }
-
-                if (iteration.newSearchResults !== undefined) {
-                  summaryMd += `- New search results: ${iteration.newSearchResults}\n`;
-                  summaryMd += `- New sources: ${iteration.newSources}\n`;
-                  summaryMd += `- Search time: ${Math.round((iteration.searchTime || 0) / 1000)} seconds\n`;
-                }
-
-                summaryMd += `\n**Reasoning**: ${iteration.reason}\n\n`;
-              });
-            }
-
-            // Synthesis and final report metrics
-            const synthesisStep = researchLog.steps.find((s: ResearchStep) => s.step === "Synthesis");
-            if (synthesisStep && synthesisStep.details) {
-              summaryMd += `\n### Synthesis\n\n`;
-              summaryMd += `- Processing time: ${Math.round(synthesisStep.details.synthesisTime / 1000)} seconds\n`;
-              summaryMd += `- Synthesis length: ${synthesisStep.details.synthesisLength} characters\n`;
-            }
-
-            const reportStep = researchLog.steps.find((s: ResearchStep) => s.step === "Final Report Generation");
-            if (reportStep && reportStep.details) {
-              summaryMd += `\n### Final Report\n\n`;
-              summaryMd += `- Processing time: ${Math.round(reportStep.details.reportTime / 1000)} seconds\n`;
-              summaryMd += `- Report length: ${reportStep.details.reportLength} characters\n`;
-            }
-          }
-        }
-      }
-
-      fs.writeFileSync("logs/research_summary.md", summaryMd);
-
-      // Create a separate detailed stats file
-      if (fs.existsSync("logs/research_log.json")) {
-        const researchLog = JSON.parse(fs.readFileSync("logs/research_log.json", "utf8"));
-        const statsOutput = {
-          summary: {
-            prompt: researchLog.prompt,
-            timestamp: researchLog.timestamp,
-            totalTime: researchLog.metrics?.processingTime?.total,
-            iterations: researchLog.metrics?.iterations,
-            totalQueries: researchLog.metrics?.totalQueries,
-            totalSources: researchLog.metrics?.totalSources,
-          },
-          steps: researchLog.steps,
-          config: this.config,
-        };
-
-        fs.writeFileSync("logs/research_stats.json", JSON.stringify(statsOutput, null, 2));
-      }
-    } catch (error) {
-      console.error("Error generating log files:", error);
-    }
   }
 }
 

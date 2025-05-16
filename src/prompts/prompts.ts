@@ -4,40 +4,6 @@
 
 import { WebSearchResult } from "../types/types";
 
-// Synthesize information from search results
-const SYNTHESIS_PROMPT_TEMPLATE = ({
-  topic,
-  searchResults,
-}: {
-  topic: string;
-  searchResults: WebSearchResult[];
-}) => `You are an expert research synthesizer. Your task is to analyze and synthesize information from multiple search results related to a main research topic.
-
-${getCurrentDateContext()}
-
-The topic for research is: ${topic}
-
-Current Search Results:
-${searchResults.map((result) => result.searchResults).join("\n")}
-
-Based on the search results provided, you will:
-1. Create a comprehensive research analysis that integrates all important findings
-2. Identify key themes and patterns across the results
-3. Generate insights that aren't explicitly stated in any single result
-4. Identify any contradictions between sources and attempt to resolve them
-5. Highlight knowledge gaps that still need to be addressed
-6. Provide a confidence score (0-1) for the overall synthesis
-
-Format your response as a valid JSON object with the following structure:
-{
-  "analysis": "A comprehensive analysis integrating all findings...",
-  "keyThemes": ["Theme 1", "Theme 2", ...],
-  "insights": ["Insight 1", "Insight 2", ...],
-  "knowledgeGaps": ["Gap 1", "Gap 2", ...],
-  "confidence": 0.85,
-  "relatedQuestions": ["Question 1", "Question 2", ...]
-}`;
-
 const RESEARCH_PROMPT_TEMPLATE = ({ topic, pastReasoning, pastQueries }: { topic: string; pastReasoning?: string; pastQueries?: string[] }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
@@ -140,7 +106,6 @@ const EVALUATION_PROMPT = ({
   resultsSummary: string;
 }) => {
   return `
-    ${getCurrentDateContext()}
     You are an expert research planner. Your task is to analyze search results evaluate them and generate targeted follow-up questions to explore knowledge gaps or go deeper into interesting aspects.
 
     PROCESS:
@@ -166,6 +131,8 @@ const EVALUATION_PROMPT = ({
     - Avoid repeating already covered information
     - Phrase as clear, direct questions
 
+    ${getCurrentDateContext()}
+
     OUTPUT FORMAT:
     First, briefly state:
     1. What specific information was found
@@ -174,6 +141,7 @@ const EVALUATION_PROMPT = ({
 
     Then provide up to 5 targeted queries that directly address the identified gaps, ordered by importance. Please consider that you
     need to generate queries that tackle a single goal at a time (searching for A AND B will return bad results). Be specific!
+
 
     <Research Topic>${prompt}</Research Topic>
 
@@ -194,8 +162,7 @@ const EVALUATION_PROMPT = ({
     
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
-// ^^ reasoning should be in the same model
-// ^^ put is_complete and queries into another model
+
 const FINAL_REPORT_PROMPT = ({
   topic,
   latestResearchPlan,
@@ -238,9 +205,9 @@ const FINAL_REPORT_PROMPT = ({
   const userPrompt = `Main Research Topic(s):
         ${topic}
         
-        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
+        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} words long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
         
-        ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens} tokens.` : ""}
+        ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens * 4} characters.` : ""}
         
         Latest Research Plan:
         ${latestResearchPlan}
@@ -252,7 +219,22 @@ const FINAL_REPORT_PROMPT = ({
         ${queries.join("\n")}
 
         Search Results:
-        ${sources.map((result) => result.searchResults).join("\n")}
+        ${sources
+          .map((result) => {
+            const overview = result.searchResults.ai_overview;
+            const sourceResults = result.searchResults.results
+              .map((source) => {
+                return `URL: ${source.url}
+Title: ${source.title || "No title"}
+Domain: ${source.domain || "Unknown domain"}
+Academic: ${source.isAcademic ? "Yes" : "No"}
+Overview: ${source.ai_overview}`;
+              })
+              .join("\n\n");
+
+            return `Query: ${result.question}\nAI Overview: ${overview}\n\nSources:\n${sourceResults}`;
+          })
+          .join("\n\n-----------------\n\n")}
 
         Current Report:
         ${currentReport}
@@ -288,9 +270,7 @@ When ranking search results, consider recency as a factor - newer information is
 
 // Export all prompts together with date context
 export const PROMPTS = {
-  synthesis: SYNTHESIS_PROMPT_TEMPLATE,
   evaluation: EVALUATION_PROMPT,
-  // evaluationParse: `${EVALUATION_PARSE_PROMPT_TEMPLATE}`,
   finalReport: FINAL_REPORT_PROMPT,
   research: RESEARCH_PROMPT_TEMPLATE,
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
