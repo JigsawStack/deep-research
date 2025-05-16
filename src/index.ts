@@ -885,30 +885,32 @@ ${Array.from(topicsCovered)
     let fullReport = "";
     let isComplete = false;
     let partCount = 0;
-    let currentPrompt = userPrompt;
 
     console.log("Generating report with continuation approach...");
 
+    // Add continuation instructions to initial prompt
+    const initialPrompt = `${userPrompt}
+    
+IMPORTANT: If you cannot complete the entire report within the token limit, end your response with ${continuationMarker} to indicate that continuation is needed. Do not write partial sentences - stop at a logical breaking point.`;
+
     while (!isComplete && partCount < 10) {
-      // Limit to 10 parts as a safety measure
       partCount++;
       console.log(`Generating report part ${partCount}...`);
 
-      // For continuation prompts, modify to include context
-      if (partCount > 1) {
-        const lastParagraphs = this.getLastContentForContinuation(fullReport, 1000);
-        currentPrompt = `
+      // Choose the appropriate prompt based on whether this is the first part
+      const currentPrompt =
+        partCount === 1
+          ? initialPrompt
+          : `
 This is a continuation of a research report. The previous content ends with:
 
-${lastParagraphs}
+${this.getLastContentForContinuation(fullReport, 1000)}
 
 Please continue the report from this point. Maintain the same style, tone, and formatting as before. 
 Do not repeat information already covered. Do not start with phrases like "Continuing from" or acknowledgments that this is a continuation.
 If you're in the middle of a section, continue with that section. If you're at a logical breaking point, proceed to the next appropriate section.
 
-${continuationMarker}
-`;
-      }
+IMPORTANT: If you cannot complete the entire report within the token limit, end your response with ${continuationMarker} to indicate that continuation is needed.`;
 
       // Generate the next part
       const reportPart = await generateText({
@@ -929,13 +931,17 @@ ${continuationMarker}
         partText = partText.split(continuationMarker)[0].trim();
         isComplete = false;
       } else {
-        isComplete = true;
+        // Only mark as complete if target length is reached or report structure indicates completion
+        isComplete = fullReport.length + partText.length >= (this.config.synthesis?.targetOutputLength || 30000);
       }
 
       fullReport += partText;
 
-      isComplete =
-        this.isReportComplete({ report: fullReport, continuationMarker }) || fullReport.length >= this.config.synthesis?.targetOutputLength;
+      // Check if structural indicators suggest the report is complete
+      const structurallyComplete = this.isReportComplete({ report: fullReport, continuationMarker });
+
+      // Only stop if we've reached the target length or the report is structurally complete
+      isComplete = isComplete || structurallyComplete;
 
       console.log(`Part ${partCount} generated (${partText.length} chars), cumulative length: ${fullReport.length}`);
     }

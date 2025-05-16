@@ -126,6 +126,8 @@ const EVALUATION_PROMPT = ({
     
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
+// ^^ reasoning should be in the same model 
+// ^^ put is_complete and queries into another model 
 
 const FINAL_REPORT_PROMPT = ({
   topic,
