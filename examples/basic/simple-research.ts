@@ -39,8 +39,8 @@ async function basicResearch() {
       minRelevanceScore: 0.8,
     },
     synthesis: {
-      maxOutputTokens: 8000, // Hard upper limit of tokens
-      targetOutputLength: 5000,
+      maxOutputTokens: 50000, // Hard upper limit of tokens
+      targetOutputLength: 30000,
     },
     models: {
       output: geminiModel,

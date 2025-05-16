@@ -47,7 +47,7 @@ export interface DeepResearchConfig {
 
 export interface SynthesisConfig {
   maxOutputTokens: number;
-  targetOutputLength: "concise" | "standard" | "detailed" | number;
+  targetOutputLength: number;
 }
 
 export interface ResearchSource {

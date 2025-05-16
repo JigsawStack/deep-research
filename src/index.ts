@@ -342,96 +342,6 @@ export class DeepResearch {
     }
   }
 
-  // Add debug logging to summarizeResultsForSynthesis method
-  // private async summarizeResultsForSynthesis(results: WebSearchResult[]): Promise<string> {
-  //   // Group results by related topics and extract key themes
-  //   console.log(`  Creating intelligent summary of search results...`);
-
-  //   try {
-  //     const summarizationResponse = await generateText({
-  //       model: this.aiProvider.getOutputModel(),
-  //       prompt: `Summarize the following search results for research synthesis.
-  // Focus on extracting:
-  // 1. Key themes and concepts
-  // 2. Important sources with citations
-  // 3. Main findings and consensus points
-  // 4. Areas of disagreement
-  // 5. Most reliable information
-
-  // Search Results:
-  // ${JSON.stringify(results, null, 2)}
-
-  // Your summary should preserve the most important information while reducing the token count.
-  // Include source URLs when mentioning specific facts or claims to maintain traceability.`,
-  //     });
-
-  //     console.log(`  Intelligent summary created (${summarizationResponse.text.length} chars)`);
-
-  //     // Debug: Write the search results and summary to files
-  //     writeDebugFile("search-results", "search-results.json", results);
-  //     // Create markdown version of search results
-  //     let searchResultsMd = `# Search Results\n\n`;
-  //     results.forEach((result, idx) => {
-  //       searchResultsMd += `## Query ${idx + 1}: ${result.question}\n\n`;
-  //       if (result.searchResults && result.searchResults.ai_overview) {
-  //         searchResultsMd += `### Overview\n\n${result.searchResults.ai_overview}\n\n`;
-  //       }
-  //       if (result.searchResults && result.searchResults.results) {
-  //         searchResultsMd += `### Results\n\n`;
-  //         result.searchResults.results.forEach((item, i) => {
-  //           searchResultsMd += `#### [${i + 1}] ${item.title || "Untitled"}\n\n`;
-  //           searchResultsMd += `- URL: ${item.url}\n`;
-  //           if (item.domain) searchResultsMd += `- Domain: ${item.domain}\n`;
-  //           if (item.ai_overview) searchResultsMd += `\n${item.ai_overview}\n\n`;
-  //           searchResultsMd += `\n---\n\n`;
-  //         });
-  //       }
-  //       searchResultsMd += `\n\n`;
-  //     });
-  //     writeDebugFile("search-results", "search-results.md", searchResultsMd);
-
-  //     return summarizationResponse.text;
-  //   } catch (error: any) {
-  //     console.error(`  Error creating intelligent summary: ${error.message || error}`);
-
-  //     // Fallback to simpler approach if the summary generation fails
-  //     const simpleTopicList = results.map((r) => r.question).join(", ");
-  //     const domainsList = new Set<string>();
-
-  //     results.forEach((result) => {
-  //       if (result.searchResults?.results) {
-  //         result.searchResults.results.forEach((item) => {
-  //           if (item.domain) domainsList.add(item.domain);
-  //         });
-  //       }
-  //     });
-
-  //     // Debug: Write the fallback summary to a file
-  //     writeDebugFile("search-results", "search-results-fallback.json", {
-  //       topic: results.map((r) => r.question),
-  //       fallbackSummary: `Search results summary (fallback mode):
-  // - Topics researched: ${simpleTopicList}
-  // - Sources from domains: ${Array.from(domainsList).join(", ")}
-  // - Total search results: ${results.length}`,
-  //     });
-  //     writeDebugFile(
-  //       "search-results",
-  //       "search-results-fallback.md",
-  //       `# Fallback Search Results Summary\n\n## Topic\n${results
-  //         .map((r) => r.question)
-  //         .join(", ")}\n\n## Summary\nSearch results summary (fallback mode):
-  // - Topics researched: ${simpleTopicList}
-  // - Sources from domains: ${Array.from(domainsList).join(", ")}
-  // - Total search results: ${results.length}`
-  //     );
-
-  //     return `Search results summary (fallback mode):
-  // - Topics researched: ${simpleTopicList}
-  // - Sources from domains: ${Array.from(domainsList).join(", ")}
-  // - Total search results: ${results.length}`;
-  //   }
-  // }
-
   public async generate(prompt: string) {
     console.log(`Running research with prompt: ${prompt}`);
     this.prompts = prompt;
@@ -604,6 +514,10 @@ export class DeepResearch {
     };
 
     // Save the research log
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync("logs")) {
+      fs.mkdirSync("logs", { recursive: true });
+    }
     fs.writeFileSync("logs/research_log.json", JSON.stringify(researchLog, null, 2));
     console.log(`Research log saved to logs/research_log.json`);
 
@@ -930,22 +844,21 @@ ${Array.from(topicsCovered)
     });
 
     try {
-      const report = await generateText({
-        model: this.aiProvider.getOutputModel(),
-        // Convert the reportPrompt object to a string by merging system and user prompts
-        prompt: `${reportPrompt.systemPrompt}\n\n${reportPrompt.userPrompt}`,
-        maxTokens: this.config.synthesis?.maxOutputTokens,
-        experimental_continueSteps: true,
+      // Use the streaming continuation approach
+      const fullReport = await this.generateReportWithContinuation({
+        systemPrompt: reportPrompt.systemPrompt,
+        userPrompt: reportPrompt.userPrompt,
+        maxTokensPerRequest: 7000, // Safe limit for most models
       });
 
       // Debug: Write the final report raw response to a file
-      writeDebugFile("final-report", "final-report-raw-response.md", report.text);
+      writeDebugFile("final-report", "final-report-raw-response.md", fullReport);
       writeDebugFile("final-report", "final-report-token-count.json", {
-        responseTextLength: report.text.length,
-        estimatedTokens: Math.round(report.text.length / 4), // Rough estimate of tokens
+        responseTextLength: fullReport.length,
+        estimatedTokens: Math.round(fullReport.length / 4), // Rough estimate of tokens
       });
 
-      return { report: report.text };
+      return { report: fullReport };
     } catch (error: any) {
       console.warn("Error in generateFinalReport:", error.message || error);
 
@@ -957,10 +870,128 @@ ${Array.from(topicsCovered)
     }
   }
 
+  // Helper method to generate a long report with continuation markers
+  private async generateReportWithContinuation({
+    systemPrompt,
+    userPrompt,
+    maxTokensPerRequest = 7000,
+    continuationMarker = "[###CONTINUE###]",
+  }: {
+    systemPrompt: string;
+    userPrompt: string;
+    maxTokensPerRequest?: number;
+    continuationMarker?: string;
+  }): Promise<string> {
+    let fullReport = "";
+    let isComplete = false;
+    let partCount = 0;
+    let currentPrompt = userPrompt;
+
+    console.log("Generating report with continuation approach...");
+
+    while (!isComplete && partCount < 10) {
+      // Limit to 10 parts as a safety measure
+      partCount++;
+      console.log(`Generating report part ${partCount}...`);
+
+      // For continuation prompts, modify to include context
+      if (partCount > 1) {
+        const lastParagraphs = this.getLastContentForContinuation(fullReport, 1000);
+        currentPrompt = `
+This is a continuation of a research report. The previous content ends with:
+
+${lastParagraphs}
+
+Please continue the report from this point. Maintain the same style, tone, and formatting as before. 
+Do not repeat information already covered. Do not start with phrases like "Continuing from" or acknowledgments that this is a continuation.
+If you're in the middle of a section, continue with that section. If you're at a logical breaking point, proceed to the next appropriate section.
+
+${continuationMarker}
+`;
+      }
+
+      // Generate the next part
+      const reportPart = await generateText({
+        model: this.aiProvider.getOutputModel(),
+        prompt: `${systemPrompt}\n\n${currentPrompt}`,
+        maxTokens: maxTokensPerRequest,
+      });
+
+      // Debug: Write the part to a file
+      writeDebugFile("final-report", `final-report-part-${partCount}.md`, reportPart.text);
+
+      // Add to the full report
+      let partText = reportPart.text;
+
+      // Check if this part contains a continuation marker
+      if (partText.includes(continuationMarker)) {
+        // Remove the marker and everything after it
+        partText = partText.split(continuationMarker)[0].trim();
+        isComplete = false;
+      } else {
+        isComplete = true;
+      }
+
+      fullReport += partText;
+
+      isComplete =
+        this.isReportComplete({ report: fullReport, continuationMarker }) || fullReport.length >= this.config.synthesis?.targetOutputLength;
+
+      console.log(`Part ${partCount} generated (${partText.length} chars), cumulative length: ${fullReport.length}`);
+    }
+
+    console.log(`Report generation complete with ${partCount} parts, total length: ${fullReport.length} characters`);
+    return fullReport;
+  }
+
+  // Helper method to extract the last N characters of content for continuation context
+  private getLastContentForContinuation(text: string, length: number): string {
+    if (text.length <= length) return text;
+
+    const excerpt = text.slice(text.length - length);
+    // Find the first paragraph or sentence break to make a clean cut
+    const breakMatches = excerpt.match(/(\n\n|\.\s+)/);
+    if (breakMatches && breakMatches.index) {
+      // Start from the next character after the break
+      return excerpt.slice(breakMatches.index + breakMatches[0].length);
+    }
+    return excerpt;
+  }
+
+  // Helper to check if the report seems complete based on content
+  private isReportComplete({ report, continuationMarker }: { report: string; continuationMarker: string }): boolean {
+    // If report contains continuation marker, it's definitely not complete
+    if (report.includes(continuationMarker)) {
+      return false;
+    }
+
+    // Check for length-based completion first - this is the primary goal
+    if (this.config.synthesis?.targetOutputLength && report.length >= this.config.synthesis.targetOutputLength) {
+      return true;
+    }
+
+    // Only check for structural completion if we're at least 80% of the target length
+    // This prevents early termination when sections appear too soon
+    const minAcceptableLength = (this.config.synthesis?.targetOutputLength || 30000) * 0.8;
+    if (report.length < minAcceptableLength) {
+      return false;
+    }
+
+    // Now check if the report contains concluding sections or phrases
+    const completionIndicators = ["Conclusion", "References", "Bibliography", "In conclusion"];
+
+    // Look for completion indicators in the last 20% of the document
+    const lastSection = report.slice(report.length * 0.8);
+    return completionIndicators.some(
+      (indicator) =>
+        lastSection.includes(`## ${indicator}`) || lastSection.includes(`# ${indicator}`) || lastSection.match(new RegExp(`\\d+\\.\\s+${indicator}`))
+    );
+  }
+
   public async writeLogs(finalReport?: any) {
     // Create logs directory if it doesn't exist
     if (!fs.existsSync("logs")) {
-      fs.mkdirSync("logs");
+      fs.mkdirSync("logs", { recursive: true });
     }
 
     // Write final report

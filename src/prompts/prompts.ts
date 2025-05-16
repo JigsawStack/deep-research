@@ -170,7 +170,7 @@ const FINAL_REPORT_PROMPT = ({
         5. Note contradictions or conflicts in the literature, resolving them or clearly framing open debates.
         6. Pinpoint remaining knowledge gaps and recommend avenues for further inquiry.
         7. Conclude with a concise summary of findings and practical or theoretical implications.
-        8. Cite every factual claim or statistic with in-text references (e.g. "[1]", "[2]") and append a numbered bibliography.
+        8. Cite every factual claim or statistic with in-text references (e.g. "[1](https://www.source.com)", "[2](https://www.source2.com)") and append a numbered bibliography.
         
         Structure your output exactly like this:
         – Title: A descriptive, engaging headline  
