@@ -21,8 +21,8 @@ export const DEFAULT_BREADTH_CONFIG = {
 };
 
 export const DEFAULT_REPORT_CONFIG = {
-  targetOutputLength: 5000,
-  maxOutputTokens: 8000,
+  targetOutputTokens: 5000,
+  maxOutputTokens: 32000,
 };
 
 export const DEFAULT_CONFIG = {

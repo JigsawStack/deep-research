@@ -179,8 +179,8 @@ export class DeepResearch {
 
   public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
     // maxOutputTokens must be greater than targetOutputLength
-    if (config.report && config.report.maxOutputTokens < config.report.targetOutputLength) {
-      throw new Error("maxOutputTokens must be greater than targetOutputLength");
+    if (config.report && config.report.maxOutputTokens < config.report.targetOutputTokens) {
+      throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
     // Merge models carefully to handle both string and LanguageModelV1 instances
@@ -455,7 +455,7 @@ export class DeepResearch {
   private async decisionMaking({ reasoning }: { reasoning: string }) {
     const decisionMakingPrompt = PROMPTS.decisionMaking({
       reasoning,
-      totalOutputLength: this.config.report.targetOutputLength,
+      totalOutputLength: this.config.report.targetOutputTokens,
     });
 
     const decisionMakingResponse = await generateObject({
@@ -517,7 +517,7 @@ export class DeepResearch {
       queries: this.queries,
       latestReasoning: this.latestReasoning,
       maxOutputTokens: this.config.report.maxOutputTokens,
-      targetOutputLength: this.config.report.targetOutputLength,
+      targetOutputTokens: this.config.report.targetOutputTokens,
       continuationMarker: continuationMarker,
       currentReport: this.finalReport,
       currentOutputLength: this.currentOutputLength,
@@ -559,12 +559,12 @@ export class DeepResearch {
     }
 
     // check if the report reaches the target output length
-    if (this.config.report.targetOutputLength && this.finalReport.length <= this.config.report.targetOutputLength) {
+    if (this.config.report.targetOutputTokens && this.finalReport.length <= this.config.report.targetOutputTokens * 4) {
       return false;
     }
 
     // check if the report reaches the max output tokens
-    if (this.config.report.maxOutputTokens && this.finalReport.length >= this.config.report.maxOutputTokens) {
+    if (this.config.report.maxOutputTokens && this.finalReport.length >= this.config.report.maxOutputTokens * 4) {
       return true;
     }
 

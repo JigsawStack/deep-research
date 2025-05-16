@@ -40,7 +40,7 @@ async function basicResearch() {
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputLength: 30000,
+      targetOutputTokens: 30000,
     },
     models: {
       output: geminiModel,

@@ -171,7 +171,7 @@ const FINAL_REPORT_PROMPT = ({
   latestReasoning,
   maxOutputTokens,
   continuationMarker,
-  targetOutputLength,
+  targetOutputTokens,
   currentReport,
   currentOutputLength,
 }: {
@@ -182,7 +182,7 @@ const FINAL_REPORT_PROMPT = ({
   latestReasoning: string;
   maxOutputTokens: number;
   continuationMarker: string;
-  targetOutputLength: number;
+  targetOutputTokens: number;
   currentReport?: string;
   currentOutputLength?: number;
 }) => {
@@ -205,7 +205,7 @@ const FINAL_REPORT_PROMPT = ({
   const userPrompt = `Main Research Topic(s):
         ${topic}
         
-        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputLength} words long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
+        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputTokens * 4} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
         
         ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens * 4} characters.` : ""}
         
