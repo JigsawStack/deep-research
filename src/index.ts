@@ -479,15 +479,6 @@ export class DeepResearch {
 
   private async reasoningSearchResults() {
     try {
-      console.log(
-        PROMPTS.reasoningSearchResults({
-          topic: this.topic || "",
-          researchPlan: this.latestResearchPlan || "",
-          searchResults: this.sources,
-          allQueries: this.queries || [],
-        })
-      );
-
       const reasoningPrompt = PROMPTS.reasoningSearchResults({
         topic: this.topic || "",
         researchPlan: this.latestResearchPlan || "",
@@ -522,12 +513,18 @@ export class DeepResearch {
     }
   }
 
-  // 🔧 generateFinalReport with robust looping
+  // ⛏ helper – remove marker and tell the caller if it was present
+  private stripMarker(text: string, marker: string): [string, boolean] {
+    const idx = text.indexOf(marker);
+    if (idx === -1) return [text, false];
+    return [text.slice(0, idx).trimEnd(), true];
+  }
+
   private async generateFinalReport(debugLog: string[]) {
     let isComplete = false;
 
     while (!isComplete) {
-      console.log("Generating final report...");
+      /* build fresh prompt */
       const prompt = PROMPTS.finalReport({
         topic: this.topic,
         latestResearchPlan: this.latestResearchPlan,
@@ -541,125 +538,36 @@ export class DeepResearch {
         currentOutputLength: this.currentOutputLength,
       });
 
-      debugLog.push(`Final report system prompt:\n${prompt.systemPrompt}`);
-      debugLog.push(`Final report user prompt:\n${prompt.userPrompt}`);
-
       const messages: Parameters<typeof generateText>[0]["messages"] = [
         { role: "system", content: prompt.systemPrompt },
         { role: "user", content: prompt.userPrompt },
       ];
-
-      /* 2️⃣  Optionally feed back only the *tail* of the draft so
-          the model has local context but we don’t blow the window */
-      if (this.finalReport.trim().length) {
-        const tail = this.finalReport.slice(-4000); // 4 k chars ≈ 1 k tokens
-        messages.push({ role: "assistant", content: tail });
+      if (this.finalReport.trim()) {
+        messages.push({ role: "assistant", content: this.finalReport.slice(-4000) });
       }
 
-      console.log("messages", messages);
-
-      /* 3️⃣  Call the model */
-      const { text: chunk } = await generateText({
+      /* call model */
+      const { text: rawChunk } = await generateText({
         model: this.aiProvider.getOutputModel(),
         maxTokens: this.config.report.maxOutputTokens,
         messages,
       });
+      if (!rawChunk.trim()) throw new Error("Empty chunk");
 
-      /* 4️⃣  Guard against empty output */
-      if (!chunk.trim()) {
-        throw new Error("Model returned empty chunk — aborting to avoid 400");
-      }
+      /* remove marker if present */
+      const [chunk, hadMarker] = this.stripMarker(rawChunk, this.continuationMarker);
 
       this.finalReport += chunk;
       this.currentOutputLength = this.finalReport.length;
 
-      debugLog.push(`Chunk:\n${chunk}`);
-      debugLog.push(`Current length: ${this.currentOutputLength}`);
-
-      isComplete = this.isReportComplete({
-        report: this.finalReport,
-        continuationMarker: this.continuationMarker,
-      });
+      /* done when: marker seen & stripped, and length target met */
+      isComplete = hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 4;
     }
+
+    if (!isComplete) throw new Error("Report hit iteration cap without finishing");
 
     fs.writeFileSync("logs/final-report.md", this.finalReport);
     return this.finalReport;
-  }
-
-  // Add debug logging to generateFinalReport method
-  // private async generateFinalReport(debugLog: string[]) {
-  //   const reportPrompt = PROMPTS.finalReport({
-  //     topic: this.topic,
-  //     latestResearchPlan: this.latestResearchPlan,
-  //     sources: this.sources,
-  //     queries: this.queries,
-  //     latestReasoning: this.latestReasoning,
-  //     maxOutputTokens: this.config.report.maxOutputTokens,
-  //     targetOutputTokens: this.config.report.targetOutputTokens,
-  //     continuationMarker: this.continuationMarker,
-  //     currentReport: this.finalReport,
-  //     currentOutputLength: this.currentOutputLength,
-  //   });
-
-  //   /** Base conversation */
-  //   const messages: Parameters<typeof generateText>[0]["messages"] = [
-  //     { role: "system", content: reportPrompt.systemPrompt },
-  //     { role: "user", content: reportPrompt.userPrompt },
-  //   ];
-
-  //   debugLog.push(`Final report system prompt: ${reportPrompt.systemPrompt}`);
-  //   debugLog.push(`Final report user prompt: ${reportPrompt.userPrompt}`);
-
-  //   let isComplete = false;
-
-  //   while (!isComplete) {
-  //     const { text: report } = await generateText({
-  //       model: this.aiProvider.getOutputModel(),
-  //       maxTokens: this.config.report.maxOutputTokens,
-  //       messages,
-  //     });
-
-  //     console.log("report", report);
-
-  //     this.finalReport += report;
-  //     this.currentOutputLength += report.length;
-
-  //     debugLog.push(`Final report: ${report}`);
-  //     debugLog.push(`Current output length: ${this.currentOutputLength}`);
-
-  //     isComplete = this.isReportComplete({ report: this.finalReport, continuationMarker: this.continuationMarker });
-
-  //     messages.push({
-  //       role: "assistant",
-  //       content: report,
-  //     });
-
-  //     debugLog.push(`Is complete: ${isComplete}`);
-  //   }
-
-  //   fs.writeFileSync("logs/final-report.md", this.finalReport);
-
-  //   return this.finalReport;
-  // }
-
-  // Helper to check if the report seems complete based on content
-  private isReportComplete({ report, continuationMarker }: { report: string; continuationMarker: string }): boolean {
-    // If report contains continuation marker, it's definitely not complete
-    if (report.includes(continuationMarker)) {
-      return false;
-    }
-
-    // check if the report reaches the target output length
-    if (this.config.report.targetOutputTokens && this.finalReport.length <= this.config.report.targetOutputTokens * 4) {
-      return false;
-    }
-
-    // check if the report reaches the max output tokens
-    if (this.config.report.maxOutputTokens && this.finalReport.length >= this.config.report.maxOutputTokens * 4) {
-      return true;
-    }
-
-    return true;
   }
 }
 
