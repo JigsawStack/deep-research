@@ -171,7 +171,7 @@ const FINAL_REPORT_PROMPT = ({
   sources,
   queries,
   latestReasoning,
-  maxOutputTokens,
+  completionMarker,
   continuationMarker,
   targetOutputTokens,
   currentReport = "",
@@ -182,7 +182,7 @@ const FINAL_REPORT_PROMPT = ({
   sources: WebSearchResult[];
   queries: string[];
   latestReasoning: string;
-  maxOutputTokens: number;
+  completionMarker: string;
   continuationMarker: string;
   targetOutputTokens: number;
   currentReport?: string;
@@ -258,89 +258,12 @@ before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” se
 **Length guideline for *this* response:**  
 Aim for ≈${Math.min(remainingChars || 1500).toLocaleString()} characters.
 
-**Remember:** If you cannot finish, end with **${continuationMarker}T**. THIS IS VERY IMPORTANT
+**Remember:** 
+- If you cannot finish, end with **${continuationMarker}**
+- When you complete the entire report, end with **${completionMarker}**
+THIS IS VERY IMPORTANT
+
 `.trim();
-
-  return { systemPrompt, userPrompt };
-};
-
-const FINAL_REPORT_PROMPT_OLD = ({
-  topic,
-  latestResearchPlan,
-  sources,
-  queries,
-  latestReasoning,
-  maxOutputTokens,
-  continuationMarker,
-  targetOutputTokens,
-  currentReport = "",
-  currentOutputLength = 0,
-}: {
-  topic: string;
-  latestResearchPlan: string;
-  sources: WebSearchResult[];
-  queries: string[];
-  latestReasoning: string;
-  maxOutputTokens: number;
-  continuationMarker: string;
-  targetOutputTokens: number;
-  currentReport?: string;
-  currentOutputLength?: number;
-}) => {
-  const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
-
-1. Introduce the topic—outlining scope, importance, and objectives.  
-2. Synthesize intermediate analyses into a structured narrative.  
-3. Identify and group key themes and patterns across sources.  
-4. Highlight novel insights not explicitly stated in any single source.  
-5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. Pinpoint remaining gaps and recommend avenues for further inquiry.  
-7. Conclude with a concise summary of findings and implications.  
-8. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
-
-**Continuation rule:**  
-If you cannot complete the report in this response, **you must** append exactly:  
-${continuationMarker}
-
-**Draft continuity:**  
-If there is an existing draft, continue seamlessly—preserve its content and structure, and build upon it rather than restarting.  
-`;
-
-  const userPrompt = `Main Research Topic:
-${topic}
-
-Existing Draft (≈${currentOutputLength} characters):
-${currentReport}
-
-Latest Research Plan:
-${latestResearchPlan}
-
-Latest Reasoning:
-${latestReasoning}
-
-Sub-Queries:
-${queries.map((q) => `- ${q}`).join("\n")}
-
-Search Results Overview:
-${sources
-  .map((r, i) => {
-    const overview = r.searchResults.ai_overview;
-    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
-    return `${i + 1}. Query: "${r.question}"  
-AI Overview: ${overview}  
-Sources:
-${list}`;
-  })
-  .join("\n\n")}
-
-**Requirements for this response:**
-- **Length:** Produce at least **${targetOutputTokens * 5}** characters total (including existing draft), 
-but do not exceed **${maxOutputTokens * 5}** characters in this call.
-- **Structure:** Follow the outline defined by the system prompt.
-- **Continuation:** If you cannot finish, append **${continuationMarker}** at the end.
-
-Continue writing the report now:
-`;
 
   return { systemPrompt, userPrompt };
 };

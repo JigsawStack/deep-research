@@ -26,6 +26,7 @@ export class DeepResearch {
   private latestReasoning: string = "";
   private currentOutputLength: number = 0;
   private continuationMarker: string = "[<---- CONTINUE ---->]";
+  private completionMarker: string = "[<---- COMPLETE ---->]";
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -323,10 +324,22 @@ export class DeepResearch {
   }
 
   // ⛏ helper – remove marker and tell the caller if it was present
-  private stripMarker(text: string, marker: string): [string, boolean] {
-    const idx = text.indexOf(marker);
-    if (idx === -1) return [text, false];
-    return [text.slice(0, idx).trimEnd(), true];
+  private stripMarker(text: string, marker: string): [string, boolean, boolean] {
+    const continueIdx = text.indexOf(marker);
+    const completeIdx = text.indexOf(marker.replace("CONTINUE", "COMPLETE"));
+
+    if (completeIdx !== -1) {
+      // Report is explicitly marked as complete
+      return [text.slice(0, completeIdx).trimEnd(), false, true];
+    }
+
+    if (continueIdx !== -1) {
+      // Report needs to continue
+      return [text.slice(0, continueIdx).trimEnd(), true, false];
+    }
+
+    // No markers found
+    return [text, false, false];
   }
 
   private async generateFinalReport(debugLog: string[]) {
@@ -340,7 +353,7 @@ export class DeepResearch {
         sources: this.sources,
         queries: this.queries,
         latestReasoning: this.latestReasoning,
-        maxOutputTokens: this.config.report.maxOutputTokens,
+        completionMarker: this.completionMarker,
         targetOutputTokens: this.config.report.targetOutputTokens,
         continuationMarker: this.continuationMarker,
         currentReport: this.finalReport,
@@ -361,27 +374,33 @@ export class DeepResearch {
         maxTokens: this.config.report.maxOutputTokens,
         messages,
       });
-      if (!rawChunk.trim()) throw new Error("Empty chunk");
+
+      // Skip empty chunks only if we haven't started generating content
+      if (!rawChunk.trim() && !this.finalReport.trim()) {
+        throw new Error("Empty chunk");
+      }
 
       debugLog.push(`[Step 5] Final report raw chunks: ${this.finalReport.length} ${rawChunk}\n`);
 
-      /* remove marker if present */
-      const [chunk, hadMarker] = this.stripMarker(rawChunk, this.continuationMarker);
+      /* remove marker if present and check for completion marker */
+      const [chunk, hadContinueMarker, hadCompleteMarker] = this.stripMarker(rawChunk, this.continuationMarker);
 
       this.finalReport += chunk;
       this.currentOutputLength = this.finalReport.length;
 
       console.log(`[Step 5] Final report chunks: ${this.finalReport.length} ${chunk}\n`);
 
-      /* done when: marker seen & stripped, and length target met or max tokens reached */
+      /* done when: 
+         1. explicit completion marker found, or
+         2. no continuation marker and length target met, or
+         3. max tokens reached */
       isComplete =
-        (!hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
-        this.finalReport.length >= this.config.report.maxOutputTokens;
+        hadCompleteMarker ||
+        (!hadContinueMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
+        this.finalReport.length >= this.config.report.maxOutputTokens * 5;
 
       debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
     }
-
-    if (!isComplete) throw new Error("Report hit iteration cap without finishing");
 
     return { report: this.finalReport, debugLog };
   }
