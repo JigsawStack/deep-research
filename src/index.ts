@@ -303,69 +303,7 @@ export class DeepResearch {
       };
     } catch (error: any) {
       console.error(`Error generating research plan: ${error.message || error}`);
-
-      // Check if the error has a text property (likely from generateObject)
-      if (error && typeof error === "object" && "text" in error && typeof error.text === "string") {
-        console.warn("Attempting to extract JSON from error response");
-        try {
-          // Try to extract JSON from the response
-          const extracted = extractJSONFromResponse(error.text);
-          if (
-            extracted &&
-            "subQueries" in extracted &&
-            Array.isArray(extracted.subQueries) &&
-            "plan" in extracted &&
-            typeof extracted.plan === "string"
-          ) {
-            let subQueries = extracted.subQueries;
-            if (this.config.breadth?.maxParallelTopics && this.config.breadth?.maxParallelTopics > 0) {
-              subQueries = subQueries.slice(0, this.config.breadth?.maxParallelTopics);
-            }
-            console.log(`Generated ${subQueries.length} research queries from extracted JSON`);
-            // Debug: Write the extracted research plan to a file
-            writeDebugFile("research-plan", "research-plan-extracted.json", extracted);
-            writeDebugFile(
-              "research-plan",
-              "research-plan-extracted.md",
-              `# Extracted Research Plan\n\n## Topic\n${this.topic}\n\n## Plan\n${extracted.plan}\n\n## Queries\n${extracted.queries
-                .map((q: string, i: number) => `${i + 1}. ${q}`)
-                .join("\n")}`
-            );
-            return {
-              subQueries,
-              plan: extracted.plan,
-            };
-          }
-        } catch (extractError) {
-          console.error("Failed to extract JSON:", extractError);
-        }
-      }
-
-      // Fallback response
-      const defaultQueries = [this.topic, `${this.topic} research`, `${this.topic} analysis`, `${this.topic} examples`, `${this.topic} implications`];
-      const limitedQueries =
-        this.config.breadth?.maxParallelTopics && this.config.breadth?.maxParallelTopics > 0
-          ? defaultQueries.slice(0, this.config.breadth?.maxParallelTopics)
-          : defaultQueries;
-
-      // Debug: Write the fallback research plan to a file
-      writeDebugFile("research-plan", "research-plan-fallback.json", {
-        topic: this.topic,
-        defaultQueries: limitedQueries,
-        plan: `Basic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.`,
-      });
-      writeDebugFile(
-        "research-plan",
-        "research-plan-fallback.md",
-        `# Fallback Research Plan\n\n## Topic\n${this.topic}\n\n## Plan\nBasic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.\n\n## Queries\n${limitedQueries
-          .map((q, i) => `${i + 1}. ${q}`)
-          .join("\n")}`
-      );
-
-      return {
-        subQueries: limitedQueries, // Return topic and variations as fallback queries
-        plan: `Basic research plan: Conduct a thorough search for information about "${this.topic}" using multiple angles and perspectives.`,
-      };
+      throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -450,18 +388,19 @@ export class DeepResearch {
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
-    const finalReport = await this.generateFinalReport(debugLog);
+    const { report, debugLog: finalDebugLog } = await this.generateFinalReport(debugLog);
 
     // Write debug log to file
-    fs.writeFileSync("logs/debug.md", debugLog.join("\n"));
+    fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
+    fs.writeFileSync("logs/finalReport.md", report);
 
-    return finalReport;
+    return report;
   }
 
   private async decisionMaking({ reasoning }: { reasoning: string }) {
     const decisionMakingPrompt = PROMPTS.decisionMaking({
       reasoning,
-      totalOutputLength: this.config.report.targetOutputTokens,
+      targetOutputTokens: this.config.report.targetOutputTokens,
     });
 
     const decisionMakingResponse = await generateObject({
@@ -554,20 +493,27 @@ export class DeepResearch {
       });
       if (!rawChunk.trim()) throw new Error("Empty chunk");
 
+      debugLog.push(`[Step 5] Final report raw chunks: ${this.finalReport.length} ${rawChunk}\n`);
+
       /* remove marker if present */
       const [chunk, hadMarker] = this.stripMarker(rawChunk, this.continuationMarker);
 
       this.finalReport += chunk;
       this.currentOutputLength = this.finalReport.length;
 
-      /* done when: marker seen & stripped, and length target met */
-      isComplete = hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 4;
+      console.log(`[Step 5] Final report chunks: ${this.finalReport.length} ${chunk}\n`);
+
+      /* done when: marker seen & stripped, and length target met or max tokens reached */
+      isComplete =
+        (hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
+        this.finalReport.length >= this.config.report.maxOutputTokens;
+
+      debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
     }
 
     if (!isComplete) throw new Error("Report hit iteration cap without finishing");
 
-    fs.writeFileSync("logs/final-report.md", this.finalReport);
-    return this.finalReport;
+    return { report: this.finalReport, debugLog };
   }
 }
 

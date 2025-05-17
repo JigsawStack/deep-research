@@ -8,20 +8,14 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
 
 export const DEFAULT_DEPTH_CONFIG = {
   maxLevel: 3,
-  maxTokensPerAnalysis: 2048,
-  includeReferences: true,
-  confidenceThreshold: 0.9,
 };
 
 export const DEFAULT_BREADTH_CONFIG = {
-  maxLevel: 2,
   maxParallelTopics: 3,
-  includeRelatedTopics: true,
-  minRelevanceScore: 0.7,
 };
 
 export const DEFAULT_REPORT_CONFIG = {
-  targetOutputTokens: 5000,
+  targetOutputTokens: 7000,
   maxOutputTokens: 32000,
 };
 

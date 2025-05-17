@@ -31,14 +31,15 @@ Your output should empower a researcher to systematically and effectively gather
 `;
 const DECISION_MAKING_PROMPT = ({
   reasoning,
-  totalOutputLength,
+  targetOutputTokens,
 }: {
   reasoning: string;
-  totalOutputLength: number;
+  targetOutputTokens: number;
 }) => `
 You are a decision-making assistant.
 
-Your job is to decide whether the provided chain-of-thought reasoning gives enough context to start writing the final report of approximately ${totalOutputLength} words.
+Your job is to decide whether the provided chain-of-thought reasoning gives enough context to start writing the 
+final report of approximately ${targetOutputTokens * 5} characters.
 
 Chain of Thought:
 """${reasoning}"""
@@ -163,7 +164,107 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
+/** Builds the prompt for each report-generation round */
 const FINAL_REPORT_PROMPT = ({
+  topic,
+  latestResearchPlan,
+  sources,
+  queries,
+  latestReasoning,
+  maxOutputTokens,
+  continuationMarker,
+  targetOutputTokens,
+  currentReport = "",
+  currentOutputLength = 0,
+}: {
+  topic: string;
+  latestResearchPlan: string;
+  sources: WebSearchResult[];
+  queries: string[];
+  latestReasoning: string;
+  maxOutputTokens: number;
+  continuationMarker: string;
+  targetOutputTokens: number;
+  currentReport?: string;
+  currentOutputLength?: number;
+}) => {
+  /* ────────────────────────────────────────────────── */
+  /* 1 .  dynamic knobs                                */
+  /* ────────────────────────────────────────────────── */
+  const FINAL_MARGIN_CHARS = 2000; // ⇠ when draft is this close, allow wrap-up
+  const targetChars = targetOutputTokens * 5;
+  const remainingChars = Math.max(targetChars - currentOutputLength, 0);
+  const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;
+
+  /* ────────────────────────────────────────────────── */
+  /* 2 .  system prompt                                 */
+  /* ────────────────────────────────────────────────── */
+  const systemPrompt = `
+You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
+
+1. Introduce the topic—outlining scope, importance, and objectives.  
+2. Synthesize intermediate analyses into a structured narrative.  
+3. Identify and group key themes and patterns across sources.  
+4. Highlight novel insights not explicitly stated in any single source.  
+5. Note contradictions or conflicts, resolving them or framing open debates.  
+6. **Write the “Conclusion” and “Bibliography” only once, at the very end.**  
+7. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
+8. **Never repeat a heading that is already present in the Existing Draft.**
+
+**Continuation rule — mandatory:**  
+If you cannot finish the report in this response, you must append exactly:  
+${continuationMarker}
+
+**Draft-continuity rule:**  
+If a draft exists, continue seamlessly; expand it rather than restarting.
+`.trim();
+
+  /* ────────────────────────────────────────────────── */
+  /* 3 .  user prompt                                   */
+  /* ────────────────────────────────────────────────── */
+  const userPrompt = `
+Main Research Topic:
+${topic}
+
+Existing Draft (≈${currentOutputLength} chars):
+${currentReport}
+
+Latest Research Plan:
+${latestResearchPlan}
+
+Latest Reasoning:
+${latestReasoning}
+
+Sub-Queries:
+${queries.map((q) => `- ${q}`).join("\n")}
+
+Search Results Overview:
+${sources
+  .map((r, i) => {
+    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
+    return `${i + 1}. Query: “${r.question}”\nAI Overview: ${r.searchResults.ai_overview}\nSources:\n${list}`;
+  })
+  .join("\n\n")}
+
+**Write-phase instruction:**  
+${
+  mustStayInBody
+    ? `🔒 You still need roughly ${remainingChars.toLocaleString()} more characters \
+before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`
+    : `✅ The draft is long enough to conclude. You may now write the \
+“Conclusion” followed immediately by the “Bibliography”.`
+}
+
+**Length guideline for *this* response:**  
+Aim for ≈${Math.min(remainingChars || 6000).toLocaleString()} characters.
+
+**Remember:** If you cannot finish, end with **${continuationMarker}**.
+`.trim();
+
+  return { systemPrompt, userPrompt };
+};
+
+const FINAL_REPORT_PROMPT_OLD = ({
   topic,
   latestResearchPlan,
   sources,
@@ -233,7 +334,8 @@ ${list}`;
   .join("\n\n")}
 
 **Requirements for this response:**
-- **Length:** Produce at least **${targetOutputTokens * 4}** characters total (including existing draft), but do not exceed **${maxOutputTokens * 4}** characters in this call.
+- **Length:** Produce at least **${targetOutputTokens * 5}** characters total (including existing draft), 
+but do not exceed **${maxOutputTokens * 5}** characters in this call.
 - **Structure:** Follow the outline defined by the system prompt.
 - **Continuation:** If you cannot finish, append **${continuationMarker}** at the end.
 

@@ -28,15 +28,9 @@ async function basicResearch() {
   const deepResearch = createDeepResearch({
     depth: {
       maxLevel: 3, // Detailed analysis
-      maxTokensPerAnalysis: 2048,
-      includeReferences: true,
-      confidenceThreshold: 0.9,
     },
     breadth: {
-      maxLevel: 4,
       maxParallelTopics: 5,
-      includeRelatedTopics: true,
-      minRelevanceScore: 0.8,
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
@@ -54,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is the meaning of life?"];
+  const prompts = ["what is the meaning of death?"];
 
   try {
     console.log("Starting deep research...");
