@@ -9,127 +9,6 @@ import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
 
-// Add debug logging functions
-/**
- * Helper function to write debug output to a file
- * @param stage The stage of the pipeline
- * @param filename The filename to write to
- * @param content The content to write
- */
-function writeDebugFile(stage: string, filename: string, content: any) {
-  // Create debug directory if it doesn't exist
-  const debugDir = "debug";
-  if (!fs.existsSync(debugDir)) {
-    fs.mkdirSync(debugDir);
-  }
-
-  // Create stage directory if it doesn't exist
-  const stageDir = `${debugDir}/${stage}`;
-  if (!fs.existsSync(stageDir)) {
-    fs.mkdirSync(stageDir);
-  }
-
-  // Write the content to the file
-  if (typeof content === "object") {
-    fs.writeFileSync(`${stageDir}/${filename}`, JSON.stringify(content, null, 2));
-  } else {
-    fs.writeFileSync(`${stageDir}/${filename}`, content);
-  }
-
-  console.log(`Debug file written: ${stageDir}/${filename}`);
-}
-
-/**
- * Helper function to safely extract JSON from a potentially contaminated response
- * Handles cases where the model returns thinking or other content with the JSON
- */
-function extractJSONFromResponse(text: string) {
-  // Look for JSON code blocks (most reliable method)
-  const jsonCodeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  if (jsonCodeBlockMatch && jsonCodeBlockMatch[1]) {
-    try {
-      return JSON.parse(jsonCodeBlockMatch[1]);
-    } catch (e) {
-      console.error("Failed to parse JSON from code block:", e);
-    }
-  }
-
-  // Look for the most promising JSON object in the text
-  const potentialObjects: string[] = [];
-
-  // Get text between curly braces, handling nested objects
-  let stack = 0;
-  let startIdx = -1;
-
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "{") {
-      if (stack === 0) {
-        startIdx = i;
-      }
-      stack++;
-    } else if (text[i] === "}" && stack > 0) {
-      stack--;
-      if (stack === 0 && startIdx !== -1) {
-        potentialObjects.push(text.substring(startIdx, i + 1));
-      }
-    }
-  }
-
-  // Try to parse each potential object in order of length (longest first)
-  // This prioritizes complete objects over small fragments
-  for (const objText of potentialObjects.sort((a, b) => b.length - a.length)) {
-    try {
-      const parsed = JSON.parse(objText);
-      // Validate the object has the expected structure
-      if (parsed && typeof parsed === "object") {
-        return parsed;
-      }
-    } catch (e) {
-      // Continue to the next candidate
-    }
-  }
-
-  // If we still couldn't extract JSON, throw an error
-  throw new Error("Could not extract valid JSON from response");
-}
-
-// Type definitions for the research log
-interface ResearchStep {
-  step: string;
-  timestamp: string;
-  details?: any;
-  iterations?: ResearchIteration[];
-}
-
-interface ResearchIteration {
-  iterationNumber: number;
-  timestamp: string;
-  isComplete: boolean;
-  reason: string;
-  additionalQueries: number;
-  evaluationTime: number;
-  newSearchResults?: number;
-  newSources?: number;
-  searchTime?: number;
-}
-
-interface ResearchLog {
-  timestamp: string;
-  prompt: string;
-  steps: ResearchStep[];
-  metrics: {
-    totalQueries: number;
-    iterations: number;
-    totalSources: number;
-    uniqueSources: number;
-    processingTime: {
-      start: number;
-      end: number;
-      total: number;
-    };
-  };
-}
-
 export class DeepResearch {
   public config: typeof DEFAULT_CONFIG;
   public topic: string = "";
@@ -287,15 +166,6 @@ export class DeepResearch {
       }
 
       console.log(`Generated ${subQueries.length} research queries`);
-
-      // Debug: Write the research plan to a file
-      writeDebugFile("research-plan", "research-plan.json", result.object);
-      writeDebugFile(
-        "research-plan",
-        "research-plan.md",
-        `# Research Plan\n\n## Topic\n${this.topic}\n\n## 
-        Plan\n${result.object.plan}\n\n## Queries\n${result.object.subQueries.map((q: string, i: number) => `${i + 1}. ${q}`).join("\n")}`
-      );
 
       return {
         subQueries,
@@ -505,7 +375,7 @@ export class DeepResearch {
 
       /* done when: marker seen & stripped, and length target met or max tokens reached */
       isComplete =
-        (hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
+        (!hadMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
         this.finalReport.length >= this.config.report.maxOutputTokens;
 
       debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
