@@ -164,6 +164,13 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
+
+// **TODO** 
+// Something we can try 
+// finishReason:
+// 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'
+// The reason the model finished generating the text.
+
 /** Builds the prompt for each report-generation round */
 const FINAL_REPORT_PROMPT = ({
   topic,
@@ -191,7 +198,7 @@ const FINAL_REPORT_PROMPT = ({
   /* ────────────────────────────────────────────────── */
   /* 1 .  dynamic knobs                                */
   /* ────────────────────────────────────────────────── */
-  const FINAL_MARGIN_CHARS = 500; // ⇠ when draft is this close, allow wrap-up
+  const FINAL_MARGIN_CHARS = 200; // ⇠ when draft is this close, allow wrap-up
   const targetChars = targetOutputTokens * 5;
   const remainingChars = Math.max(targetChars - currentOutputLength, 0);
   const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;

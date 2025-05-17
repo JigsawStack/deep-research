@@ -9,6 +9,9 @@ import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
 
+// **TODO**
+// make everything functional by passing parameters instead of using class variables   
+
 export class DeepResearch {
   public config: typeof DEFAULT_CONFIG;
   public topic: string = "";
@@ -146,6 +149,10 @@ export class DeepResearch {
   }
 
   // Add debug logging to generateResearchPlan method
+
+  // **TODO**
+  // planning step should include the depth if its more
+  // than the config it should be the config
   private async generateResearchPlan() {
     try {
       // Generate the research plan using the AI provider
@@ -156,6 +163,9 @@ export class DeepResearch {
           subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
           plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         }),
+
+        // **TODO**
+        // pass in the past sources as well (TEST IT OUT)
         prompt: PROMPTS.research({ topic: this.topic, pastReasoning: this.latestReasoning, pastQueries: this.queries }),
       });
 
@@ -183,6 +193,7 @@ export class DeepResearch {
     debugLog.push(`Running research with prompt: ${prompt}`);
     this.topic = prompt;
 
+    // do while instead
     while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel) {
       this.iterationCount++;
       // step 1: generate research plan
@@ -218,10 +229,14 @@ export class DeepResearch {
       // step 2.5: deduplicate results
       debugLog.push(`[Step 2.5] Deduplicating search results...`);
       console.log(`[Step 2.5] Deduplicating search results...`);
+
+      // **TODO**
+      // EVERYTHING SHOULD BE DEDUPLICATED
+
       const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
       // save it to the class for later use
-      this.sources = deduplicatedResults;
+      this.sources = [...this.sources, ...deduplicatedResults];
 
       // logging
       // Count sources after deduplication
@@ -307,6 +322,7 @@ export class DeepResearch {
       }
 
       // Option 2: Extract content between <think> or <thinking> tags
+      // **TODO** DOUBLE CHECK if the thinking tag is contained in the result check OMIAI
       const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
       if (thinkingMatch) {
         return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
@@ -360,12 +376,18 @@ export class DeepResearch {
         currentOutputLength: this.currentOutputLength,
       });
 
+      // **TODO** 
+      // second run should have a different prompt than the initial run 
+      // and it should be able to finish the report
+
+      // **TODO**
+      // add the report into user prompt dynamically instead of doing messages
       const messages: Parameters<typeof generateText>[0]["messages"] = [
         { role: "system", content: prompt.systemPrompt },
         { role: "user", content: prompt.userPrompt },
       ];
       if (this.finalReport.trim()) {
-        messages.push({ role: "assistant", content: this.finalReport.slice(-4000) });
+        messages.push({ role: "assistant", content: this.finalReport });
       }
 
       /* call model */
@@ -398,6 +420,9 @@ export class DeepResearch {
         hadCompleteMarker ||
         (!hadContinueMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
         this.finalReport.length >= this.config.report.maxOutputTokens * 5;
+      
+      // **TODO**
+      // keep the tokens times 3 for standard
 
       debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
     }
@@ -412,3 +437,8 @@ export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
 
 // Default export
 export default createDeepResearch;
+
+//**TODO**
+// return json
+  // text instead of report
+  // follow the standard
