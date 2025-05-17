@@ -191,7 +191,7 @@ const FINAL_REPORT_PROMPT = ({
   /* ────────────────────────────────────────────────── */
   /* 1 .  dynamic knobs                                */
   /* ────────────────────────────────────────────────── */
-  const FINAL_MARGIN_CHARS = 2000; // ⇠ when draft is this close, allow wrap-up
+  const FINAL_MARGIN_CHARS = 500; // ⇠ when draft is this close, allow wrap-up
   const targetChars = targetOutputTokens * 5;
   const remainingChars = Math.max(targetChars - currentOutputLength, 0);
   const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;
@@ -256,9 +256,9 @@ before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” se
 }
 
 **Length guideline for *this* response:**  
-Aim for ≈${Math.min(remainingChars || 6000).toLocaleString()} characters.
+Aim for ≈${Math.min(remainingChars || 1500).toLocaleString()} characters.
 
-**Remember:** If you cannot finish, end with **${continuationMarker}**.
+**Remember:** If you cannot finish, end with **${continuationMarker}T**. THIS IS VERY IMPORTANT
 `.trim();
 
   return { systemPrompt, userPrompt };
