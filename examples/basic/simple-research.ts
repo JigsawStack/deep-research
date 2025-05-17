@@ -54,7 +54,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is true happiness?"];
+  const prompts = ["what is the meaning of life?"];
 
   try {
     console.log("Starting deep research...");

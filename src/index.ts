@@ -146,6 +146,7 @@ export class DeepResearch {
   private iterationCount: number = 0;
   private latestReasoning: string = "";
   private currentOutputLength: number = 0;
+  private continuationMarker: string = "[<---- CONTINUE ---->]";
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -376,6 +377,7 @@ export class DeepResearch {
     while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel) {
       this.iterationCount++;
       // step 1: generate research plan
+      console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
       debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
       const { subQueries, plan } = await this.generateResearchPlan();
 
@@ -387,10 +389,10 @@ export class DeepResearch {
 
       // step 2: fire web searches
       debugLog.push(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
+      console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
 
       const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
-      debugLog.push(`Received ${initialSearchResults.length} initial search results`);
-
+      console.log(`Received ${initialSearchResults.length} initial search results`);
       // Count sources from initial results
       // logging
       let initialSourceCount = 0;
@@ -406,6 +408,7 @@ export class DeepResearch {
 
       // step 2.5: deduplicate results
       debugLog.push(`[Step 2.5] Deduplicating search results...`);
+      console.log(`[Step 2.5] Deduplicating search results...`);
       const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
 
       // save it to the class for later use
@@ -428,11 +431,13 @@ export class DeepResearch {
 
       // step 3: reasoning about the search results
       debugLog.push(`[Step 3] Reasoning about the search results...`);
+      console.log(`[Step 3] Reasoning about the search results...`);
       const reasoning = await this.reasoningSearchResults();
       debugLog.push(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
       debugLog.push(`[Step 4] Decision making...`);
+      console.log(`[Step 4] Decision making...`);
       const decisionMaking = await this.decisionMaking({ reasoning });
       debugLog.push(`Decision making: ${decisionMaking.isComplete} ${decisionMaking.reason}`);
 
@@ -443,6 +448,7 @@ export class DeepResearch {
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);
+    console.log(`[Step 5] Generating report...`);
 
     const finalReport = await this.generateFinalReport(debugLog);
 
@@ -473,6 +479,15 @@ export class DeepResearch {
 
   private async reasoningSearchResults() {
     try {
+      console.log(
+        PROMPTS.reasoningSearchResults({
+          topic: this.topic || "",
+          researchPlan: this.latestResearchPlan || "",
+          searchResults: this.sources,
+          allQueries: this.queries || [],
+        })
+      );
+
       const reasoningPrompt = PROMPTS.reasoningSearchResults({
         topic: this.topic || "",
         researchPlan: this.latestResearchPlan || "",
@@ -507,49 +522,125 @@ export class DeepResearch {
     }
   }
 
-  // Add debug logging to generateFinalReport method
+  // 🔧 generateFinalReport with robust looping
   private async generateFinalReport(debugLog: string[]) {
-    const continuationMarker = "[###CONTINUE###]";
-    const reportPrompt = PROMPTS.finalReport({
-      topic: this.topic,
-      latestResearchPlan: this.latestResearchPlan,
-      sources: this.sources,
-      queries: this.queries,
-      latestReasoning: this.latestReasoning,
-      maxOutputTokens: this.config.report.maxOutputTokens,
-      targetOutputTokens: this.config.report.targetOutputTokens,
-      continuationMarker: continuationMarker,
-      currentReport: this.finalReport,
-      currentOutputLength: this.currentOutputLength,
-    });
-
-    debugLog.push(`Final report system prompt: ${reportPrompt.systemPrompt}`);
-    debugLog.push(`Final report user prompt: ${reportPrompt.userPrompt}`);
-
     let isComplete = false;
 
     while (!isComplete) {
-      const report = await generateText({
-        model: this.aiProvider.getOutputModel(),
-        prompt: `${reportPrompt.systemPrompt}\n\n${reportPrompt.userPrompt}`,
-        maxTokens: this.config.report.maxOutputTokens,
+      console.log("Generating final report...");
+      const prompt = PROMPTS.finalReport({
+        topic: this.topic,
+        latestResearchPlan: this.latestResearchPlan,
+        sources: this.sources,
+        queries: this.queries,
+        latestReasoning: this.latestReasoning,
+        maxOutputTokens: this.config.report.maxOutputTokens,
+        targetOutputTokens: this.config.report.targetOutputTokens,
+        continuationMarker: this.continuationMarker,
+        currentReport: this.finalReport,
+        currentOutputLength: this.currentOutputLength,
       });
 
-      this.finalReport += report.text;
-      this.currentOutputLength += report.text.length;
+      debugLog.push(`Final report system prompt:\n${prompt.systemPrompt}`);
+      debugLog.push(`Final report user prompt:\n${prompt.userPrompt}`);
 
-      debugLog.push(`Final report: ${report.text}`);
-      debugLog.push(`Current output length: ${this.currentOutputLength}`);
+      const messages: Parameters<typeof generateText>[0]["messages"] = [
+        { role: "system", content: prompt.systemPrompt },
+        { role: "user", content: prompt.userPrompt },
+      ];
 
-      isComplete = this.isReportComplete({ report: this.finalReport, continuationMarker: continuationMarker });
+      /* 2️⃣  Optionally feed back only the *tail* of the draft so
+          the model has local context but we don’t blow the window */
+      if (this.finalReport.trim().length) {
+        const tail = this.finalReport.slice(-4000); // 4 k chars ≈ 1 k tokens
+        messages.push({ role: "assistant", content: tail });
+      }
 
-      debugLog.push(`Is complete: ${isComplete}`);
+      console.log("messages", messages);
+
+      /* 3️⃣  Call the model */
+      const { text: chunk } = await generateText({
+        model: this.aiProvider.getOutputModel(),
+        maxTokens: this.config.report.maxOutputTokens,
+        messages,
+      });
+
+      /* 4️⃣  Guard against empty output */
+      if (!chunk.trim()) {
+        throw new Error("Model returned empty chunk — aborting to avoid 400");
+      }
+
+      this.finalReport += chunk;
+      this.currentOutputLength = this.finalReport.length;
+
+      debugLog.push(`Chunk:\n${chunk}`);
+      debugLog.push(`Current length: ${this.currentOutputLength}`);
+
+      isComplete = this.isReportComplete({
+        report: this.finalReport,
+        continuationMarker: this.continuationMarker,
+      });
     }
 
     fs.writeFileSync("logs/final-report.md", this.finalReport);
-
     return this.finalReport;
   }
+
+  // Add debug logging to generateFinalReport method
+  // private async generateFinalReport(debugLog: string[]) {
+  //   const reportPrompt = PROMPTS.finalReport({
+  //     topic: this.topic,
+  //     latestResearchPlan: this.latestResearchPlan,
+  //     sources: this.sources,
+  //     queries: this.queries,
+  //     latestReasoning: this.latestReasoning,
+  //     maxOutputTokens: this.config.report.maxOutputTokens,
+  //     targetOutputTokens: this.config.report.targetOutputTokens,
+  //     continuationMarker: this.continuationMarker,
+  //     currentReport: this.finalReport,
+  //     currentOutputLength: this.currentOutputLength,
+  //   });
+
+  //   /** Base conversation */
+  //   const messages: Parameters<typeof generateText>[0]["messages"] = [
+  //     { role: "system", content: reportPrompt.systemPrompt },
+  //     { role: "user", content: reportPrompt.userPrompt },
+  //   ];
+
+  //   debugLog.push(`Final report system prompt: ${reportPrompt.systemPrompt}`);
+  //   debugLog.push(`Final report user prompt: ${reportPrompt.userPrompt}`);
+
+  //   let isComplete = false;
+
+  //   while (!isComplete) {
+  //     const { text: report } = await generateText({
+  //       model: this.aiProvider.getOutputModel(),
+  //       maxTokens: this.config.report.maxOutputTokens,
+  //       messages,
+  //     });
+
+  //     console.log("report", report);
+
+  //     this.finalReport += report;
+  //     this.currentOutputLength += report.length;
+
+  //     debugLog.push(`Final report: ${report}`);
+  //     debugLog.push(`Current output length: ${this.currentOutputLength}`);
+
+  //     isComplete = this.isReportComplete({ report: this.finalReport, continuationMarker: this.continuationMarker });
+
+  //     messages.push({
+  //       role: "assistant",
+  //       content: report,
+  //     });
+
+  //     debugLog.push(`Is complete: ${isComplete}`);
+  //   }
+
+  //   fs.writeFileSync("logs/final-report.md", this.finalReport);
+
+  //   return this.finalReport;
+  // }
 
   // Helper to check if the report seems complete based on content
   private isReportComplete({ report, continuationMarker }: { report: string; continuationMarker: string }): boolean {

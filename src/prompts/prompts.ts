@@ -172,8 +172,8 @@ const FINAL_REPORT_PROMPT = ({
   maxOutputTokens,
   continuationMarker,
   targetOutputTokens,
-  currentReport,
-  currentOutputLength,
+  currentReport = "",
+  currentOutputLength = 0,
 }: {
   topic: string;
   latestResearchPlan: string;
@@ -187,68 +187,62 @@ const FINAL_REPORT_PROMPT = ({
   currentOutputLength?: number;
 }) => {
   const systemPrompt = `You are a world-class research analyst and writer. Your task is to produce a single, cohesive deep research article based on multiple research findings related to a main research topic.
-        
-        You will:
-        1. Introduce the topic—outlining scope, importance, and objectives.
-        2. Synthesize all intermediate analyses, weaving them into a structured narrative.
-        3. Identify and group the key themes and patterns that emerge across sources.
-        4. Highlight novel insights your analysis uncovers—points not explicitly stated in any one source.
-        5. Note contradictions or conflicts in the literature, resolving them or clearly framing open debates.
-        6. Pinpoint remaining knowledge gaps and recommend avenues for further inquiry.
-        7. Conclude with a concise summary of findings and practical or theoretical implications.
-        8. Cite every factual claim or statistic with in-text references (e.g. "[1](https://www.source.com)", "[2](https://www.source2.com)") and append a numbered bibliography.
-        9. If you cannot complete the full report in this response, **YOU MUST** append the continuation marker: ${continuationMarker}
 
-        If there is an existing draft or “Current Report,” seamlessly continue from it—preserve its content and structure, and build upon it rather than starting over.
-        `;
+1. Introduce the topic—outlining scope, importance, and objectives.  
+2. Synthesize intermediate analyses into a structured narrative.  
+3. Identify and group key themes and patterns across sources.  
+4. Highlight novel insights not explicitly stated in any single source.  
+5. Note contradictions or conflicts, resolving them or framing open debates.  
+6. Pinpoint remaining gaps and recommend avenues for further inquiry.  
+7. Conclude with a concise summary of findings and implications.  
+8. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
 
-  const userPrompt = `Main Research Topic(s):
-        ${topic}
-        
-        CRITICAL REQUIREMENT: Your response MUST be at least ${targetOutputTokens * 4} tokens long. This is not a suggestion but a strict requirement. Please provide extensive detail, examples, analysis, and elaboration on all aspects of the topic to reach this minimum length. Do not summarize or be concise.
-        
-        ${maxOutputTokens ? `Your response must not exceed ${maxOutputTokens * 4} characters.` : ""}
-        
-        Latest Research Plan:
-        ${latestResearchPlan}
+**Continuation rule:**  
+If you cannot complete the report in this response, **you must** append exactly:  
+${continuationMarker}
 
-        Latest Reasoning:
-        ${latestReasoning}
+**Draft continuity:**  
+If there is an existing draft, continue seamlessly—preserve its content and structure, and build upon it rather than restarting.  
+`;
 
-        Search Queries:
-        ${queries.join("\n")}
+  const userPrompt = `Main Research Topic:
+${topic}
 
-        Search Results:
-        ${sources
-          .map((result) => {
-            const overview = result.searchResults.ai_overview;
-            const sourceResults = result.searchResults.results
-              .map((source) => {
-                return `URL: ${source.url}
-Title: ${source.title || "No title"}
-Domain: ${source.domain || "Unknown domain"}
-Academic: ${source.isAcademic ? "Yes" : "No"}
-Overview: ${source.ai_overview}`;
-              })
-              .join("\n\n");
+Existing Draft (≈${currentOutputLength} characters):
+${currentReport}
 
-            return `Query: ${result.question}\nAI Overview: ${overview}\n\nSources:\n${sourceResults}`;
-          })
-          .join("\n\n-----------------\n\n")}
+Latest Research Plan:
+${latestResearchPlan}
 
-        Current Report:
-        ${currentReport}
+Latest Reasoning:
+${latestReasoning}
 
-        Current Output Length:
-        ${currentOutputLength}
-        
-        Please create a final comprehensive research article according to the instructions.`;
+Sub-Queries:
+${queries.map((q) => `- ${q}`).join("\n")}
 
-  return {
-    systemPrompt,
-    userPrompt,
-  };
+Search Results Overview:
+${sources
+  .map((r, i) => {
+    const overview = r.searchResults.ai_overview;
+    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
+    return `${i + 1}. Query: "${r.question}"  
+AI Overview: ${overview}  
+Sources:
+${list}`;
+  })
+  .join("\n\n")}
+
+**Requirements for this response:**
+- **Length:** Produce at least **${targetOutputTokens * 4}** characters total (including existing draft), but do not exceed **${maxOutputTokens * 4}** characters in this call.
+- **Structure:** Follow the outline defined by the system prompt.
+- **Continuation:** If you cannot finish, append **${continuationMarker}** at the end.
+
+Continue writing the report now:
+`;
+
+  return { systemPrompt, userPrompt };
 };
+
 /**
  *
  *
