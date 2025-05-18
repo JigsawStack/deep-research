@@ -177,9 +177,6 @@ const EVALUATION_PROMPT = ({
 
 // **TODO**
 // Something we can try
-// finishReason:
-// 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'
-// The reason the model finished generating the text.
 
 /** Builds the prompt for each report-generation round */
 const FINAL_REPORT_PROMPT = ({
@@ -287,6 +284,132 @@ ${currentReport}
 
   return { systemPrompt, userPrompt };
 };
+
+// MARKERS
+export const CONT = "<<<CONTINUE>>>";
+export const DONE = "<<<COMPLETE>>>";
+
+// ─────────────────────────────────────────────
+//  #1  INITIAL  – used only when currentReport === ""
+// ─────────────────────────────────────────────
+export function buildInitialPrompt({
+  topic,
+  sources,
+  targetTokens,
+  latestResearchPlan,
+  latestReasoning,
+  queries,
+}: {
+  topic: string;
+  sources: WebSearchResult[];
+  targetTokens: number;
+  latestResearchPlan: string;
+  latestReasoning: string;
+  queries: string[];
+}) {
+  const targetChars = targetTokens * 4;
+  const systemPrompt = `
+You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
+
+1. Introduce the topic—outlining scope, importance, and objectives.  
+2. Synthesize intermediate analyses into a structured narrative.  
+3. Identify and group key themes and patterns across sources.  
+4. Highlight novel insights not explicitly stated in any single source.  
+5. Note contradictions or conflicts, resolving them or framing open debates.  
+6. **Write the "Conclusion" and "Bibliography" only once, at the very end.**  
+7. Cite every factual claim or statistic with in-text references (e.g. "[1](https://source.com)") and append a numbered bibliography.  
+8. **Never repeat a heading that is already present in the Existing Draft.**
+
+**Continuation rule — mandatory:**  
+If you cannot finish the report in this response, you must append exactly:  
+${CONT}`;
+
+  /* ────────────────────────────────────────────────── */
+  /* 3 .  user prompt                                   */
+  /* ────────────────────────────────────────────────── */
+  const userPrompt = `
+Main Research Topic:
+${topic}
+
+
+Latest Research Plan:
+${latestResearchPlan}
+
+Latest Reasoning:
+${latestReasoning}
+
+Sub-Queries:
+${queries.map((q) => `- ${q}`).join("\n")}
+
+Search Results Overview:
+${sources
+  .map((r, i) => {
+    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
+    return `${i + 1}. Query: “${r.question}”\nAI Overview: ${r.searchResults.ai_overview}\nSources:\n${list}`;
+  })
+  .join("\n\n")}
+
+
+`.trim();
+
+  return {
+    system: systemPrompt,
+
+    user: `
+Main Topic:  ${topic}
+
+Source Pack:
+${JSON.stringify(sources, null, 2)}
+
+Start the article now.  Remember: end with ${CONT} if unfinished.`,
+    stopSequences: [DONE], // cut as soon as DONE appears
+  };
+}
+
+// ─────────────────────────────────────────────
+//  #2  CONTINUATION – used when report already has text
+// ─────────────────────────────────────────────
+export function buildContinuationPrompt({
+  topic,
+  sources,
+  targetTokens,
+  currentReport,
+  currentChars,
+}: {
+  topic: string;
+  sources: WebSearchResult[];
+  targetTokens: number;
+  currentReport: string;
+  currentChars: number;
+}) {
+  const finalMargin = 2_000; // ≈500 tokens
+  const remaining = targetTokens - currentChars;
+
+  return {
+    system: `
+Continue expanding the draft WITHOUT restarting.
+
+Only when fewer than ${finalMargin} characters remain may you write
+“Conclusion” followed immediately by “Bibliography”.
+If you finish in this response append ${DONE}.  Otherwise append ${CONT}.`,
+
+    user: `
+Current draft (${currentChars.toLocaleString()} chars):
+${currentReport}
+
+Main Topic:
+${topic}
+
+Chars still needed ≈ ${Math.max(remaining, 0).toLocaleString()}.
+
+Source Pack:
+${JSON.stringify(sources, null, 2)}
+
+
+Resume exactly where the draft ends.`,
+    stopSequences: [DONE],
+  };
+}
 
 /**
  *

@@ -5,9 +5,9 @@ import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_R
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
-import { PROMPTS } from "./prompts/prompts";
+import { buildContinuationPrompt, buildInitialPrompt, PROMPTS } from "./prompts/prompts";
 
 // **TODO**
 // make everything functional by passing parameters instead of using class variables
@@ -116,10 +116,10 @@ export class DeepResearch {
   }
 
   // Add this function to the DeepResearch class to summarize search results
-  private deduplicateSearchResults(results: WebSearchResult[]): WebSearchResult[] {
+  private deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
     const urlMap = new Map<string, boolean>();
 
-    return results.map((result) => {
+    return sources.map((result) => {
       return {
         question: result.question,
         searchResults: {
@@ -150,11 +150,17 @@ export class DeepResearch {
 
   // Add debug logging to generateResearchPlan method
 
-  private async generateResearchPlan() {
+  private async generateResearchPlan({
+    model,
+    topic,
+    pastReasoning,
+    pastQueries,
+    maxDepth,
+  }: { model: LanguageModelV1; topic: string; pastReasoning: string; pastQueries: string[]; maxDepth: number }) {
     try {
       // Generate the research plan using the AI provider
       const result = await generateObject({
-        model: this.aiProvider.getDefaultModel(),
+        model,
         output: "object",
         schema: z.object({
           subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
@@ -164,10 +170,10 @@ export class DeepResearch {
         // **TODO**
         // pass in the past sources as well (TEST IT OUT)
         prompt: PROMPTS.research({
-          topic: this.topic,
-          pastReasoning: this.latestReasoning,
-          pastQueries: this.queries,
-          maxDepth: this.config.depth?.maxLevel,
+          topic,
+          pastReasoning,
+          pastQueries,
+          maxDepth,
         }),
       });
 
@@ -200,7 +206,13 @@ export class DeepResearch {
       // step 1: generate research plan
       console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
       debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
-      const { subQueries, plan } = await this.generateResearchPlan();
+      const { subQueries, plan } = await this.generateResearchPlan({
+        model: this.aiProvider.getDefaultModel(),
+        topic: this.topic,
+        pastReasoning: this.latestReasoning,
+        pastQueries: this.queries,
+        maxDepth: this.config.depth?.maxLevel,
+      });
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
@@ -221,7 +233,7 @@ export class DeepResearch {
 
       this.sources = [...this.sources, ...initialSearchResults];
 
-      const deduplicatedResults = this.deduplicateSearchResults(this.sources);
+      const deduplicatedResults = this.deduplicateSearchResults({ sources: this.sources });
 
       // save it to the class for later use
       this.sources = deduplicatedResults;
@@ -238,6 +250,12 @@ export class DeepResearch {
       const decisionMaking = await this.decisionMaking({ reasoning });
       debugLog.push(`Decision making: ${decisionMaking.isComplete} ${decisionMaking.reason}`);
 
+      fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
+      fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
+      fs.writeFileSync("logs/reasoning.json", JSON.stringify(reasoning, null, 2));
+      fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(decisionMaking, null, 2));
+      fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
+
       const { isComplete, reason } = decisionMaking;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
@@ -247,11 +265,52 @@ export class DeepResearch {
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
-    const { report, debugLog: finalDebugLog } = await this.generateFinalReport(debugLog);
+    const { report, debugLog: finalDebugLog } = await this.generateFinalReport({
+      sources: this.sources,
+      topic: this.topic,
+      targetTokens: this.config.report.targetOutputTokens,
+      model: this.aiProvider.getOutputModel(),
+      continuationMarker: this.continuationMarker,
+      completionMarker: this.completionMarker,
+      debugLog: debugLog,
+      latestReasoning: this.latestReasoning,
+      latestResearchPlan: this.latestResearchPlan,
+      queries: this.queries,
+    });
 
     // Write debug log to file
     fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
     fs.writeFileSync("logs/finalReport.md", report);
+
+    return report;
+  }
+
+  public async testGenerate() {
+    // Load data from logs folder
+    const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
+    const topic = "what is determinism and why is it the best explanation for the universe?";
+    const targetTokens = this.config.report.targetOutputTokens;
+    const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
+    const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
+    const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
+
+    // Generate the final report using the loaded data
+    const { report, debugLog } = await this.generateFinalReport({
+      sources,
+      topic,
+      targetTokens,
+      model: this.aiProvider.getOutputModel(),
+      continuationMarker: this.continuationMarker,
+      completionMarker: this.completionMarker,
+      debugLog: [],
+      latestResearchPlan,
+      latestReasoning,
+      queries,
+    });
+
+    // Write the report to file
+    fs.writeFileSync("logs/testReport.md", report);
+    fs.writeFileSync("logs/testDebugLog.md", debugLog.join("\n"));
 
     return report;
   }
@@ -331,66 +390,84 @@ export class DeepResearch {
     return [text, false, false];
   }
 
-  private async generateFinalReport(debugLog: string[]) {
-    let isComplete = false;
+  private async generateFinalReport({
+    sources,
+    topic,
+    targetTokens,
+    model,
+    continuationMarker,
+    completionMarker,
+    debugLog,
+    latestReasoning,
+    latestResearchPlan,
+    queries,
+  }: {
+    sources: WebSearchResult[];
+    topic: string;
+    targetTokens: number;
+    model: LanguageModelV1;
+    continuationMarker: string;
+    completionMarker: string;
+    debugLog: string[];
+    latestReasoning: string;
+    latestResearchPlan: string;
+    queries: string[];
+  }) {
+    let draft = "";
+    let done = false;
+    let iter = 0;
 
-    do {
-      /* build fresh prompt */
-      const finalReportPrompt = PROMPTS.finalReport({
-        topic: this.topic,
-        latestResearchPlan: this.latestResearchPlan,
-        sources: this.sources,
-        queries: this.queries,
-        latestReasoning: this.latestReasoning,
-        completionMarker: this.completionMarker,
-        targetOutputTokens: this.config.report.targetOutputTokens,
-        continuationMarker: this.continuationMarker,
-        currentReport: this.finalReport,
-        currentOutputLength: this.currentOutputLength,
-      });
+    while (!done && ++iter < 5) {
+      // hard cap
+      try {
+        const base = {
+          topic,
+          sources,
+          targetTokens,
+          latestResearchPlan,
+          latestReasoning,
+          queries: sources.map((s) => s.searchResults.ai_overview).filter(Boolean) as string[],
+        };
+        const prompt = draft ? buildContinuationPrompt({ ...base, currentReport: draft, currentChars: draft.length }) : buildInitialPrompt(base);
+        debugLog.push(`[Step 5] Generating final report... at ${iter}`);
+        console.log(`[Step 5] Generating final report... at ${iter}`);
 
-      // **TODO**
-      // second run should have a different prompt than the initial run
-      // and it should be able to finish the report
+        const { text } = await generateText({
+          model,
+          system: prompt.system,
+          prompt: prompt.user,
+          stopSequences: prompt.stopSequences, // ✨ key line
+        });
 
-      /* call model */
-      const { text: rawChunk, finishReason } = await generateText({
-        model: this.aiProvider.getOutputModel(),
-        system: finalReportPrompt.systemPrompt,
-        prompt: finalReportPrompt.userPrompt,
-      });
+        if (!text.trim()) throw new Error("empty chunk");
 
-      console.log(`step 5 ${finishReason}`);
+        debugLog.push(`[Step 5] System Prompt: ${prompt.system}`);
+        debugLog.push(`[Step 5] User Prompt: ${prompt.user}`);
+        debugLog.push(`[Step 5] Generated text: ${text}`);
+        fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
 
-      // Skip empty chunks only if we haven't started generating content
-      if (!rawChunk.trim() && !this.finalReport.trim()) {
-        throw new Error("Empty chunk");
+        if (text.includes(completionMarker)) {
+          draft += text.replace(completionMarker, "");
+          done = true;
+        } else if (text.includes(continuationMarker)) {
+          draft += text.replace(continuationMarker, "");
+        } else {
+          // extremely unlikely: model forgot marker → ask again
+          draft += text;
+        }
+      } catch (error: any) {
+        console.error("Error in generateFinalReport:", error.message || error);
+        debugLog.push(`[Step 5] ERROR: ${error.message || "Unknown error"}`);
+        debugLog.push(`[Step 5] Error details: ${JSON.stringify(error)}`);
+        fs.writeFileSync("debug-log.md", debugLog.join("\n"));
+        throw error; // Re-throw to stop execution
       }
+    }
 
-      debugLog.push(`[Step 5] Stopped: ${finishReason}`);
-      debugLog.push(`[Step 5] Final report raw chunks: ${this.finalReport.length} ${rawChunk}\n`);
+    if (!done) throw new Error("iteration cap without DONE marker");
 
-      /* remove marker if present and check for completion marker */
-      const [chunk, hadContinueMarker, hadCompleteMarker] = this.stripMarker(rawChunk, this.continuationMarker);
-
-      this.finalReport += chunk;
-      this.currentOutputLength = this.finalReport.length;
-
-      console.log(`[Step 5] Final report chunks: ${this.finalReport.length}\n`);
-
-      /* done when: 
-         1. explicit completion marker found, or
-         2. no continuation marker and length target met, or
-         3. max tokens reached */
-      isComplete =
-        hadCompleteMarker ||
-        (!hadContinueMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 4) ||
-        this.finalReport.length >= this.config.report.maxOutputTokens * 4;
-
-      debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
-    } while (!isComplete);
-
-    return { report: this.finalReport, debugLog };
+    fs.writeFileSync("final-report.md", draft.trim());
+    return { report: draft, debugLog };
   }
 }
 
