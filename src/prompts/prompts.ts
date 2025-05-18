@@ -171,118 +171,12 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
-const FINAL_REPORT_PROMPT = ({
-  topic,
-  latestResearchPlan,
-  sources,
-  queries,
-  latestReasoning,
-  completionMarker,
-  continuationMarker,
-  targetOutputTokens,
-  currentReport = "",
-  currentOutputLength = 0,
-}: {
-  topic: string;
-  latestResearchPlan: string;
-  sources: WebSearchResult[];
-  queries: string[];
-  latestReasoning: string;
-  completionMarker: string;
-  continuationMarker: string;
-  targetOutputTokens: number;
-  currentReport?: string;
-  currentOutputLength?: number;
-}) => {
-  /* ────────────────────────────────────────────────── */
-  /* 1 .  dynamic knobs                                */
-  /* ────────────────────────────────────────────────── */
-  const FINAL_MARGIN_CHARS = 200; // ⇠ when draft is this close, allow wrap-up
-  const targetChars = targetOutputTokens * 4;
-  const remainingChars = Math.max(targetChars - currentOutputLength, 0);
-  const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;
-
-  /* ────────────────────────────────────────────────── */
-  /* 2 .  system prompt                                 */
-  /* ────────────────────────────────────────────────── */
-  const systemPrompt = `
-You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
-
-1. Introduce the topic—outlining scope, importance, and objectives.  
-2. Synthesize intermediate analyses into a structured narrative.  
-3. Identify and group key themes and patterns across sources.  
-4. Highlight novel insights not explicitly stated in any single source.  
-5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. **Write the “Conclusion” and “Bibliography” only once, at the very end.**  
-7. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
-8. **Never repeat a heading that is already present in the Existing Draft.**
-
-**Continuation rule — mandatory:**  
-If you cannot finish the report in this response, you must append exactly:  
-${continuationMarker}
-
-**Draft-continuity rule:**  
-If a draft exists, continue seamlessly; expand it rather than restarting.
-`.trim();
-
-  /* ────────────────────────────────────────────────── */
-  /* 3 .  user prompt                                   */
-  /* ────────────────────────────────────────────────── */
-  const userPrompt = `
-Main Research Topic:
-${topic}
-
-Existing Draft (≈${currentOutputLength} chars):
-${currentReport}
-
-Latest Research Plan:
-${latestResearchPlan}
-
-Latest Reasoning:
-${latestReasoning}
-
-Sub-Queries:
-${queries.map((q) => `- ${q}`).join("\n")}
-
-Search Results Overview:
-${sources
-  .map((r, i) => {
-    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
-    return `${i + 1}. Query: “${r.question}”\nAI Overview: ${r.searchResults.ai_overview}\nSources:\n${list}`;
-  })
-  .join("\n\n")}
-
-**Write-phase instruction:**  
-${
-  mustStayInBody
-    ? `🔒 You still need roughly ${remainingChars.toLocaleString()} more characters \
-before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`
-    : `✅ The draft is long enough to conclude. You may now write the \
-“Conclusion” followed immediately by the “Bibliography”.`
-}
-
-**Length guideline for *this* response:**  
-Aim for ≈${Math.min(remainingChars || 1500).toLocaleString()} characters.
-
-**Remember:** 
-- If you cannot finish, end with **${continuationMarker}**
-- When you complete the entire report, end with **${completionMarker}**
-THIS IS VERY IMPORTANT
-
-CONTINUE FROM HERE:
-${currentReport}
-
-`.trim();
-
-  return { systemPrompt, userPrompt };
-};
-
 // MARKERS
 export const CONT = "@@@CONTINUE@@@";
 export const REPORT_DONE = "@@@REPORT_DONE@@@";
 export const DONE = "@@@COMPLETE@@@";
 
-export function buildInitialPrompt({
+const INIT_FINAL_REPORT_PROMPT = ({
   topic,
   sources,
   targetTokens,
@@ -296,7 +190,7 @@ export function buildInitialPrompt({
   latestResearchPlan: string;
   latestReasoning: string;
   queries: string[];
-}) {
+}) => {
   const targetChars = targetTokens * 4; // ≈ tokens × 4
   const remaining = targetChars; // draft is empty at start
 
@@ -344,7 +238,7 @@ Search Results Overview:
 ${sources
   .map((r, i) => {
     const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
-    return `${i + 1}. Query: “${r.question}”\nAI Overview: ${r.searchResults.ai_overview}\nSources:\n${list}`;
+    return `${i + 1}. Query: "${r.question}"\nAI Overview: ${r.searchResults.results}\nSources:\n${list}`;
   })
   .join("\n\n")}
 
@@ -365,9 +259,9 @@ THIS IS VERY IMPORTANT
     user: userPrompt,
     // stopSequences: [`\n${CONT}`, `${CONT}\n`],
   };
-}
+};
 
-export function buildContinuationPrompt({
+const CONTINUE_FINAL_REPORT_PROMPT = ({
   topic,
   sources,
   targetTokens,
@@ -385,7 +279,7 @@ export function buildContinuationPrompt({
   latestResearchPlan: string;
   latestReasoning: string;
   queries: string[];
-}) {
+}) => {
   const targetChars = targetTokens * 4;
   const remaining = Math.max(targetChars - currentOutputLength, 0);
   const atTarget = currentOutputLength >= targetChars;
@@ -439,13 +333,13 @@ ${
     system: systemPrompt,
     user: userPrompt,
   };
-}
+};
 
-export function buildCitationPrompt({
+const CITATION_PROMPT = ({
   currentReport,
 }: {
   currentReport: string;
-}) {
+}) => {
   return {
     system: `
     You are a world-class research analyst and writer. Parse the following text and extract all the citations. Generate the bibliography at the end of the report.
@@ -454,7 +348,7 @@ export function buildCitationPrompt({
     ${currentReport}
     `,
   };
-}
+};
 
 /**
  *
@@ -478,8 +372,10 @@ When ranking search results, consider recency as a factor - newer information is
 // Export all prompts together with date context
 export const PROMPTS = {
   evaluation: EVALUATION_PROMPT,
-  finalReport: FINAL_REPORT_PROMPT,
   research: RESEARCH_PROMPT_TEMPLATE,
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
+  initFinalReport: INIT_FINAL_REPORT_PROMPT,
+  continueFinalReport: CONTINUE_FINAL_REPORT_PROMPT,
+  citation: CITATION_PROMPT,
 };

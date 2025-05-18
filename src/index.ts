@@ -7,7 +7,7 @@ import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
-import { buildCitationPrompt, buildContinuationPrompt, buildInitialPrompt, CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
+import { CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
 export async function decisionMaking({
   reasoning,
@@ -50,6 +50,9 @@ export async function reasoningSearchResults({
       model: aiProvider.getReasoningModel(),
       prompt: reasoningPrompt,
     });
+
+    fs.writeFileSync("logs/reasoningPrompt.md", reasoningPrompt);
+    fs.writeFileSync("logs/reasoningTest.md", reasoningResponse.text);
 
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
@@ -119,16 +122,16 @@ export async function generateFinalReport({
     };
 
     if (phase === "initial") {
-      promptConfig = buildInitialPrompt(base);
+      promptConfig = PROMPTS.initFinalReport(base);
     } else if (phase === "continuation") {
-      promptConfig = buildContinuationPrompt({
+      promptConfig = PROMPTS.continueFinalReport({
         ...base,
         currentReport: draft,
         currentOutputLength: draft.length,
       });
     } else {
       // bibliography-only pass
-      promptConfig = buildCitationPrompt({ currentReport: draft });
+      promptConfig = PROMPTS.citation({ currentReport: draft });
     }
 
     debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
@@ -262,7 +265,6 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
               url: item.url,
               title: item.title || "",
               domain: item.domain || "",
-              ai_overview: item.ai_overview || "",
             };
           }),
       },
@@ -285,7 +287,6 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
   private latestReasoning: string = "";
-  private currentOutputLength: number = 0;
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -424,6 +425,7 @@ export class DeepResearch {
         queries: this.queries,
         aiProvider: this.aiProvider,
       });
+
       debugLog.push(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
@@ -469,7 +471,7 @@ export class DeepResearch {
     return report;
   }
 
-  public async testGenerate() {
+  public async testFinalReportGeneration() {
     // Load data from logs folder
     const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
     const topic = "what is determinism and why is it the best explanation for the universe?";

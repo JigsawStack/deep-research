@@ -5,13 +5,11 @@ export class ContentCleaner {
    * Clean and normalize content from a research source
    */
   public static cleanContent(source: ResearchSource): ResearchSource {
-    const cleanedOverview = this.markdownPipeline(source.ai_overview);
     const domain = this.extractDomain(source.url);
     const isAcademic = this.isAcademicSource(domain);
 
     return {
       ...source,
-      ai_overview: cleanedOverview,
       domain,
       isAcademic,
     };

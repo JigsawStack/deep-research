@@ -65,7 +65,6 @@ export class JigsawProvider {
           const source: ResearchSource = {
             url: result.url || "",
             title: result.title || "",
-            ai_overview: results.ai_overview || "",
           };
           const cleaned = ContentCleaner.cleanContent(source);
           return {
