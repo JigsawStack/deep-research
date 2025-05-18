@@ -4,7 +4,12 @@
 
 import { WebSearchResult } from "../types/types";
 
-const RESEARCH_PROMPT_TEMPLATE = ({ topic, pastReasoning, pastQueries }: { topic: string; pastReasoning?: string; pastQueries?: string[] }) => `
+const RESEARCH_PROMPT_TEMPLATE = ({
+  topic,
+  pastReasoning,
+  pastQueries,
+  maxDepth,
+}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth?: number }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
 The topic for research is: ${topic}
@@ -26,6 +31,12 @@ Please provide the following two components:
     *   These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.
     *   The set of queries should collectively aim to cover the main aspects identified in your research plan.
     *   Ensure queries are distinct and avoid redundancy.
+     
+3.  **Generate a list of sub-topics to research:**
+    * Determine how many iterations of research are needed (depth) to fully explore this topic
+    * Specify the depth as a number between 1-5, where 1 is surface-level and 5 is extremely thorough
+    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
+    * For each level of depth, identify what new information or perspectives should be explored
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
@@ -39,7 +50,7 @@ const DECISION_MAKING_PROMPT = ({
 You are a decision-making assistant.
 
 Your job is to decide whether the provided chain-of-thought reasoning gives enough context to start writing the 
-final report of approximately ${targetOutputTokens * 5} characters.
+final report of approximately ${targetOutputTokens * 4} characters.
 
 Chain of Thought:
 """${reasoning}"""
@@ -164,9 +175,8 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
-
-// **TODO** 
-// Something we can try 
+// **TODO**
+// Something we can try
 // finishReason:
 // 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'
 // The reason the model finished generating the text.
@@ -199,7 +209,7 @@ const FINAL_REPORT_PROMPT = ({
   /* 1 .  dynamic knobs                                */
   /* ────────────────────────────────────────────────── */
   const FINAL_MARGIN_CHARS = 200; // ⇠ when draft is this close, allow wrap-up
-  const targetChars = targetOutputTokens * 5;
+  const targetChars = targetOutputTokens * 4;
   const remainingChars = Math.max(targetChars - currentOutputLength, 0);
   const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;
 
@@ -269,6 +279,9 @@ Aim for ≈${Math.min(remainingChars || 1500).toLocaleString()} characters.
 - If you cannot finish, end with **${continuationMarker}**
 - When you complete the entire report, end with **${completionMarker}**
 THIS IS VERY IMPORTANT
+
+CONTINUE FROM HERE:
+${currentReport}
 
 `.trim();
 

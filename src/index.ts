@@ -10,7 +10,7 @@ import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
 
 // **TODO**
-// make everything functional by passing parameters instead of using class variables   
+// make everything functional by passing parameters instead of using class variables
 
 export class DeepResearch {
   public config: typeof DEFAULT_CONFIG;
@@ -150,9 +150,6 @@ export class DeepResearch {
 
   // Add debug logging to generateResearchPlan method
 
-  // **TODO**
-  // planning step should include the depth if its more
-  // than the config it should be the config
   private async generateResearchPlan() {
     try {
       // Generate the research plan using the AI provider
@@ -166,7 +163,12 @@ export class DeepResearch {
 
         // **TODO**
         // pass in the past sources as well (TEST IT OUT)
-        prompt: PROMPTS.research({ topic: this.topic, pastReasoning: this.latestReasoning, pastQueries: this.queries }),
+        prompt: PROMPTS.research({
+          topic: this.topic,
+          pastReasoning: this.latestReasoning,
+          pastQueries: this.queries,
+          maxDepth: this.config.depth?.maxLevel,
+        }),
       });
 
       let subQueries = result.object.subQueries;
@@ -193,8 +195,7 @@ export class DeepResearch {
     debugLog.push(`Running research with prompt: ${prompt}`);
     this.topic = prompt;
 
-    // do while instead
-    while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel) {
+    do {
       this.iterationCount++;
       // step 1: generate research plan
       console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
@@ -213,45 +214,17 @@ export class DeepResearch {
 
       const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
       console.log(`Received ${initialSearchResults.length} initial search results`);
-      // Count sources from initial results
-      // logging
-      let initialSourceCount = 0;
-      let uniqueUrls = new Set();
-      initialSearchResults.forEach((result) => {
-        if (result.searchResults && result.searchResults.results) {
-          initialSourceCount += result.searchResults.results.length;
-          result.searchResults.results.forEach((item) => {
-            if (item.url) uniqueUrls.add(item.url);
-          });
-        }
-      });
 
       // step 2.5: deduplicate results
       debugLog.push(`[Step 2.5] Deduplicating search results...`);
       console.log(`[Step 2.5] Deduplicating search results...`);
 
-      // **TODO**
-      // EVERYTHING SHOULD BE DEDUPLICATED
+      this.sources = [...this.sources, ...initialSearchResults];
 
-      const deduplicatedResults = this.deduplicateSearchResults(initialSearchResults);
+      const deduplicatedResults = this.deduplicateSearchResults(this.sources);
 
       // save it to the class for later use
-      this.sources = [...this.sources, ...deduplicatedResults];
-
-      // logging
-      // Count sources after deduplication
-      let dedupSourceCount = 0;
-      uniqueUrls = new Set();
-      deduplicatedResults.forEach((result) => {
-        if (result.searchResults && result.searchResults.results) {
-          dedupSourceCount += result.searchResults.results.length;
-          result.searchResults.results.forEach((item) => {
-            if (item.url) uniqueUrls.add(item.url);
-          });
-        }
-      });
-
-      debugLog.push(`After deduplication: ${dedupSourceCount} sources (${uniqueUrls.size} unique URLs)`);
+      this.sources = deduplicatedResults;
 
       // step 3: reasoning about the search results
       debugLog.push(`[Step 3] Reasoning about the search results...`);
@@ -268,7 +241,7 @@ export class DeepResearch {
       const { isComplete, reason } = decisionMaking;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    }
+    } while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel);
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);
@@ -361,9 +334,9 @@ export class DeepResearch {
   private async generateFinalReport(debugLog: string[]) {
     let isComplete = false;
 
-    while (!isComplete) {
+    do {
       /* build fresh prompt */
-      const prompt = PROMPTS.finalReport({
+      const finalReportPrompt = PROMPTS.finalReport({
         topic: this.topic,
         latestResearchPlan: this.latestResearchPlan,
         sources: this.sources,
@@ -376,32 +349,25 @@ export class DeepResearch {
         currentOutputLength: this.currentOutputLength,
       });
 
-      // **TODO** 
-      // second run should have a different prompt than the initial run 
+      // **TODO**
+      // second run should have a different prompt than the initial run
       // and it should be able to finish the report
 
-      // **TODO**
-      // add the report into user prompt dynamically instead of doing messages
-      const messages: Parameters<typeof generateText>[0]["messages"] = [
-        { role: "system", content: prompt.systemPrompt },
-        { role: "user", content: prompt.userPrompt },
-      ];
-      if (this.finalReport.trim()) {
-        messages.push({ role: "assistant", content: this.finalReport });
-      }
-
       /* call model */
-      const { text: rawChunk } = await generateText({
+      const { text: rawChunk, finishReason } = await generateText({
         model: this.aiProvider.getOutputModel(),
-        maxTokens: this.config.report.maxOutputTokens,
-        messages,
+        system: finalReportPrompt.systemPrompt,
+        prompt: finalReportPrompt.userPrompt,
       });
+
+      console.log(`step 5 ${finishReason}`);
 
       // Skip empty chunks only if we haven't started generating content
       if (!rawChunk.trim() && !this.finalReport.trim()) {
         throw new Error("Empty chunk");
       }
 
+      debugLog.push(`[Step 5] Stopped: ${finishReason}`);
       debugLog.push(`[Step 5] Final report raw chunks: ${this.finalReport.length} ${rawChunk}\n`);
 
       /* remove marker if present and check for completion marker */
@@ -410,7 +376,7 @@ export class DeepResearch {
       this.finalReport += chunk;
       this.currentOutputLength = this.finalReport.length;
 
-      console.log(`[Step 5] Final report chunks: ${this.finalReport.length} ${chunk}\n`);
+      console.log(`[Step 5] Final report chunks: ${this.finalReport.length}\n`);
 
       /* done when: 
          1. explicit completion marker found, or
@@ -418,14 +384,11 @@ export class DeepResearch {
          3. max tokens reached */
       isComplete =
         hadCompleteMarker ||
-        (!hadContinueMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 5) ||
-        this.finalReport.length >= this.config.report.maxOutputTokens * 5;
-      
-      // **TODO**
-      // keep the tokens times 3 for standard
+        (!hadContinueMarker && this.finalReport.length >= this.config.report.targetOutputTokens * 4) ||
+        this.finalReport.length >= this.config.report.maxOutputTokens * 4;
 
       debugLog.push(`[Step 5] Final report is complete: ${isComplete}`);
-    }
+    } while (!isComplete);
 
     return { report: this.finalReport, debugLog };
   }
@@ -440,5 +403,5 @@ export default createDeepResearch;
 
 //**TODO**
 // return json
-  // text instead of report
-  // follow the standard
+// text instead of report
+// follow the standard
