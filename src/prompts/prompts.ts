@@ -309,13 +309,15 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 3. Identify and group key themes and patterns across sources.  
 4. Highlight novel insights not explicitly stated in any single source.  
 5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. DO NOT WRITE THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.
-7. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
-8. **Never repeat a heading that is already present in the Existing Draft.**
+6. Each topic should be a deep dive paragraph, not a bullet point list.
+7. **DO NOT WRITE OR EVEN START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**
+8. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
+9. **Never repeat a heading that is already present in the Existing Draft.**
 
 
 THIS IS VERY IMPORTANT:
 • Always finish this response by outputting ${CONT} alone—no other markers.
+• Do not start the “Conclusion” or “Bibliography” sections in this response.
 `.trim();
 
   /* ───────── USER prompt ───────── */
@@ -436,7 +438,6 @@ ${
   return {
     system: systemPrompt,
     user: userPrompt,
-    // stopSequences: [CONT, REPORT_DONE],
   };
 }
 

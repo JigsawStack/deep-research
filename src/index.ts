@@ -458,7 +458,6 @@ export class DeepResearch {
       debugLog.push("MODEL OUTPUT:\n" + text);
       debugLog.push("FINISH REASON:\n" + finishReason);
       debugLog.push("PHASE==============================:\n" + phase);
-      debugLog.push("Prompts:\n" + promptConfig.system + "\n" + promptConfig.user);
 
       fs.writeFileSync("logs/modelOutput2.md", debugLog.join("\n"));
 
