@@ -7,7 +7,7 @@ import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
-import { buildContinuationPrompt, buildInitialPrompt, PROMPTS } from "./prompts/prompts";
+import { buildCitationPrompt, buildContinuationPrompt, buildInitialPrompt, CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
 // **TODO**
 // make everything functional by passing parameters instead of using class variables
@@ -28,8 +28,6 @@ export class DeepResearch {
   private iterationCount: number = 0;
   private latestReasoning: string = "";
   private currentOutputLength: number = 0;
-  private continuationMarker: string = "[<---- CONTINUE ---->]";
-  private completionMarker: string = "[<---- COMPLETE ---->]";
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -270,8 +268,6 @@ export class DeepResearch {
       topic: this.topic,
       targetTokens: this.config.report.targetOutputTokens,
       model: this.aiProvider.getOutputModel(),
-      continuationMarker: this.continuationMarker,
-      completionMarker: this.completionMarker,
       debugLog: debugLog,
       latestReasoning: this.latestReasoning,
       latestResearchPlan: this.latestResearchPlan,
@@ -300,8 +296,6 @@ export class DeepResearch {
       topic,
       targetTokens,
       model: this.aiProvider.getOutputModel(),
-      continuationMarker: this.continuationMarker,
-      completionMarker: this.completionMarker,
       debugLog: [],
       latestResearchPlan,
       latestReasoning,
@@ -395,8 +389,6 @@ export class DeepResearch {
     topic,
     targetTokens,
     model,
-    continuationMarker,
-    completionMarker,
     debugLog,
     latestReasoning,
     latestResearchPlan,
@@ -406,8 +398,6 @@ export class DeepResearch {
     topic: string;
     targetTokens: number;
     model: LanguageModelV1;
-    continuationMarker: string;
-    completionMarker: string;
     debugLog: string[];
     latestReasoning: string;
     latestResearchPlan: string;
@@ -416,57 +406,95 @@ export class DeepResearch {
     let draft = "";
     let done = false;
     let iter = 0;
+    // track which prompt we’re on
+    let phase: "initial" | "continuation" | "citation" = "initial";
 
-    while (!done && ++iter < 5) {
-      // hard cap
-      try {
-        const base = {
-          topic,
-          sources,
-          targetTokens,
-          latestResearchPlan,
-          latestReasoning,
-          queries: sources.map((s) => s.searchResults.ai_overview).filter(Boolean) as string[],
-        };
-        const prompt = draft ? buildContinuationPrompt({ ...base, currentReport: draft, currentChars: draft.length }) : buildInitialPrompt(base);
-        debugLog.push(`[Step 5] Generating final report... at ${iter}`);
-        console.log(`[Step 5] Generating final report... at ${iter}`);
+    while (!done && ++iter <= 5) {
+      console.log(`[Iteration ${iter}] phase=${phase}`);
+      // build the shared base
+      const base = {
+        topic,
+        sources,
+        targetTokens,
+        latestResearchPlan,
+        latestReasoning,
+        queries,
+      };
 
-        const { text } = await generateText({
-          model,
-          system: prompt.system,
-          prompt: prompt.user,
-          stopSequences: prompt.stopSequences, // ✨ key line
+      // pick the right prompt
+      let promptConfig: {
+        system: string;
+        user: string;
+        // stopSequences: string[];
+      };
+
+      if (phase === "initial") {
+        promptConfig = buildInitialPrompt(base);
+      } else if (phase === "continuation") {
+        promptConfig = buildContinuationPrompt({
+          ...base,
+          currentReport: draft,
+          currentOutputLength: draft.length,
         });
+      } else {
+        // bibliography-only pass
+        promptConfig = buildCitationPrompt({ currentReport: draft });
+      }
 
-        if (!text.trim()) throw new Error("empty chunk");
+      debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
+      debugLog.push("SYSTEM PROMPT:\n" + promptConfig.system);
+      debugLog.push("USER PROMPT:\n" + promptConfig.user);
 
-        debugLog.push(`[Step 5] System Prompt: ${prompt.system}`);
-        debugLog.push(`[Step 5] User Prompt: ${prompt.user}`);
-        debugLog.push(`[Step 5] Generated text: ${text}`);
-        fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
+      // call the model
+      const { text, finishReason } = await generateText({
+        model,
+        system: promptConfig.system,
+        prompt: promptConfig.user,
+        // stopSequences: promptConfig.stopSequences,
+      });
 
-        if (text.includes(completionMarker)) {
-          draft += text.replace(completionMarker, "");
-          done = true;
-        } else if (text.includes(continuationMarker)) {
-          draft += text.replace(continuationMarker, "");
+      console.log(finishReason);
+
+      debugLog.push("MODEL OUTPUT:\n" + text);
+      debugLog.push("FINISH REASON:\n" + finishReason);
+      debugLog.push("PHASE==============================:\n" + phase);
+      debugLog.push("Prompts:\n" + promptConfig.system + "\n" + promptConfig.user);
+
+      fs.writeFileSync("logs/modelOutput2.md", debugLog.join("\n"));
+
+      if (phase !== "citation") {
+        // look for our two markers
+        if (text.includes(CONT)) {
+          // still more body to come
+          draft += text.replace(CONT, "");
+          // after first initial chunk, always switch to continuation
+          if (phase === "initial") phase = "continuation";
+        } else if (text.includes(REPORT_DONE)) {
+          // finished body + conclusion/biblio → move to citation pass
+          draft += text.replace(REPORT_DONE, "");
+          phase = "citation";
         } else {
-          // extremely unlikely: model forgot marker → ask again
+          // no marker (should be rare) – just append
           draft += text;
         }
-      } catch (error: any) {
-        console.error("Error in generateFinalReport:", error.message || error);
-        debugLog.push(`[Step 5] ERROR: ${error.message || "Unknown error"}`);
-        debugLog.push(`[Step 5] Error details: ${JSON.stringify(error)}`);
-        fs.writeFileSync("debug-log.md", debugLog.join("\n"));
-        throw error; // Re-throw to stop execution
+      } else {
+        // citation pass: consume final DONE marker if present
+        if (text.includes(DONE)) {
+          draft += text.replace(DONE, "");
+        } else {
+          draft += text;
+        }
+        done = true;
       }
+
+      // persist debug log each loop
+      fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
     }
 
-    if (!done) throw new Error("iteration cap without DONE marker");
+    // write out the final report
+    fs.writeFileSync("logs/final-report.md", draft.trim());
+    if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
-    fs.writeFileSync("final-report.md", draft.trim());
     return { report: draft, debugLog };
   }
 }

@@ -1,7 +1,3 @@
-/**
- * System and user prompts for the deep research pipeline
- */
-
 import { WebSearchResult } from "../types/types";
 
 const RESEARCH_PROMPT_TEMPLATE = ({
@@ -175,10 +171,6 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
-// **TODO**
-// Something we can try
-
-/** Builds the prompt for each report-generation round */
 const FINAL_REPORT_PROMPT = ({
   topic,
   latestResearchPlan,
@@ -286,12 +278,10 @@ ${currentReport}
 };
 
 // MARKERS
-export const CONT = "<<<CONTINUE>>>";
-export const DONE = "<<<COMPLETE>>>";
+export const CONT = "@@@CONTINUE@@@";
+export const REPORT_DONE = "@@@REPORT_DONE@@@";
+export const DONE = "@@@COMPLETE@@@";
 
-// ─────────────────────────────────────────────
-//  #1  INITIAL  – used only when currentReport === ""
-// ─────────────────────────────────────────────
 export function buildInitialPrompt({
   topic,
   sources,
@@ -307,7 +297,10 @@ export function buildInitialPrompt({
   latestReasoning: string;
   queries: string[];
 }) {
-  const targetChars = targetTokens * 4;
+  const targetChars = targetTokens * 4; // ≈ tokens × 4
+  const remaining = targetChars; // draft is empty at start
+
+  /* ───────── SYSTEM prompt ───────── */
   const systemPrompt = `
 You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
 
@@ -316,26 +309,30 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 3. Identify and group key themes and patterns across sources.  
 4. Highlight novel insights not explicitly stated in any single source.  
 5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. **Write the "Conclusion" and "Bibliography" only once, at the very end.**  
-7. Cite every factual claim or statistic with in-text references (e.g. "[1](https://source.com)") and append a numbered bibliography.  
+6. DO NOT WRITE THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.
+7. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
 8. **Never repeat a heading that is already present in the Existing Draft.**
 
-**Continuation rule — mandatory:**  
-If you cannot finish the report in this response, you must append exactly:  
-${CONT}`;
 
-  /* ────────────────────────────────────────────────── */
-  /* 3 .  user prompt                                   */
-  /* ────────────────────────────────────────────────── */
+THIS IS VERY IMPORTANT:
+• Always finish this response by outputting ${CONT} alone—no other markers.
+`.trim();
+
+  /* ───────── USER prompt ───────── */
   const userPrompt = `
 Main Research Topic:
 ${topic}
 
+Target length:
+≈ ${targetChars.toLocaleString()} characters (${targetTokens} tokens ×4)
+
+Current draft length:
+0 characters (start of article)
 
 Latest Research Plan:
 ${latestResearchPlan}
 
-Latest Reasoning:
+Latest Reasoning Snapshot:
 ${latestReasoning}
 
 Sub-Queries:
@@ -349,65 +346,113 @@ ${sources
   })
   .join("\n\n")}
 
+────────────────────────────────────────
+**Write-phase instruction:**  
 
+${`🔒 You still need roughly ${remaining.toLocaleString()} more characters \
+before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`}
+
+
+**Remember:** 
+- Finish by outputting ${CONT} alone.
+THIS IS VERY IMPORTANT
 `.trim();
 
   return {
     system: systemPrompt,
-
-    user: `
-Main Topic:  ${topic}
-
-Source Pack:
-${JSON.stringify(sources, null, 2)}
-
-Start the article now.  Remember: end with ${CONT} if unfinished.`,
-    stopSequences: [DONE], // cut as soon as DONE appears
+    user: userPrompt,
+    // stopSequences: [`\n${CONT}`, `${CONT}\n`],
   };
 }
 
-// ─────────────────────────────────────────────
-//  #2  CONTINUATION – used when report already has text
-// ─────────────────────────────────────────────
 export function buildContinuationPrompt({
   topic,
   sources,
   targetTokens,
   currentReport,
-  currentChars,
+  currentOutputLength,
+  latestResearchPlan,
+  latestReasoning,
+  queries,
 }: {
   topic: string;
   sources: WebSearchResult[];
   targetTokens: number;
   currentReport: string;
-  currentChars: number;
+  currentOutputLength: number;
+  latestResearchPlan: string;
+  latestReasoning: string;
+  queries: string[];
 }) {
-  const finalMargin = 2_000; // ≈500 tokens
-  const remaining = targetTokens - currentChars;
+  const targetChars = targetTokens * 4;
+  const remaining = Math.max(targetChars - currentOutputLength, 0);
+  const atTarget = currentOutputLength >= targetChars;
 
-  return {
-    system: `
-Continue expanding the draft WITHOUT restarting.
+  /* ───────── SYSTEM prompt ───────── */
+  const systemPrompt = `
+You are a world-class research analyst expanding an existing draft.
 
-Only when fewer than ${finalMargin} characters remain may you write
-“Conclusion” followed immediately by “Bibliography”.
-If you finish in this response append ${DONE}.  Otherwise append ${CONT}.`,
+• Continue seamlessly—never restart or duplicate headings.  
+• Cite every fact with in-text numeric refs and maintain the numbered bibliography.  
+• If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
+`.trim();
 
-    user: `
-Current draft (${currentChars.toLocaleString()} chars):
-${currentReport}
-
-Main Topic:
+  /* ───────── USER prompt ───────── */
+  const userPrompt = `
+Main Research Topic:
 ${topic}
 
-Chars still needed ≈ ${Math.max(remaining, 0).toLocaleString()}.
+Current draft length:
+${currentOutputLength.toLocaleString()} chars  
+Target length:
+≈ ${targetChars.toLocaleString()} chars
 
-Source Pack:
-${JSON.stringify(sources, null, 2)}
+Current Draft:
+${currentReport}
 
+────────────────────────────────────────
+Latest Research Plan:
+${latestResearchPlan}
 
-Resume exactly where the draft ends.`,
-    stopSequences: [DONE],
+Latest Reasoning Snapshot:
+${latestReasoning}
+
+Sub-Queries:
+${queries.map((q) => `- ${q}`).join("\n")}
+
+Source Pack (for quick reference):
+${sources.map((s, i) => `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits`).join("\n")}
+
+────────────────────────────────────────
+${
+  !atTarget
+    ? `🔒 **Continue body sections only.** You still need ≈${remaining.toLocaleString()} characters.  
+       Finish this response by outputting ${CONT} alone.`
+    : `✅ **Target reached.** Now write the **Conclusion** and then the **Bibliography** in full,  
+       and finish by outputting ${REPORT_DONE} alone.`
+}
+`.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+    // stopSequences: [CONT, REPORT_DONE],
+  };
+}
+
+export function buildCitationPrompt({
+  currentReport,
+}: {
+  currentReport: string;
+}) {
+  return {
+    system: `
+    You are a world-class research analyst and writer. Parse the following text and extract all the citations. Generate the bibliography at the end of the report.
+    `,
+    user: `
+    ${currentReport}
+    `,
+    // stopSequences: [DONE],
   };
 }
 
