@@ -1,7 +1,7 @@
 import { JigsawStack } from "jigsawstack";
 import "dotenv/config";
 import { ResearchSource } from "../types/types";
-import { ContentCleaner } from "../preparation/contentCleaner";
+import { ContentCleaner } from "../utils/utils";
 
 export class JigsawProvider {
   private static instance: JigsawProvider;
