@@ -30,11 +30,11 @@ async function basicResearch() {
       maxLevel: 3, // Detailed analysis
     },
     breadth: {
-      maxParallelTopics: 5,
+      maxParallelTopics: 10,
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 30000,
+      targetOutputTokens: 15000,
     },
     models: {
       output: geminiModel,

@@ -432,20 +432,20 @@ export class DeepResearch {
       // step 4: decision making
       debugLog.push(`[Step 4] Decision making...`);
       console.log(`[Step 4] Decision making...`);
-      const decisionMaking = await decisionMaking({
+      const deciding = await decisionMaking({
         reasoning,
         aiProvider: this.aiProvider,
         targetOutputTokens: this.config.report.targetOutputTokens,
       });
-      debugLog.push(`Decision making: ${decisionMaking.isComplete} ${decisionMaking.reason}`);
+      debugLog.push(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
 
       fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
       fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
       fs.writeFileSync("logs/reasoning.json", JSON.stringify(reasoning, null, 2));
-      fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(decisionMaking, null, 2));
+      fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(deciding, null, 2));
       fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
-      const { isComplete, reason } = decisionMaking;
+      const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
     } while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel);
@@ -458,7 +458,7 @@ export class DeepResearch {
       sources: this.sources,
       topic: this.topic,
       targetTokens: this.config.report.targetOutputTokens,
-      model: this.aiProvider.getOutputModel(),
+      aiProvider: this.aiProvider,
       debugLog: debugLog,
       latestReasoning: this.latestReasoning,
       latestResearchPlan: this.latestResearchPlan,
