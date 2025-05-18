@@ -395,7 +395,7 @@ export function buildContinuationPrompt({
 You are a world-class research analyst expanding an existing draft.
 
 • Continue seamlessly—never restart or duplicate headings.  
-• Cite every fact with in-text numeric refs and maintain the numbered bibliography.  
+• Cite every fact with in-text numeric refs and maintain the numbered bibliography similar as such [1](https://source.com).  
 • If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
 `.trim();
 
@@ -429,8 +429,8 @@ ${sources.map((s, i) => `${i + 1}. **${s.question}** → ${s.searchResults.resul
 ${
   !atTarget
     ? `🔒 **Continue body sections only.** You still need ≈${remaining.toLocaleString()} characters.  
-       Finish this response by outputting ${CONT} alone.`
-    : `✅ **Target reached.** Now write the **Conclusion** and then the **Bibliography** in full,  
+       Finish this response by outputting ${CONT} alone. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.`
+    : `✅ **Target reached.** Now write the **Conclusion** in full, DO NOT START THE BIBLIOGRAPHY IN THIS RESPONSE.
        and finish by outputting ${REPORT_DONE} alone.`
 }
 `.trim();
@@ -453,7 +453,6 @@ export function buildCitationPrompt({
     user: `
     ${currentReport}
     `,
-    // stopSequences: [DONE],
   };
 }
 

@@ -409,7 +409,7 @@ export class DeepResearch {
     // track which prompt we’re on
     let phase: "initial" | "continuation" | "citation" = "initial";
 
-    while (!done && ++iter <= 5) {
+    while (!done && ++iter <= 10) {
       console.log(`[Iteration ${iter}] phase=${phase}`);
       // build the shared base
       const base = {
@@ -453,13 +453,11 @@ export class DeepResearch {
         // stopSequences: promptConfig.stopSequences,
       });
 
-      console.log(finishReason);
-
       debugLog.push("MODEL OUTPUT:\n" + text);
       debugLog.push("FINISH REASON:\n" + finishReason);
       debugLog.push("PHASE==============================:\n" + phase);
 
-      fs.writeFileSync("logs/modelOutput2.md", debugLog.join("\n"));
+      fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
 
       if (phase !== "citation") {
         // look for our two markers
