@@ -238,7 +238,6 @@ export async function generateResearchPlan({
   }
 }
 
-// Add this function to the DeepResearch class to summarize search results
 export function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, boolean>();
 
@@ -270,8 +269,6 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
     };
   });
 }
-
-// make everything functional by passing parameters instead of using class variables
 
 export class DeepResearch {
   public config: typeof DEFAULT_CONFIG;

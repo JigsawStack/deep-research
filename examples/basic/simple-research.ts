@@ -48,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is determinism and why is it the best explanation for the universe?"];
+  const prompts = ["what is love?"];
 
   try {
     console.log("Starting deep research...");
