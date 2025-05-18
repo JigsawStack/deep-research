@@ -1,8 +1,7 @@
-import { JigsawStack } from 'jigsawstack';
-import 'dotenv/config';
-import { SubQuestionGeneratorResult } from '../types/generators';
-import { WebSearchResult, ResearchSource, CleanedSearchResult } from '../types';
-import { ContentCleaner } from '../preparation/contentCleaner';
+import { JigsawStack } from "jigsawstack";
+import "dotenv/config";
+import { ResearchSource } from "../types/types";
+import { ContentCleaner } from "../preparation/contentCleaner";
 
 export class JigsawProvider {
   private static instance: JigsawProvider;
@@ -21,21 +20,22 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  public async fireWebSearches(
-    subQuestions: SubQuestionGeneratorResult
-  ): Promise<WebSearchResult[]> {
-    // Map each question to a promise that resolves to a search result
-    const searchPromises = subQuestions.questions.map(async (question) => {
+  // **TODO** take the top 6 results and use them instead of the 20
+
+  public async fireWebSearches(queries: string[]) {
+    // Map each query to a promise that resolves to a search result
+    const searchPromises = queries.map(async (query) => {
       try {
         // Add retry logic for API requests
         const maxRetries = 3;
         let retryCount = 0;
         let results;
 
+        // **TODO** TS RETRIES instead of doing this manually
         while (retryCount < maxRetries) {
           try {
             results = await this.jigsawInstance.web.search({
-              query: question.question,
+              query,
               ai_overview: true,
             });
 
@@ -43,58 +43,50 @@ export class JigsawProvider {
             break;
           } catch (apiError) {
             retryCount++;
-            console.warn(
-              `API request failed (attempt ${retryCount}/${maxRetries}):`,
-              (apiError as Error).message
-            );
+            console.warn(`API request failed (attempt ${retryCount}/${maxRetries}):`, (apiError as Error).message);
 
             if (retryCount >= maxRetries) {
               throw apiError; // Rethrow after max retries
             }
 
             // Wait before retrying (exponential backoff)
-            await new Promise((resolve) =>
-              setTimeout(resolve, 1000 * Math.pow(2, retryCount))
-            );
+            await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
           }
         }
 
         // Check if results has the expected structure
         if (!results || !results.results) {
-          console.error('Invalid response structure:', results);
-          throw new Error('Invalid search response structure');
+          console.error("Invalid response structure:", results);
+          throw new Error("Invalid search response structure");
         }
 
         // Clean and process each search result
         const cleanedResults = results.results.map((result) => {
           const source: ResearchSource = {
-            url: result.url || '',
-            content: result.content || '',
-            title: result.title || '',
-            ai_overview: results.ai_overview || '',
+            url: result.url || "",
+            title: result.title || "",
+            ai_overview: results.ai_overview || "",
           };
           const cleaned = ContentCleaner.cleanContent(source);
           return {
             ...cleaned,
-            domain: cleaned.domain || '',
+            domain: cleaned.domain || "",
             isAcademic: cleaned.isAcademic || false,
-          } as CleanedSearchResult;
+          } as ResearchSource;
         });
-
         return {
-          question,
+          question: query,
           searchResults: {
-            ai_overview: results.ai_overview || '',
+            ai_overview: results.ai_overview || "",
             results: cleanedResults,
           },
         };
       } catch (error) {
-        console.error('Full error details:', error);
-        // Return a default structure in case of error
+        console.error("Full error details:", error);
         return {
-          question,
+          question: query,
           searchResults: {
-            ai_overview: 'Error fetching results',
+            ai_overview: "Error fetching results",
             results: [],
           },
         };

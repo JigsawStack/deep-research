@@ -1,38 +1,31 @@
-import {
-  ModelConfig,
-  ResearchBreadthConfig,
-  ResearchDepthConfig,
-} from '../types';
-import { ReportConfig } from '../types/synthesis';
+import { ModelConfig } from "../types/types";
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
-  default: 'gpt-4.1',
-  output: 'gemini-2-flash',
-  reasoning: 'deepseek-r1',
+  default: "gpt-4.1",
+  output: "gemini-2-flash",
+  reasoning: "deepseek-r1",
 };
 
-export const DEFAULT_DEPTH_CONFIG: ResearchDepthConfig = {
-  level: 3,
-  maxTokensPerAnalysis: 2048,
-  includeReferences: true,
-  confidenceThreshold: 0.85,
+export const DEFAULT_DEPTH_CONFIG = {
+  maxLevel: 3,
 };
 
-export const DEFAULT_BREADTH_CONFIG: ResearchBreadthConfig = {
-  level: 2,
+export const DEFAULT_BREADTH_CONFIG = {
   maxParallelTopics: 3,
-  includeRelatedTopics: true,
-  minRelevanceScore: 0.7,
 };
 
-export const DEFAULT_SYNTHESIS_CONFIG: ReportConfig = {
-  targetOutputLength: 'standard',
-  formatAsMarkdown: true,
+export const DEFAULT_REPORT_CONFIG = {
+  targetOutputTokens: 7000,
+  maxOutputTokens: 32000,
 };
 
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
-  synthesis: DEFAULT_SYNTHESIS_CONFIG,
-} as const;
+  report: DEFAULT_REPORT_CONFIG,
+  jigsawApiKey: "",
+  openaiApiKey: "",
+  geminiApiKey: "",
+  deepInfraApiKey: "",
+};
