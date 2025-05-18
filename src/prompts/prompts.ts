@@ -395,7 +395,7 @@ export function buildContinuationPrompt({
 You are a world-class research analyst expanding an existing draft.
 
 • Continue seamlessly—never restart or duplicate headings.  
-• Cite every fact with in-text numeric refs and maintain the numbered bibliography similar as such [1](https://source.com).  
+• ** YOU MUST: Cite every fact with in-text numeric refs and maintain the numbered bibliography similar as such [1](https://source.com).**
 • If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
 `.trim();
 

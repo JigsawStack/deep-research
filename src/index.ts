@@ -239,7 +239,13 @@ export class DeepResearch {
       // step 3: reasoning about the search results
       debugLog.push(`[Step 3] Reasoning about the search results...`);
       console.log(`[Step 3] Reasoning about the search results...`);
-      const reasoning = await this.reasoningSearchResults();
+      const reasoning = await this.reasoningSearchResults({
+        topic: this.topic,
+        latestResearchPlan: this.latestResearchPlan,
+        sources: this.sources,
+        queries: this.queries,
+        aiProvider: this.aiProvider,
+      });
       debugLog.push(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
@@ -328,17 +334,23 @@ export class DeepResearch {
     return decisionMakingResponse.object;
   }
 
-  private async reasoningSearchResults() {
+  private async reasoningSearchResults({
+    topic,
+    latestResearchPlan,
+    sources,
+    queries,
+    aiProvider,
+  }: { topic: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
     try {
       const reasoningPrompt = PROMPTS.reasoningSearchResults({
-        topic: this.topic || "",
-        researchPlan: this.latestResearchPlan || "",
-        searchResults: this.sources,
-        allQueries: this.queries || [],
+        topic,
+        researchPlan: latestResearchPlan,
+        searchResults: sources,
+        allQueries: queries,
       });
 
       const reasoningResponse = await generateText({
-        model: this.aiProvider.getReasoningModel(),
+        model: aiProvider.getReasoningModel(),
         prompt: reasoningPrompt,
       });
 
@@ -363,25 +375,6 @@ export class DeepResearch {
       // Throw the error to terminate program execution
       throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
     }
-  }
-
-  // ⛏ helper – remove marker and tell the caller if it was present
-  private stripMarker(text: string, marker: string): [string, boolean, boolean] {
-    const continueIdx = text.indexOf(marker);
-    const completeIdx = text.indexOf(marker.replace("CONTINUE", "COMPLETE"));
-
-    if (completeIdx !== -1) {
-      // Report is explicitly marked as complete
-      return [text.slice(0, completeIdx).trimEnd(), false, true];
-    }
-
-    if (continueIdx !== -1) {
-      // Report needs to continue
-      return [text.slice(0, continueIdx).trimEnd(), true, false];
-    }
-
-    // No markers found
-    return [text, false, false];
   }
 
   private async generateFinalReport({
@@ -409,7 +402,7 @@ export class DeepResearch {
     // track which prompt we’re on
     let phase: "initial" | "continuation" | "citation" = "initial";
 
-    while (!done && ++iter <= 10) {
+    do {
       console.log(`[Iteration ${iter}] phase=${phase}`);
       // build the shared base
       const base = {
@@ -486,7 +479,9 @@ export class DeepResearch {
 
       // persist debug log each loop
       fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
-    }
+
+      iter++;
+    } while (!done);
 
     // write out the final report
     fs.writeFileSync("logs/final-report.md", draft.trim());

@@ -52,8 +52,8 @@ async function basicResearch() {
 
   try {
     console.log("Starting deep research...");
-    // const result = await deepResearch.generate(prompts[0]);
-    const result = await deepResearch.testGenerate();
+    const result = await deepResearch.generate(prompts[0]);
+    // const result = await deepResearch.testGenerate();
 
     // Log research results
     console.log("\n=== RESEARCH SUMMARY ===");
