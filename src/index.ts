@@ -1,11 +1,11 @@
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult, ResearchSource } from "@/types/types";
+import { WebSearchResult } from "@/types/types";
 
 import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
-import { generateObject, generateText, LanguageModelV1 } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
@@ -129,24 +129,54 @@ export async function processReportForCitations({
   
   console.log(`Reference map size: ${referenceMap.size}`);
   
-  // Regular expression to find citation numbers in the report: [1], [2], etc.
-  const citationRegex = /\[(\d+)\]/g;
+  // Enhanced regex to find both single citations [1] and multiple citations [1, 2, 3]
+  // This matches either:
+  // 1. [number] - A single citation
+  // 2. [number, number, ...] - Multiple comma-separated citations
+  const citationRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
   
-  // Replace each citation number with a markdown link
-  const reportWithLinks = report.replace(citationRegex, (match, referenceNumber) => {
-    const refNum = parseInt(referenceNumber, 10);
-    const source = referenceMap.get(refNum);
+  // Replace each citation with markdown links
+  const reportWithLinks = report.replace(citationRegex, (match, referenceString) => {
+    // Split the reference string by commas if it contains multiple references
+    const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
     
-    if (source) {
-      // Log for debugging
-      console.log(`Replacing citation [${referenceNumber}] with link to ${source.url}`);
-      // Create markdown link with the citation number pointing to the source URL
-      return `[${referenceNumber}](${source.url})`;
+    // If it's a single reference number
+    if (referenceNumbers.length === 1) {
+      const refNum = referenceNumbers[0];
+      const source = referenceMap.get(refNum);
+      
+      if (source) {
+        // Log for debugging
+        console.log(`Replacing citation [${refNum}] with link to ${source.url}`);
+        // Create markdown link with the citation number pointing to the source URL
+        return `[${refNum}](${source.url})`;
+      }
+      
+      // If no matching source found, keep the original citation
+      console.log(`No source found for citation [${refNum}]`);
+      return match;
+    } 
+    // If it's multiple reference numbers
+    else {
+      // Create an array to hold the links
+      const links = referenceNumbers.map(refNum => {
+        const source = referenceMap.get(refNum);
+        
+        if (source) {
+          // Log for debugging
+          console.log(`Replacing citation part ${refNum} with link to ${source.url}`);
+          // Create markdown link with the citation number pointing to the source URL
+          return `[${refNum}](${source.url})`;
+        }
+        
+        // If no matching source found, just return the number
+        console.log(`No source found for citation part ${refNum}`);
+        return `${refNum}`;
+      });
+      
+      // Join the links with commas
+      return `[${links.join(', ')}]`;
     }
-    
-    // If no matching source found, keep the original citation
-    console.log(`No source found for citation [${referenceNumber}]`);
-    return match;
   });
   
   // Generate bibliography section
@@ -161,9 +191,8 @@ export async function processReportForCitations({
   // Create bibliography entries
   sortedReferences.forEach(([number, source]) => {
     const title = source.title || "No title";
-    const domain = source.domain || new URL(source.url).hostname;
     
-    bibliography += `${number}. [${title}](${source.url}) - ${domain}\n`;
+    bibliography += `${number}. [${title}](${source.url})\n`;
   });
 
   const finalReport = reportWithLinks + bibliography;
@@ -426,6 +455,10 @@ export class DeepResearch {
   public finalReport: string = "";
 
   public latestResearchPlan: string = "";
+  public latestReasoning: string = "";
+  public latestDecisionMaking: string = "";
+
+
   public queries: string[] = [];
 
   public sources: WebSearchResult[] = [];
@@ -434,7 +467,6 @@ export class DeepResearch {
   private jigsaw: JigsawProvider;
   private isComplete: boolean = false;
   private iterationCount: number = 0;
-  private latestReasoning: string = "";
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -531,12 +563,13 @@ export class DeepResearch {
     debugLog.push(`Running research with topic: ${topic}`);
     this.topic = topic;
     let depth = this.config.depth?.maxLevel;
+    let iteration = 0;
 
     do {
-      this.iterationCount++;
+      iteration++;
       // step 1: generate research plan
-      console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
-      debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
+      console.log(`[Step 1] Generating research plan... at ${iteration}`);
+      debugLog.push(`[Step 1] Generating research plan... at ${iteration}`);
       const {
         subQueries,
         plan,
@@ -551,7 +584,7 @@ export class DeepResearch {
         maxBreadth: this.config.breadth?.maxParallelTopics,
       });
 
-      depth = suggestedDepth || this.config.depth?.maxLevel;
+      this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
@@ -587,6 +620,7 @@ export class DeepResearch {
         queries: this.queries,
         aiProvider: this.aiProvider,
       });
+      this.latestReasoning = reasoning;
 
       debugLog.push(`Reasoning: ${reasoning}`);
 
@@ -598,18 +632,21 @@ export class DeepResearch {
         aiProvider: this.aiProvider,
         targetOutputTokens: this.config.report.targetOutputTokens,
       });
+
+      this.latestDecisionMaking = deciding.reason;
       debugLog.push(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
 
-      fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
-      fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
-      fs.writeFileSync("logs/reasoning.json", JSON.stringify(reasoning, null, 2));
-      fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(deciding, null, 2));
-      fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && this.iterationCount < depth);
+    } while (!this.isComplete && iteration < depth);
+
+    fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
+    fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
+    fs.writeFileSync("logs/reasoning.json", JSON.stringify(this.latestReasoning, null, 2));
+    fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(this.latestDecisionMaking, null, 2));
+    fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);

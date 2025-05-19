@@ -1,9 +1,6 @@
 // **TODO**
 // links should not be [1, 2, 3, 4]
 
-// **TODO**
-// check if the links are being passed properly to the LLM
-
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
