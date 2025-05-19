@@ -211,8 +211,9 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 5. Note contradictions or conflicts, resolving them or framing open debates.  
 6. Each topic should be a deep dive paragraph, not a bullet point list.
 7. **DO NOT WRITE OR EVEN START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**
-8. Cite every factual claim or statistic with in-text references using the reference numbers provided (e.g. "[1]").  
-9. **Never repeat a heading that is already present in the Existing Draft.**
+8. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
+9. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].
+10. **Never repeat a heading that is already present in the Existing Draft.**
 
 THIS IS VERY IMPORTANT:
 • Always finish this response by outputting ${CONT} alone—no other markers.
@@ -294,7 +295,8 @@ const CONTINUE_FINAL_REPORT_PROMPT = ({
 You are a world-class research analyst expanding an existing draft.
 
 • Continue seamlessly—never restart or duplicate headings.  
-• ** YOU MUST: Cite every fact with in-text numeric refs and maintain the numbered bibliography similar as such [1](https://source.com).**
+• ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
+• Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].
 • If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
 `.trim();
 

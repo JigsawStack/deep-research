@@ -1,9 +1,3 @@
-// **TODO**
-// links should not be [1, 2, 3, 4]
-
-// **TODO**
-// check if the links are being passed properly to the LLM
-
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
@@ -58,8 +52,7 @@ async function basicResearch() {
 
   try {
     console.log("Starting deep research...");
-    const result = await deepResearch.generate(topic);
-    // const result = await deepResearch.testGenerate();
+    const result = await deepResearch.testFinalReportGeneration({topic});
 
     return result;
   } catch (error) {

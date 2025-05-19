@@ -106,17 +106,28 @@ export async function processReportForCitations({
   report: string;
   sources: WebSearchResult[];
 }) {
-  // Create a lookup map for reference numbers to URLs
-  const referenceMap = new Map<number, ResearchSource>();
+  // Create a lookup map for reference numbers to source info
+  const referenceMap = new Map<number, any>();
   
   // Populate the map with reference numbers and their corresponding source info
+  // Log for debugging
+  console.log("Processing sources for citations:", JSON.stringify(sources.slice(0, 1), null, 2));
+  
   sources.forEach(source => {
-    source.searchResults.results.forEach(result => {
-      if (result.referenceNumber) {
-        referenceMap.set(result.referenceNumber, result);
-      }
-    });
+    if (source.searchResults && Array.isArray(source.searchResults.results)) {
+      source.searchResults.results.forEach(result => {
+        // Log for debugging
+        console.log("Processing result:", JSON.stringify(result, null, 2));
+        
+        if (result.referenceNumber) {
+          console.log(`Adding reference number ${result.referenceNumber} to map`);
+          referenceMap.set(result.referenceNumber, result);
+        }
+      });
+    }
   });
+  
+  console.log(`Reference map size: ${referenceMap.size}`);
   
   // Regular expression to find citation numbers in the report: [1], [2], etc.
   const citationRegex = /\[(\d+)\]/g;
@@ -127,11 +138,14 @@ export async function processReportForCitations({
     const source = referenceMap.get(refNum);
     
     if (source) {
+      // Log for debugging
+      console.log(`Replacing citation [${referenceNumber}] with link to ${source.url}`);
       // Create markdown link with the citation number pointing to the source URL
       return `[${referenceNumber}](${source.url})`;
     }
     
     // If no matching source found, keep the original citation
+    console.log(`No source found for citation [${referenceNumber}]`);
     return match;
   });
   
@@ -142,6 +156,8 @@ export async function processReportForCitations({
   const sortedReferences = Array.from(referenceMap.entries())
     .sort((a, b) => a[0] - b[0]);
   
+  console.log(`Generating bibliography with ${sortedReferences.length} entries`);
+  
   // Create bibliography entries
   sortedReferences.forEach(([number, source]) => {
     const title = source.title || "No title";
@@ -149,9 +165,11 @@ export async function processReportForCitations({
     
     bibliography += `${number}. [${title}](${source.url}) - ${domain}\n`;
   });
+
+  const finalReport = reportWithLinks + bibliography;
   
   // Return the report with links and bibliography
-  return reportWithLinks + bibliography;
+  return finalReport;
 }
 
 /**
@@ -225,14 +243,13 @@ export async function generateFinalReport({
     debugLog.push("USER PROMPT:\n" + promptConfig.user);
 
     // call the model
-    const { text, finishReason } = await generateText({
+    const { text } = await generateText({
       model: aiProvider.getOutputModel(),
       system: promptConfig.system,
       prompt: promptConfig.user,
     });
 
     debugLog.push("MODEL OUTPUT:\n" + text);
-    debugLog.push("FINISH REASON:\n" + finishReason);
     debugLog.push("PHASE==============================:\n" + phase);
 
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
@@ -269,7 +286,7 @@ export async function generateFinalReport({
   });
 
   // write out the final report
-  fs.writeFileSync("logs/final-report.md", draft.trim());
+  fs.writeFileSync("logs/final-report.md", reportWithCitations.trim());
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
   return { report: reportWithCitations, debugLog };
@@ -632,10 +649,9 @@ export class DeepResearch {
     };
   }
 
-  public async testFinalReportGeneration() {
+  public async testFinalReportGeneration({topic}: {topic: string}) {
     // Load data from logs folder
     const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
-    const topic = "what is determinism and why is it the best explanation for the universe?";
     const targetOutputTokens = this.config.report.targetOutputTokens;
     const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
