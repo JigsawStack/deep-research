@@ -430,7 +430,7 @@ export class DeepResearch {
 
   public sources: WebSearchResult[] = [];
 
-  private aiProvider: AIProvider;
+  public aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
   private isComplete: boolean = false;
   private iterationCount: number = 0;
@@ -657,9 +657,11 @@ export class DeepResearch {
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
     const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
+    const numberedSources = mapSearchResultsToNumbers({ sources });
+
     // Generate the final report using the loaded data
     const { report, debugLog } = await generateFinalReport({
-      sources,
+      sources: numberedSources,
       topic,
       targetOutputTokens,
       aiProvider: this.aiProvider,

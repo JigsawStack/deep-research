@@ -239,15 +239,12 @@ ${latestReasoning}
 Sub-Queries:
 ${queries.map((q) => `- ${q}`).join("\n")}
 
-Search Results Overview:
-${sources
-  .map((r, i) => {
-    const list = r.searchResults.results.map((s) => 
-      `    [${s.referenceNumber}] ${s.title || "No title"} (${s.domain})`
-    ).join("\n");
-    return `${i + 1}. Query: "${r.question}"\nSources:\n${list}`;
-  })
-  .join("\n\n")}
+Source Pack (for quick reference):
+${sources.map((s, i) => {
+  const overview = s.searchResults.ai_overview ? `\n   AI Overview: ${s.searchResults.ai_overview.substring(0, 150)}...` : '';
+  const urls = s.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
+  return `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits${overview}\n${urls}`;
+}).join('\n\n')}
 
 ────────────────────────────────────────
 **Write-phase instruction:**  
@@ -257,6 +254,7 @@ before concluding.\n**Do NOT start the "Conclusion" or "Bibliography" sections i
 
 **Remember:** 
 - Use reference numbers [X] for citations instead of URLs
+- Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].
 - Finish by outputting ${CONT} alone.
 THIS IS VERY IMPORTANT
 `.trim();
@@ -297,6 +295,7 @@ You are a world-class research analyst expanding an existing draft.
 • Continue seamlessly—never restart or duplicate headings.  
 • ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
 • Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].
+• USE ONLY THE SOURCES PROVIDED. There should be no other sources than the ones provided.
 • If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
 `.trim();
 
@@ -324,7 +323,11 @@ Sub-Queries:
 ${queries.map((q) => `- ${q}`).join("\n")}
 
 Source Pack (for quick reference):
-${sources.map((s, i) => `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits`).join("\n")}
+${sources.map((s, i) => {
+  const overview = s.searchResults.ai_overview ? `\n   AI Overview: ${s.searchResults.ai_overview.substring(0, 150)}...` : '';
+  const urls = s.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
+  return `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits${overview}\n${urls}`;
+}).join('\n\n')}
 
 ────────────────────────────────────────
 ${

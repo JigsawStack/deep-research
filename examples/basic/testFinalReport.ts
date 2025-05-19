@@ -1,10 +1,11 @@
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
-import { createDeepResearch } from "../../src/index";
+import { createDeepResearch, generateFinalReport, mapSearchResultsToNumbers } from "../../src/index";
+import fs from "fs";
 
 // Basic usage example
-async function basicResearch() {
+async function testFinalReport() {
   // Check for required API keys
   if (!process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY || !process.env.DEEPINFRA_API_KEY || !process.env.JIGSAW_API_KEY) {
     console.error("Error: API keys are required for all models.");
@@ -50,16 +51,30 @@ async function basicResearch() {
   // Need to provide prompts array as required by generate method
   const topic = "how to make a billion dollars";
 
-  try {
-    console.log("Starting deep research...");
-    const result = await deepResearch.testFinalReportGeneration({topic});
+  const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
+  const targetOutputTokens = deepResearch.config.report.targetOutputTokens;
+  const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
+  const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
+  const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
-    return result;
-  } catch (error) {
-    console.error("Research failed with error:", error);
-    process.exit(1);
-  }
+  const numberedSources = mapSearchResultsToNumbers({ sources });
+
+  // Generate the final report using the loaded data
+  const { report, debugLog } = await generateFinalReport({
+    sources: numberedSources,
+    topic,
+    targetOutputTokens,
+    aiProvider: deepResearch.aiProvider,
+    debugLog: [],
+    latestResearchPlan,
+    latestReasoning,
+    queries,
+  });
+
+  fs.writeFileSync("logs/testReport.md", report);
+  fs.writeFileSync("logs/testDebugLog.md", debugLog.join("\n"));
+
 }
 
 // Run the research
-basicResearch();
+testFinalReport();
