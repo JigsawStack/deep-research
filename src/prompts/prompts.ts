@@ -30,12 +30,16 @@ Please provide the following two components:
      
 3.  **Generate a list of sub-topics to research:**
     * Determine how many iterations of research are needed (depth) to fully explore this topic
-    * Specify the depth as a number between 1-5, where 1 is surface-level and 5 is extremely thorough
-    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
     * For each level of depth, identify what new information or perspectives should be explored
+     
+4. **Generate how deep the research should be:**
+    * Generate a number between 1-5, where 1 is surface-level and 5 is extremely thorough
+    * This number represents how deep the research should be
+    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
+
 const DECISION_MAKING_PROMPT = ({
   reasoning,
   targetOutputTokens,

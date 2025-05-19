@@ -209,6 +209,7 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
+        depth: z.number().describe("A number between 1-5, where 1 is surface-level and 5 is extremely thorough"),
       }),
 
       // **TODO**
