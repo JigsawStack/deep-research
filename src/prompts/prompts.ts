@@ -12,10 +12,13 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   pastQueries,
   maxDepth,
   maxBreadth,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth: number; maxBreadth: number }) => `
+  targetOutputTokens,
+}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
 The topic for research is: ${topic}
+
+The target output number of characters for the report is: ${targetOutputTokens * 4}
 
 ${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}
 

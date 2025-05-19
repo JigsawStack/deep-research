@@ -149,7 +149,7 @@ export async function processReportForCitations({
         // Log for debugging
         console.log(`Replacing citation [${refNum}] with link to ${source.url}`);
         // Create markdown link with the citation number pointing to the source URL
-        return `[${refNum}](${source.url})`;
+        return `[[${refNum}](${source.url})]`;
       }
       
       // If no matching source found, keep the original citation
@@ -339,7 +339,8 @@ export async function generateResearchPlan({
   config,
   maxDepth,
   maxBreadth,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number }) {
+  targetOutputTokens,
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -357,6 +358,7 @@ export async function generateResearchPlan({
         pastQueries,
         maxDepth,
         maxBreadth,
+        targetOutputTokens,
       }),
     });
 
@@ -582,6 +584,7 @@ export class DeepResearch {
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
         maxBreadth: this.config.breadth?.maxParallelTopics,
+        targetOutputTokens: this.config.report.targetOutputTokens,
       });
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
