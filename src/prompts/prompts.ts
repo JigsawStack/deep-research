@@ -347,6 +347,7 @@ const CITATION_PROMPT = ({
   return {
     system: `
     You are a world-class research analyst and writer. Parse the following text and extract all the citations. Generate the bibliography at the end of the report.
+    Make sure to include all the citations presented in the text in the bibliography. Do not repeat citations in the bibliography.
     `,
     user: `
     ${currentReport}

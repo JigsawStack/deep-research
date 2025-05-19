@@ -48,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is love?"];
+  const prompts = ["what is the capital of the moon?"];
 
   try {
     console.log("Starting deep research...");
