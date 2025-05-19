@@ -1,6 +1,3 @@
-// **TODO**
-// links should not be [1, 2, 3, 4]
-
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
@@ -37,7 +34,7 @@ async function basicResearch() {
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 12000,
+      targetOutputTokens: 8000,
     },
     models: {
       output: geminiModel,
