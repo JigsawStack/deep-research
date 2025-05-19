@@ -1,7 +1,7 @@
 import { JigsawStack } from "jigsawstack";
 import "dotenv/config";
-import { ResearchSource } from "../types/types";
-import { ContentCleaner } from "../utils/utils";
+import { ResearchSource } from "@/types/types";
+import { ContentCleaner } from "@utils/utils";
 import { retryAsync, createExponetialDelay } from "ts-retry";
 
 export class JigsawProvider {

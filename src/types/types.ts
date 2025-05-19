@@ -1,5 +1,3 @@
-import { DEFAULT_DEPTH_CONFIG } from "../config/defaults";
-import { DEFAULT_BREADTH_CONFIG } from "../config/defaults";
 import { LanguageModelV1 } from "@ai-sdk/provider";
 
 export interface ResearchBreadthConfig {
