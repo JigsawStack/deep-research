@@ -238,7 +238,7 @@ Search Results Overview:
 ${sources
   .map((r, i) => {
     const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
-    return `${i + 1}. Query: "${r.question}"\nAI Overview: ${r.searchResults.results}\nSources:\n${list}`;
+    return `${i + 1}. Query: "${r.question}"\nSources:\n${list}`;
   })
   .join("\n\n")}
 

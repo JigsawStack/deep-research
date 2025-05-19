@@ -60,7 +60,6 @@ export async function reasoningSearchResults({
     }
 
     // Option 2: Extract content between <think> or <thinking> tags
-    // **TODO** DOUBLE CHECK if the thinking tag is contained in the result check OMIAI
     const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
     if (thinkingMatch) {
       return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
@@ -464,11 +463,24 @@ export class DeepResearch {
       queries: this.queries,
     });
 
-    // Write debug log to file
     fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
     fs.writeFileSync("logs/finalReport.md", report);
 
-    return report;
+    return {
+      status: "success",
+      data: {
+        text: report,
+        metadata: {
+          topic: this.topic,
+          iterationCount: this.iterationCount,
+          completionStatus: this.isComplete,
+          reasoning: this.latestReasoning,
+          researchPlan: this.latestResearchPlan,
+          queries: this.queries,
+          sources: this.sources,
+        },
+      },
+    };
   }
 
   public async testFinalReportGeneration() {
@@ -502,8 +514,3 @@ export class DeepResearch {
 
 // Default export
 export default createDeepResearch;
-
-//**TODO**
-// return json
-// text instead of report
-// follow the standard

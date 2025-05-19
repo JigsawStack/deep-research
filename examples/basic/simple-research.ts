@@ -34,7 +34,7 @@ async function basicResearch() {
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 15000,
+      targetOutputTokens: 40000,
     },
     models: {
       output: geminiModel,
@@ -54,10 +54,6 @@ async function basicResearch() {
     console.log("Starting deep research...");
     const result = await deepResearch.generate(prompts[0]);
     // const result = await deepResearch.testGenerate();
-
-    // Log research results
-    console.log("\n=== RESEARCH SUMMARY ===");
-    console.log(`Research completed successfully: ${result}`);
 
     return result;
   } catch (error) {
