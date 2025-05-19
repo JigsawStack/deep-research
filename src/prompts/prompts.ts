@@ -183,19 +183,19 @@ export const DONE = "@@@COMPLETE@@@";
 const INIT_FINAL_REPORT_PROMPT = ({
   topic,
   sources,
-  targetTokens,
+  targetOutputTokens,
   latestResearchPlan,
   latestReasoning,
   queries,
 }: {
   topic: string;
   sources: WebSearchResult[];
-  targetTokens: number;
+  targetOutputTokens: number;
   latestResearchPlan: string;
   latestReasoning: string;
   queries: string[];
 }) => {
-  const targetChars = targetTokens * 4; // ≈ tokens × 4
+  const targetChars = targetOutputTokens * 4; // ≈ tokens × 4
   const remaining = targetChars; // draft is empty at start
 
   /* ───────── SYSTEM prompt ───────── */
@@ -224,7 +224,7 @@ Main Research Topic:
 ${topic}
 
 Target length:
-≈ ${targetChars.toLocaleString()} characters (${targetTokens} tokens ×4)
+≈ ${targetChars.toLocaleString()} characters (${targetOutputTokens} tokens ×4)
 
 Current draft length:
 0 characters (start of article)
@@ -268,7 +268,7 @@ THIS IS VERY IMPORTANT
 const CONTINUE_FINAL_REPORT_PROMPT = ({
   topic,
   sources,
-  targetTokens,
+  targetOutputTokens,
   currentReport,
   currentOutputLength,
   latestResearchPlan,
@@ -277,14 +277,14 @@ const CONTINUE_FINAL_REPORT_PROMPT = ({
 }: {
   topic: string;
   sources: WebSearchResult[];
-  targetTokens: number;
+  targetOutputTokens: number;
   currentReport: string;
   currentOutputLength: number;
   latestResearchPlan: string;
   latestReasoning: string;
   queries: string[];
 }) => {
-  const targetChars = targetTokens * 4;
+  const targetChars = targetOutputTokens * 4;
   const remaining = Math.max(targetChars - currentOutputLength, 0);
   const atTarget = currentOutputLength >= targetChars;
 
