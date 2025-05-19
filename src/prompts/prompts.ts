@@ -1,7 +1,3 @@
-/**
- * System and user prompts for the deep research pipeline
- */
-
 import { WebSearchResult } from "../types/types";
 
 const RESEARCH_PROMPT_TEMPLATE = ({
@@ -34,12 +30,16 @@ Please provide the following two components:
      
 3.  **Generate a list of sub-topics to research:**
     * Determine how many iterations of research are needed (depth) to fully explore this topic
-    * Specify the depth as a number between 1-5, where 1 is surface-level and 5 is extremely thorough
-    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
     * For each level of depth, identify what new information or perspectives should be explored
+     
+4. **Generate how deep the research should be:**
+    * Generate a number between 1-5, where 1 is surface-level and 5 is extremely thorough
+    * This number represents how deep the research should be
+    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
+
 const DECISION_MAKING_PROMPT = ({
   reasoning,
   targetOutputTokens,
@@ -175,47 +175,30 @@ const EVALUATION_PROMPT = ({
     Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
 };
 
-// **TODO**
-// Something we can try
-// finishReason:
-// 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'
-// The reason the model finished generating the text.
+// MARKERS
+export const CONT = "@@@CONTINUE@@@";
+export const REPORT_DONE = "@@@REPORT_DONE@@@";
+export const DONE = "@@@COMPLETE@@@";
 
-/** Builds the prompt for each report-generation round */
-const FINAL_REPORT_PROMPT = ({
+const INIT_FINAL_REPORT_PROMPT = ({
   topic,
-  latestResearchPlan,
   sources,
-  queries,
+  targetTokens,
+  latestResearchPlan,
   latestReasoning,
-  completionMarker,
-  continuationMarker,
-  targetOutputTokens,
-  currentReport = "",
-  currentOutputLength = 0,
+  queries,
 }: {
   topic: string;
-  latestResearchPlan: string;
   sources: WebSearchResult[];
-  queries: string[];
+  targetTokens: number;
+  latestResearchPlan: string;
   latestReasoning: string;
-  completionMarker: string;
-  continuationMarker: string;
-  targetOutputTokens: number;
-  currentReport?: string;
-  currentOutputLength?: number;
+  queries: string[];
 }) => {
-  /* ────────────────────────────────────────────────── */
-  /* 1 .  dynamic knobs                                */
-  /* ────────────────────────────────────────────────── */
-  const FINAL_MARGIN_CHARS = 200; // ⇠ when draft is this close, allow wrap-up
-  const targetChars = targetOutputTokens * 4;
-  const remainingChars = Math.max(targetChars - currentOutputLength, 0);
-  const mustStayInBody = remainingChars > FINAL_MARGIN_CHARS;
+  const targetChars = targetTokens * 4; // ≈ tokens × 4
+  const remaining = targetChars; // draft is empty at start
 
-  /* ────────────────────────────────────────────────── */
-  /* 2 .  system prompt                                 */
-  /* ────────────────────────────────────────────────── */
+  /* ───────── SYSTEM prompt ───────── */
   const systemPrompt = `
 You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
 
@@ -224,32 +207,32 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 3. Identify and group key themes and patterns across sources.  
 4. Highlight novel insights not explicitly stated in any single source.  
 5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. **Write the “Conclusion” and “Bibliography” only once, at the very end.**  
-7. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
-8. **Never repeat a heading that is already present in the Existing Draft.**
+6. Each topic should be a deep dive paragraph, not a bullet point list.
+7. **DO NOT WRITE OR EVEN START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**
+8. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
+9. **Never repeat a heading that is already present in the Existing Draft.**
 
-**Continuation rule — mandatory:**  
-If you cannot finish the report in this response, you must append exactly:  
-${continuationMarker}
 
-**Draft-continuity rule:**  
-If a draft exists, continue seamlessly; expand it rather than restarting.
+THIS IS VERY IMPORTANT:
+• Always finish this response by outputting ${CONT} alone—no other markers.
+• Do not start the “Conclusion” or “Bibliography” sections in this response.
 `.trim();
 
-  /* ────────────────────────────────────────────────── */
-  /* 3 .  user prompt                                   */
-  /* ────────────────────────────────────────────────── */
+  /* ───────── USER prompt ───────── */
   const userPrompt = `
 Main Research Topic:
 ${topic}
 
-Existing Draft (≈${currentOutputLength} chars):
-${currentReport}
+Target length:
+≈ ${targetChars.toLocaleString()} characters (${targetTokens} tokens ×4)
+
+Current draft length:
+0 characters (start of article)
 
 Latest Research Plan:
 ${latestResearchPlan}
 
-Latest Reasoning:
+Latest Reasoning Snapshot:
 ${latestReasoning}
 
 Sub-Queries:
@@ -259,33 +242,117 @@ Search Results Overview:
 ${sources
   .map((r, i) => {
     const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
-    return `${i + 1}. Query: “${r.question}”\nAI Overview: ${r.searchResults.ai_overview}\nSources:\n${list}`;
+    return `${i + 1}. Query: "${r.question}"\nSources:\n${list}`;
   })
   .join("\n\n")}
 
+────────────────────────────────────────
 **Write-phase instruction:**  
-${
-  mustStayInBody
-    ? `🔒 You still need roughly ${remainingChars.toLocaleString()} more characters \
-before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`
-    : `✅ The draft is long enough to conclude. You may now write the \
-“Conclusion” followed immediately by the “Bibliography”.`
-}
 
-**Length guideline for *this* response:**  
-Aim for ≈${Math.min(remainingChars || 1500).toLocaleString()} characters.
+${`🔒 You still need roughly ${remaining.toLocaleString()} more characters \
+before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`}
+
 
 **Remember:** 
-- If you cannot finish, end with **${continuationMarker}**
-- When you complete the entire report, end with **${completionMarker}**
+- Finish by outputting ${CONT} alone.
 THIS IS VERY IMPORTANT
-
-CONTINUE FROM HERE:
-${currentReport}
-
 `.trim();
 
-  return { systemPrompt, userPrompt };
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+    // stopSequences: [`\n${CONT}`, `${CONT}\n`],
+  };
+};
+
+const CONTINUE_FINAL_REPORT_PROMPT = ({
+  topic,
+  sources,
+  targetTokens,
+  currentReport,
+  currentOutputLength,
+  latestResearchPlan,
+  latestReasoning,
+  queries,
+}: {
+  topic: string;
+  sources: WebSearchResult[];
+  targetTokens: number;
+  currentReport: string;
+  currentOutputLength: number;
+  latestResearchPlan: string;
+  latestReasoning: string;
+  queries: string[];
+}) => {
+  const targetChars = targetTokens * 4;
+  const remaining = Math.max(targetChars - currentOutputLength, 0);
+  const atTarget = currentOutputLength >= targetChars;
+
+  /* ───────── SYSTEM prompt ───────── */
+  const systemPrompt = `
+You are a world-class research analyst expanding an existing draft.
+
+• Continue seamlessly—never restart or duplicate headings.  
+• ** YOU MUST: Cite every fact with in-text numeric refs and maintain the numbered bibliography similar as such [1](https://source.com).**
+• If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
+`.trim();
+
+  /* ───────── USER prompt ───────── */
+  const userPrompt = `
+Main Research Topic:
+${topic}
+
+Current draft length:
+${currentOutputLength.toLocaleString()} chars  
+Target length:
+≈ ${targetChars.toLocaleString()} chars
+
+Current Draft:
+${currentReport}
+
+────────────────────────────────────────
+Latest Research Plan:
+${latestResearchPlan}
+
+Latest Reasoning Snapshot:
+${latestReasoning}
+
+Sub-Queries:
+${queries.map((q) => `- ${q}`).join("\n")}
+
+Source Pack (for quick reference):
+${sources.map((s, i) => `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits`).join("\n")}
+
+────────────────────────────────────────
+${
+  !atTarget
+    ? `🔒 **Continue body sections only.** You still need ≈${remaining.toLocaleString()} characters.  
+       Finish this response by outputting ${CONT} alone. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.`
+    : `✅ **Target reached.** Now write the **Conclusion** in full, DO NOT START THE BIBLIOGRAPHY IN THIS RESPONSE.
+       and finish by outputting ${REPORT_DONE} alone.`
+}
+`.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+};
+
+const CITATION_PROMPT = ({
+  currentReport,
+}: {
+  currentReport: string;
+}) => {
+  return {
+    system: `
+    You are a world-class research analyst and writer. Parse the following text and extract all the citations. Generate the bibliography at the end of the report.
+    Make sure to include all the citations presented in the text in the bibliography. Do not repeat citations in the bibliography.
+    `,
+    user: `
+    ${currentReport}
+    `,
+  };
 };
 
 /**
@@ -310,8 +377,10 @@ When ranking search results, consider recency as a factor - newer information is
 // Export all prompts together with date context
 export const PROMPTS = {
   evaluation: EVALUATION_PROMPT,
-  finalReport: FINAL_REPORT_PROMPT,
   research: RESEARCH_PROMPT_TEMPLATE,
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
+  initFinalReport: INIT_FINAL_REPORT_PROMPT,
+  continueFinalReport: CONTINUE_FINAL_REPORT_PROMPT,
+  citation: CITATION_PROMPT,
 };

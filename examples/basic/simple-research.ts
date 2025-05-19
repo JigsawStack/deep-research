@@ -30,11 +30,11 @@ async function basicResearch() {
       maxLevel: 3, // Detailed analysis
     },
     breadth: {
-      maxParallelTopics: 5,
+      maxParallelTopics: 10,
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 30000,
+      targetOutputTokens: 40000,
     },
     models: {
       output: geminiModel,
@@ -48,15 +48,12 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is determinism and why is it the best explanation for the universe?"];
+  const prompts = ["what is the capital of the moon?"];
 
   try {
     console.log("Starting deep research...");
     const result = await deepResearch.generate(prompts[0]);
-
-    // Log research results
-    console.log("\n=== RESEARCH SUMMARY ===");
-    console.log(`Research completed successfully: ${result}`);
+    // const result = await deepResearch.testGenerate();
 
     return result;
   } catch (error) {

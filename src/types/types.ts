@@ -36,7 +36,6 @@ export interface ModelConfig {
 
 export interface ResearchSource {
   url: string;
-  ai_overview: string;
   title?: string;
   domain?: string;
   isAcademic?: boolean;

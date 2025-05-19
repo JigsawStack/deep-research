@@ -1,137 +1,131 @@
-export function cleanJsonResponse(response: string): string {
-  // First check if this is a markdown article with a report format starting with '–' (em dash)
-  if (response.startsWith("–") || response.startsWith("#") || response.includes("Title:")) {
-    // This is likely a markdown report without proper JSON
-    console.log("Detected markdown report format");
+import { ResearchSource } from "../types/types";
 
-    // Check if there's a JSON metadata block at the end
-    const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonBlockMatch) {
-      console.log("Found JSON metadata block in markdown report");
-      try {
-        // Extract and validate the JSON block
-        const jsonContent = jsonBlockMatch[1].trim();
-        const parsedJson = JSON.parse(jsonContent);
+export class ContentCleaner {
+  /**
+   * Clean and normalize content from a research source
+   */
+  public static cleanContent(source: ResearchSource): ResearchSource {
+    const domain = this.extractDomain(source.url);
+    const isAcademic = this.isAcademicSource(domain);
 
-        // Add the full report content as the analysis
-        if (!parsedJson.analysis) {
-          // Extract the markdown content before the JSON block
-          const markdownContent = response.substring(0, response.indexOf("```json")).trim();
-
-          parsedJson.analysis = markdownContent;
-          return JSON.stringify(parsedJson);
-        }
-
-        return JSON.stringify(parsedJson);
-      } catch (e) {
-        console.log("Failed to parse JSON metadata in markdown report");
-        // If JSON parsing fails, return the whole response as a markdown document
-        return response;
-      }
-    }
-
-    // No JSON metadata block, just return the markdown response as is
-    return response;
+    return {
+      ...source,
+      domain,
+      isAcademic,
+    };
   }
 
-  // Check if this is a markdown article with JSON metadata at the end
-  const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch) {
-    console.log("Found JSON metadata block in markdown article");
+  /**
+   * Extract domain from URL
+   */
+  private static extractDomain(url: string): string {
     try {
-      // Extract and parse the JSON block
-      const jsonContent = jsonBlockMatch[1].trim();
-
-      // Test if it's valid JSON
-      const parsedJson = JSON.parse(jsonContent);
-
-      // If we have a markdown report, add the full report content as the analysis
-      if (!parsedJson.analysis && response.indexOf("```json") > 0) {
-        // Extract the markdown content before the JSON block
-        const markdownContent = response.substring(0, response.indexOf("```json")).trim();
-        if (markdownContent.length > 0) {
-          console.log(`Adding markdown content (${markdownContent.length} chars) as analysis`);
-          parsedJson.analysis = markdownContent;
-          return JSON.stringify(parsedJson);
-        }
-      }
-
-      return jsonContent;
-    } catch (e) {
-      console.error("Failed to parse JSON metadata block:", e);
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch {
+      // If URL parsing fails, try basic extraction
+      const match = url.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n]+)/im);
+      return match ? match[1] : url;
     }
   }
 
-  // Remove markdown code block markers if present
-  let cleaned = response.replace(/```(json|javascript)?\s*/g, "").replace(/\s*```\s*$/g, "");
+  /**
+   * Check if source is from an academic domain
+   */
+  private static isAcademicSource(domain: string): boolean {
+    const academicDomains = [
+      /\.edu$/,
+      /\.ac\.[a-z]{2}$/,
+      /scholar\.google\./,
+      /science(direct)?\.com$/,
+      /nature\.com$/,
+      /researchgate\.net$/,
+      /springer\.com$/,
+      /ieee\.org$/,
+      /jstor\.org$/,
+      /pubmed\.ncbi\.nlm\.nih\.gov$/,
+    ];
 
-  // Trim whitespace
-  cleaned = cleaned.trim();
-
-  // Try to find a valid JSON object in the text
-  try {
-    // If the response starts with a bracket or curly brace, assume it's JSON
-    if ((cleaned.startsWith("{") && cleaned.endsWith("}")) || (cleaned.startsWith("[") && cleaned.endsWith("]"))) {
-      // Test if it's valid JSON
-      JSON.parse(cleaned);
-      return cleaned;
-    }
-
-    // Try to extract JSON object from text
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const potentialJson = jsonMatch[0];
-      // Test if it's valid JSON
-      JSON.parse(potentialJson);
-      return potentialJson;
-    }
-
-    // If we have a markdown report with no valid JSON, create a JSON with the content as analysis
-    if (response.length > 0 && !response.includes("<thinking>")) {
-      console.log("Creating JSON with markdown content as analysis");
-      const jsonWithContent = JSON.stringify({
-        analysis: response,
-        keyThemes: ["Generated from markdown content"],
-        insights: ["Content extracted from markdown"],
-        knowledgeGaps: [],
-        confidence: 0.8,
-        relatedQuestions: [],
-        depth: 0,
-      });
-      return jsonWithContent;
-    }
-  } catch (e) {
-    // If parsing fails, try to fix common issues with JSON strings
-    console.log("JSON parsing failed, attempting to fix common issues...");
-
-    // Handle escaped dollar signs in strings that might be causing issues
-    const fixedJson = cleaned.replace(/(\\"|\s|\n|\r)(\$)(\d)/g, "$1\\\\$2$3");
-
-    try {
-      JSON.parse(fixedJson);
-      return fixedJson;
-    } catch (e2) {
-      console.error("Failed to fix JSON:", e2);
-
-      // If all attempts fail, create a minimal valid JSON with the content as analysis
-      try {
-        // Create a minimal JSON object with the content as analysis
-        const minimalJson = JSON.stringify({
-          analysis: response.substring(0, 2000), // Limit to 2000 chars to avoid token issues
-          keyThemes: ["Content extraction failed"],
-          insights: ["Unable to parse response as JSON"],
-          knowledgeGaps: ["Full content available in raw response"],
-          confidence: 0.5,
-          relatedQuestions: [],
-        });
-
-        return minimalJson;
-      } catch (e3) {
-        console.error("Failed to create minimal JSON:", e3);
-      }
-    }
+    return academicDomains.some((pattern) => pattern.test(domain));
   }
 
-  // If we can't find a JSON object, return the cleaned string
-  return cleaned;
+  /**
+   * Run content through the regular cleaning pipeline
+   */
+  private static contentPipeline(content: string): string {
+    return this.contentSteps.reduce((text, step) => step(text), content);
+  }
+
+  /**
+   * Run markdown content through the markdown-preserving pipeline
+   */
+  private static markdownPipeline(content: string): string {
+    return this.markdownSteps.reduce((text, step) => step(text), content);
+  }
+
+  /**
+   * Steps for cleaning regular content
+   */
+  private static contentSteps: Array<(text: string) => string> = [
+    // Remove HTML tags
+    (text: string) => text.replace(/<[^>]*>/g, " "),
+
+    // Normalize whitespace
+    (text: string) => text.replace(/\s+/g, " "),
+
+    // Remove special characters but keep meaningful punctuation
+    (text: string) => text.replace(/[^\w\s.,!?;:()"'-]/g, " "),
+
+    // Normalize quotes
+    (text: string) => text.replace(/[""]/g, '"').replace(/['']/g, "'"),
+
+    // Fix common typographical issues
+    (text: string) =>
+      text
+        .replace(/(\d+)([a-zA-Z])/g, "$1 $2") // Add space between numbers and letters
+        .replace(/([a-zA-Z])(\d+)/g, "$1 $2") // Add space between letters and numbers
+        .replace(/\.{3,}/g, "...") // Normalize ellipsis
+        .replace(/\s*-\s*/g, " - "), // Normalize dashes
+
+    // Remove URLs
+    (text: string) => text.replace(/https?:\/\/\S+/g, ""),
+
+    // Fix sentence spacing
+    (text: string) => text.replace(/([.!?])\s*([A-Z])/g, "$1 $2"),
+
+    // Trim extra whitespace
+    (text: string) => text.trim(),
+
+    // Ensure proper sentence endings
+    (text: string) => {
+      const lastChar = text.slice(-1);
+      if (!".,!?".includes(lastChar)) {
+        return text + ".";
+      }
+      return text;
+    },
+  ];
+
+  /**
+   * Steps for cleaning markdown content while preserving formatting
+   */
+  private static markdownSteps: Array<(text: string) => string> = [
+    // Remove HTML tags but preserve markdown
+    (text: string) => text.replace(/<[^>]*>/g, " "),
+
+    // Normalize markdown list items
+    (text: string) => text.replace(/^\s*[-*+]\s+/gm, "* "),
+
+    // Preserve markdown bold/italic
+    (text: string) => text.replace(/\*\*|\*/g, (match) => match),
+
+    // Normalize whitespace while preserving line breaks
+    (text: string) => text.replace(/[ \t]+/g, " "),
+
+    // Fix markdown list spacing
+    (text: string) => text.replace(/\n\n\*/g, "\n*"),
+
+    // Trim extra whitespace while preserving markdown structure
+    (text: string) => text.trim(),
+  ];
 }
