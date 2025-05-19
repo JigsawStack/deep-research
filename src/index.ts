@@ -212,8 +212,6 @@ export async function generateResearchPlan({
         depth: z.number().describe("A number between 1-5, where 1 is surface-level and 5 is extremely thorough"),
       }),
 
-      // **TODO**
-      // pass in the past sources as well (TEST IT OUT)
       prompt: PROMPTS.research({
         topic,
         pastReasoning,
@@ -234,6 +232,7 @@ export async function generateResearchPlan({
     return {
       subQueries,
       plan: result.object.plan,
+      depth: result.object.depth,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -372,17 +371,22 @@ export class DeepResearch {
     };
   }
 
-  public async generate(prompt: string) {
+  public async generate(topic: string) {
     const debugLog: string[] = [];
-    debugLog.push(`Running research with prompt: ${prompt}`);
-    this.topic = prompt;
+    debugLog.push(`Running research with topic: ${topic}`);
+    this.topic = topic;
+    let depth = this.config.depth?.maxLevel;
 
     do {
       this.iterationCount++;
       // step 1: generate research plan
       console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
       debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
-      const { subQueries, plan } = await generateResearchPlan({
+      const {
+        subQueries,
+        plan,
+        depth: suggestedDepth,
+      } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
         pastReasoning: this.latestReasoning,
@@ -390,6 +394,8 @@ export class DeepResearch {
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
       });
+
+      depth = suggestedDepth || this.config.depth?.maxLevel;
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
@@ -447,7 +453,7 @@ export class DeepResearch {
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && this.iterationCount < this.config.depth?.maxLevel);
+    } while (!this.isComplete && this.iterationCount < depth);
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);

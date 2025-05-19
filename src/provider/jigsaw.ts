@@ -21,8 +21,6 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  // **TODO** take the top 6 results and use them instead of the 20
-
   public async fireWebSearches(queries: string[]) {
     // Map each query to a promise that resolves to a search result
     const searchPromises = queries.map(async (query) => {

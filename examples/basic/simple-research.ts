@@ -48,11 +48,11 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const prompts = ["what is the capital of the moon?"];
+  const topic = "how to make a billion dollars";
 
   try {
     console.log("Starting deep research...");
-    const result = await deepResearch.generate(prompts[0]);
+    const result = await deepResearch.generate(topic);
     // const result = await deepResearch.testGenerate();
 
     return result;
