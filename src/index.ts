@@ -1,5 +1,5 @@
-import AIProvider from "./provider/aiProvider";
-import { WebSearchResult } from "./types/types";
+import AIProvider from "@provider/aiProvider";
+import { WebSearchResult } from "@/types/types";
 
 import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";

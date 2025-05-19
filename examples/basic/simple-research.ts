@@ -1,7 +1,16 @@
-import createDeepResearch from "../..";
+// **TODO**
+// review update branch by Yoeven and add them in
+
+// **TODO**
+// do @ signs for imports in tsconfig
+
+// **TODO**
+// no links at the end
+
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { createDeepResearch } from "../../src/index";
 
 // Basic usage example
 async function basicResearch() {

@@ -1,4 +1,4 @@
-import { WebSearchResult } from "../types/types";
+import { WebSearchResult } from "@/types/types";
 
 const RESEARCH_PROMPT_TEMPLATE = ({
   topic,
