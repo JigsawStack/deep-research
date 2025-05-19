@@ -299,6 +299,7 @@ const CONTINUE_FINAL_REPORT_PROMPT = ({
 You are a world-class research analyst expanding an existing draft.
 
 • Continue seamlessly—never restart or duplicate headings.  
+• Write in the same style as the existing draft.
 • ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
 • ** For multiple citations, each citations should have it's own bracket []. Something like this: [1][2][3].**
 • **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.

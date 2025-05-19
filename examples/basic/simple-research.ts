@@ -48,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const topic = "how to make a billion dollars";
+  const topic = "how to be a tech genius";
 
   try {
     console.log("Starting deep research...");
