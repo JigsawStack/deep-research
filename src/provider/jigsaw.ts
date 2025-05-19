@@ -2,6 +2,7 @@ import { JigsawStack } from "jigsawstack";
 import "dotenv/config";
 import { ResearchSource } from "../types/types";
 import { ContentCleaner } from "../utils/utils";
+import { retryAsync, createExponetialDelay } from "ts-retry";
 
 export class JigsawProvider {
   private static instance: JigsawProvider;
@@ -26,33 +27,24 @@ export class JigsawProvider {
     // Map each query to a promise that resolves to a search result
     const searchPromises = queries.map(async (query) => {
       try {
-        // Add retry logic for API requests
-        const maxRetries = 3;
-        let retryCount = 0;
-        let results;
-
-        // **TODO** TS RETRIES instead of doing this manually
-        while (retryCount < maxRetries) {
-          try {
-            results = await this.jigsawInstance.web.search({
+        // Use ts-retry for API requests
+        const results = await retryAsync(
+          async () => {
+            const response = await this.jigsawInstance.web.search({
               query,
               ai_overview: true,
             });
-
-            // If we get here, the request succeeded
-            break;
-          } catch (apiError) {
-            retryCount++;
-            console.warn(`API request failed (attempt ${retryCount}/${maxRetries}):`, (apiError as Error).message);
-
-            if (retryCount >= maxRetries) {
-              throw apiError; // Rethrow after max retries
-            }
-
-            // Wait before retrying (exponential backoff)
-            await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+            return response;
+          },
+          {
+            delay: createExponetialDelay(1000), // Start with 1s, then grows exponentially
+            maxTry: 3,
+            onError: (error, currentTry) => {
+              console.warn(`API request failed (attempt ${currentTry}/3):`, (error as Error).message);
+              return true;
+            },
           }
-        }
+        );
 
         // Check if results has the expected structure
         if (!results || !results.results) {
