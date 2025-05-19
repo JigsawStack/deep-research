@@ -1,6 +1,3 @@
-// **TODO**
-// no links at the end
-
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";

@@ -5,7 +5,8 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   pastReasoning,
   pastQueries,
   maxDepth,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth?: number }) => `
+  maxBreadth,
+}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth: number; maxBreadth: number }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
 The topic for research is: ${topic}
@@ -33,9 +34,12 @@ Please provide the following two components:
     * For each level of depth, identify what new information or perspectives should be explored
      
 4. **Generate how deep the research should be:**
-    * Generate a number between 1-5, where 1 is surface-level and 5 is extremely thorough
+    * Generate a number between 1-${maxDepth}, where 1 is surface-level and ${maxDepth} is the max thoroughness 
     * This number represents how deep the research should be
-    * If your planned depth exceeds ${maxDepth}, use ${maxDepth} as the maximum depth
+
+5. **Generate how broad the research should be:**
+    * Generate a number between 1-${maxBreadth}, where 1 is surface-level and ${maxBreadth} is the max thoroughness 
+    * This number represents how broad the research should be
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
@@ -56,9 +60,9 @@ Chain of Thought:
 """${reasoning}"""
 
 Instructions:
-- If the reasoning is sufficient to cover all major sub-topics at the planned length, set “isComplete” to true.
-- Otherwise set “isComplete” to false.
-- In either case, provide a brief explanation in “reason” describing your judgement.
+- If the reasoning is sufficient to cover all major sub-topics at the planned length, set "isComplete" to true.
+- Otherwise set "isComplete" to false.
+- In either case, provide a brief explanation in "reason" describing your judgement.
 - **Output only** a JSON object with exactly these two keys and no extra text, for example:
   {
     "isComplete": true,
@@ -80,7 +84,7 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
 You are an expert reasoning assistant. Given:
 
   • Topic to address:
-    “${topic}”
+    "${topic}"
 
   • Proposed research plan:
     """${researchPlan}"""
@@ -99,11 +103,11 @@ Your task is to evaluate whether this set of inputs collectively provides enough
 4. **Assess** the quality, relevance, and diversity of the sources provided.
 5. **Recommend** additional queries, source types, or angles needed to fill those gaps.
 6. **Summarize** at the end with a JSON object containing:
-   - sufficiency: “sufficient” or “insufficient”
+   - sufficiency: "sufficient" or "insufficient"
    - missingAreas: [list of uncovered sub-topics]
    - suggestions: [list of concrete next queries or source types]
 
-Begin by stating “Let me think through this step by step,” then proceed with your reasoning.  
+Begin by stating "Let me think through this step by step," then proceed with your reasoning.  
 `;
 
 const EVALUATION_PROMPT = ({
@@ -178,7 +182,6 @@ const EVALUATION_PROMPT = ({
 // MARKERS
 export const CONT = "@@@CONTINUE@@@";
 export const REPORT_DONE = "@@@REPORT_DONE@@@";
-export const DONE = "@@@COMPLETE@@@";
 
 const INIT_FINAL_REPORT_PROMPT = ({
   topic,
@@ -195,10 +198,9 @@ const INIT_FINAL_REPORT_PROMPT = ({
   latestReasoning: string;
   queries: string[];
 }) => {
-  const targetChars = targetOutputTokens * 4; // ≈ tokens × 4
-  const remaining = targetChars; // draft is empty at start
+  const targetChars = targetOutputTokens * 4;
+  const remaining = targetChars;
 
-  /* ───────── SYSTEM prompt ───────── */
   const systemPrompt = `
 You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
 
@@ -209,16 +211,14 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 5. Note contradictions or conflicts, resolving them or framing open debates.  
 6. Each topic should be a deep dive paragraph, not a bullet point list.
 7. **DO NOT WRITE OR EVEN START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**
-8. Cite every factual claim or statistic with in-text references (e.g. “[1](https://source.com)”) and append a numbered bibliography.  
+8. Cite every factual claim or statistic with in-text references using the reference numbers provided (e.g. "[1]").  
 9. **Never repeat a heading that is already present in the Existing Draft.**
-
 
 THIS IS VERY IMPORTANT:
 • Always finish this response by outputting ${CONT} alone—no other markers.
-• Do not start the “Conclusion” or “Bibliography” sections in this response.
+• Do not start the "Conclusion" or "Bibliography" sections in this response.
 `.trim();
 
-  /* ───────── USER prompt ───────── */
   const userPrompt = `
 Main Research Topic:
 ${topic}
@@ -241,7 +241,9 @@ ${queries.map((q) => `- ${q}`).join("\n")}
 Search Results Overview:
 ${sources
   .map((r, i) => {
-    const list = r.searchResults.results.map((s, j) => `    ${j + 1}. ${s.title || "No title"} (${s.domain}) — ${s.url}`).join("\n");
+    const list = r.searchResults.results.map((s) => 
+      `    [${s.referenceNumber}] ${s.title || "No title"} (${s.domain})`
+    ).join("\n");
     return `${i + 1}. Query: "${r.question}"\nSources:\n${list}`;
   })
   .join("\n\n")}
@@ -250,10 +252,10 @@ ${sources
 **Write-phase instruction:**  
 
 ${`🔒 You still need roughly ${remaining.toLocaleString()} more characters \
-before concluding.\n**Do NOT start the “Conclusion” or “Bibliography” sections in this response.**`}
-
+before concluding.\n**Do NOT start the "Conclusion" or "Bibliography" sections in this response.**`}
 
 **Remember:** 
+- Use reference numbers [X] for citations instead of URLs
 - Finish by outputting ${CONT} alone.
 THIS IS VERY IMPORTANT
 `.trim();
@@ -261,7 +263,6 @@ THIS IS VERY IMPORTANT
   return {
     system: systemPrompt,
     user: userPrompt,
-    // stopSequences: [`\n${CONT}`, `${CONT}\n`],
   };
 };
 
@@ -339,21 +340,6 @@ ${
   };
 };
 
-const CITATION_PROMPT = ({
-  currentReport,
-}: {
-  currentReport: string;
-}) => {
-  return {
-    system: `
-    You are a world-class research analyst and writer. Parse the following text and extract all the citations. Generate the bibliography at the end of the report.
-    Make sure to include all the citations presented in the text in the bibliography. Do not repeat citations in the bibliography.
-    `,
-    user: `
-    ${currentReport}
-    `,
-  };
-};
 
 /**
  *
@@ -382,5 +368,4 @@ export const PROMPTS = {
   decisionMaking: DECISION_MAKING_PROMPT,
   initFinalReport: INIT_FINAL_REPORT_PROMPT,
   continueFinalReport: CONTINUE_FINAL_REPORT_PROMPT,
-  citation: CITATION_PROMPT,
 };

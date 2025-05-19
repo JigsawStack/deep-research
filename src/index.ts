@@ -1,5 +1,5 @@
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult } from "@/types/types";
+import { WebSearchResult, ResearchSource } from "@/types/types";
 
 import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";
@@ -7,7 +7,7 @@ import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
-import { CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
+import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
 /**
  * Decision making
@@ -70,6 +70,10 @@ export async function reasoningSearchResults({
       prompt: reasoningPrompt,
     });
 
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync("logs")) {
+      fs.mkdirSync("logs", { recursive: true });
+    }
     fs.writeFileSync("logs/reasoningPrompt.md", reasoningPrompt);
     fs.writeFileSync("logs/reasoningTest.md", reasoningResponse.text);
 
@@ -93,6 +97,61 @@ export async function reasoningSearchResults({
     // Throw the error to terminate program execution
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
+}
+
+export async function processReportForCitations({
+  report,
+  sources,
+}: {
+  report: string;
+  sources: WebSearchResult[];
+}) {
+  // Create a lookup map for reference numbers to URLs
+  const referenceMap = new Map<number, ResearchSource>();
+  
+  // Populate the map with reference numbers and their corresponding source info
+  sources.forEach(source => {
+    source.searchResults.results.forEach(result => {
+      if (result.referenceNumber) {
+        referenceMap.set(result.referenceNumber, result);
+      }
+    });
+  });
+  
+  // Regular expression to find citation numbers in the report: [1], [2], etc.
+  const citationRegex = /\[(\d+)\]/g;
+  
+  // Replace each citation number with a markdown link
+  const reportWithLinks = report.replace(citationRegex, (match, referenceNumber) => {
+    const refNum = parseInt(referenceNumber, 10);
+    const source = referenceMap.get(refNum);
+    
+    if (source) {
+      // Create markdown link with the citation number pointing to the source URL
+      return `[${referenceNumber}](${source.url})`;
+    }
+    
+    // If no matching source found, keep the original citation
+    return match;
+  });
+  
+  // Generate bibliography section
+  let bibliography = "\n\n## References\n\n";
+  
+  // Sort by reference number for a well-ordered bibliography
+  const sortedReferences = Array.from(referenceMap.entries())
+    .sort((a, b) => a[0] - b[0]);
+  
+  // Create bibliography entries
+  sortedReferences.forEach(([number, source]) => {
+    const title = source.title || "No title";
+    const domain = source.domain || new URL(source.url).hostname;
+    
+    bibliography += `${number}. [${title}](${source.url}) - ${domain}\n`;
+  });
+  
+  // Return the report with links and bibliography
+  return reportWithLinks + bibliography;
 }
 
 /**
@@ -130,7 +189,7 @@ export async function generateFinalReport({
   let draft = "";
   let done = false;
   let iter = 0;
-  // track which prompt we’re on
+  // track which prompt we're on
   let phase: "initial" | "continuation" | "citation" = "initial";
 
   do {
@@ -149,20 +208,16 @@ export async function generateFinalReport({
     let promptConfig: {
       system: string;
       user: string;
-      // stopSequences: string[];
     };
 
     if (phase === "initial") {
       promptConfig = PROMPTS.initFinalReport(base);
-    } else if (phase === "continuation") {
+    } else {
       promptConfig = PROMPTS.continueFinalReport({
         ...base,
         currentReport: draft,
         currentOutputLength: draft.length,
       });
-    } else {
-      // bibliography-only pass
-      promptConfig = PROMPTS.citation({ currentReport: draft });
     }
 
     debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
@@ -174,7 +229,6 @@ export async function generateFinalReport({
       model: aiProvider.getOutputModel(),
       system: promptConfig.system,
       prompt: promptConfig.user,
-      // stopSequences: promptConfig.stopSequences,
     });
 
     debugLog.push("MODEL OUTPUT:\n" + text);
@@ -194,19 +248,13 @@ export async function generateFinalReport({
         // finished body + conclusion/biblio → move to citation pass
         draft += text.replace(REPORT_DONE, "");
         phase = "citation";
+        done = true;
       } else {
         // no marker (should be rare) – just append
         draft += text;
       }
-    } else {
-      // citation pass: consume final DONE marker if present
-      if (text.includes(DONE)) {
-        draft += text.replace(DONE, "");
-      } else {
-        draft += text;
-      }
-      done = true;
-    }
+    } 
+
 
     // persist debug log each loop
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
@@ -214,11 +262,17 @@ export async function generateFinalReport({
     iter++;
   } while (!done);
 
+  // process the report for citations
+  const reportWithCitations = await processReportForCitations({
+    report: draft,
+    sources,
+  });
+
   // write out the final report
   fs.writeFileSync("logs/final-report.md", draft.trim());
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
-  return { report: draft, debugLog };
+  return { report: reportWithCitations, debugLog };
 }
 
 /**
@@ -235,10 +289,11 @@ export async function generateResearchPlan({
   aiProvider,
   topic,
   pastReasoning,
-  maxDepth,
   pastQueries,
-  config
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number }) {
+  config,
+  maxDepth,
+  maxBreadth,
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -247,7 +302,7 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().describe("A number between 1-5, where 1 is surface-level and 5 is extremely thorough"),
+        depth: z.number().describe("A number between 1-10, where 1 is surface-level and 10 is extremely thorough"),
       }),
 
       prompt: PROMPTS.research({
@@ -255,17 +310,16 @@ export async function generateResearchPlan({
         pastReasoning,
         pastQueries,
         maxDepth,
+        maxBreadth,
       }),
     });
 
     let subQueries = result.object.subQueries;
 
-    // Limit queries if maxQueries is specified
-    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0) {
+    // extra guard rails for max parallel topics
+    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0 && subQueries.length > config.breadth?.maxParallelTopics) {
       subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
     }
-
-    console.log(`Generated ${subQueries.length} research queries`);
 
     return {
       subQueries,
@@ -304,6 +358,33 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
               domain: item.domain || "",
             };
           }),
+      },
+    };
+  });
+}
+
+export function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+  const urlMap = new Map<string, number>();
+  let currentNumber = 1;
+
+  return sources.map((result) => {
+    return {
+      question: result.question,
+      searchResults: {
+        ai_overview: result.searchResults.ai_overview,
+        results: result.searchResults.results.map((item) => {
+          // If URL hasn't been seen before, assign it a new number
+          if (!urlMap.has(item.url)) {
+            urlMap.set(item.url, currentNumber++);
+          }
+          
+        return {
+            url: item.url,
+            title: item.title || "",
+            domain: item.domain || "",
+            referenceNumber: urlMap.get(item.url) // Add the reference number
+          };
+        }),
       },
     };
   });
@@ -450,6 +531,7 @@ export class DeepResearch {
         pastQueries: this.queries,
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
+        maxBreadth: this.config.breadth?.maxParallelTopics,
       });
 
       depth = suggestedDepth || this.config.depth?.maxLevel;
@@ -516,8 +598,11 @@ export class DeepResearch {
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
+    // map the sources to numbers for citations
+    const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
+
     const { report, debugLog: finalDebugLog } = await generateFinalReport({
-      sources: this.sources,
+      sources: numberedSources,
       topic: this.topic,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
