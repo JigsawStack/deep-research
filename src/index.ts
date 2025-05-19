@@ -9,6 +9,14 @@ import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
+/**
+ * Decision making
+ * 
+ * @param reasoning - The reasoning for the decision
+ * @param aiProvider - The AI provider
+ * @param targetOutputTokens - The target output tokens
+ * @returns The decision whether to continue with more research or to start generating the final report
+ */
 export async function decisionMaking({
   reasoning,
   aiProvider,
@@ -31,6 +39,17 @@ export async function decisionMaking({
 
   return decisionMakingResponse.object;
 }
+
+/**
+ * Reasoning about the search results
+ * 
+ * @param topic - The topic of the research
+ * @param latestResearchPlan - The latest research plan
+ * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
+ * @param queries - The queries used to get the search results
+ * @param aiProvider - The AI provider
+ * @returns The reasoning / thinking output evaluating the search results
+**/
 export async function reasoningSearchResults({
   topic,
   latestResearchPlan,
@@ -76,10 +95,23 @@ export async function reasoningSearchResults({
   }
 }
 
+/**
+ * Generate the final report
+ * 
+ * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
+ * @param topic - The topic of the research
+ * @param targetOutputTokens - The target output tokens
+ * @param aiProvider - The AI provider
+ * @param debugLog - The debug log
+ * @param latestReasoning - The latest reasoning
+ * @param latestResearchPlan - The latest research plan
+ * @param queries - The queries used to get the search results
+ * @returns The final report
+ */
 export async function generateFinalReport({
   sources,
   topic,
-  targetTokens,
+  targetOutputTokens,
   aiProvider,
   debugLog,
   latestReasoning,
@@ -88,7 +120,7 @@ export async function generateFinalReport({
 }: {
   sources: WebSearchResult[];
   topic: string;
-  targetTokens: number;
+  targetOutputTokens: number;
   aiProvider: AIProvider;
   debugLog: string[];
   latestReasoning: string;
@@ -107,7 +139,7 @@ export async function generateFinalReport({
     const base = {
       topic,
       sources,
-      targetTokens,
+      targetOutputTokens,
       latestResearchPlan,
       latestReasoning,
       queries,
@@ -462,7 +494,7 @@ export class DeepResearch {
     const { report, debugLog: finalDebugLog } = await generateFinalReport({
       sources: this.sources,
       topic: this.topic,
-      targetTokens: this.config.report.targetOutputTokens,
+      targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
       debugLog: debugLog,
       latestReasoning: this.latestReasoning,
@@ -494,7 +526,7 @@ export class DeepResearch {
     // Load data from logs folder
     const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
     const topic = "what is determinism and why is it the best explanation for the universe?";
-    const targetTokens = this.config.report.targetOutputTokens;
+    const targetOutputTokens = this.config.report.targetOutputTokens;
     const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
     const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
@@ -503,7 +535,7 @@ export class DeepResearch {
     const { report, debugLog } = await generateFinalReport({
       sources,
       topic,
-      targetTokens,
+      targetOutputTokens,
       aiProvider: this.aiProvider,
       debugLog: [],
       latestResearchPlan,

@@ -1,10 +1,4 @@
 // **TODO**
-// review update branch by Yoeven and add them in
-
-// **TODO**
-// do @ signs for imports in tsconfig
-
-// **TODO**
 // no links at the end
 
 import "dotenv/config";
