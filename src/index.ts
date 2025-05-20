@@ -1,3 +1,12 @@
+// **TODO Cool Feature**
+// byo_urls user bring their own urls to do the websearch
+
+// **TODO Cool Feature**
+// byo_pdfs as content
+
+// **TODO PROMPT OPTIMIZATION**!!!
+// make it more research-like (latex-style)
+
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 

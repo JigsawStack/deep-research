@@ -26,20 +26,20 @@ async function basicResearch() {
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
-    depth: {
-      maxLevel: 3, // Detailed analysis
-    },
-    breadth: {
-      maxParallelTopics: 10,
-    },
+    // depth: {
+    //   maxLevel: 3, // Detailed analysis
+    // },
+    // breadth: {
+      // maxParallelTopics: 10,
+    // },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 40000,
+      targetOutputTokens: 10000,
     },
-    models: {
-      output: geminiModel,
-      reasoning: deepseekModel,
-    },
+    // models: {
+      // output: geminiModel,
+      // reasoning: deepseekModel,
+    // },
     // Pass API keys from environment variables to config
     openaiApiKey: process.env.OPENAI_API_KEY,
     geminiApiKey: process.env.GEMINI_API_KEY,
@@ -48,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const topic = "is it possible to have life on mars";
+  const topic = "what is love";
 
   try {
     console.log("Starting deep research...");
