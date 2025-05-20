@@ -213,10 +213,12 @@ You are a world-class research analyst and writer. Produce a single, cohesive de
 4. Highlight novel insights not explicitly stated in any single source.\n
 5. Note contradictions or conflicts, resolving them or framing open debates.\n
 6. Each topic should be a deep dive paragraph, not a bullet point list.\n
-7. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
-8. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-9. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
-10. **Never repeat a heading that is already present in the Existing Draft.**\n
+7. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
+8. Do not worry about covering all the topics, just dive deep into each topic.\n
+9. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
+10. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+11. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
+12. **Never repeat a heading that is already present in the Existing Draft.**\n
 
 THIS IS VERY IMPORTANT:\n
 • Always finish this response by outputting ${CONT} alone—no other markers.\n
@@ -294,12 +296,17 @@ const CONTINUE_FINAL_REPORT_PROMPT = ({
   const systemPrompt = `
 You are a world-class research analyst expanding an existing draft.\n
 
-• Continue seamlessly—never restart or duplicate headings.\n
-• Write in the same style as the existing draft.\n
-• ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-• ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
-• **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.\n
-• If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.\n 
+1. Continue seamlessly—never restart or duplicate headings.\n
+2. Write in the same style as the existing draft.\n
+3. Note contradictions or conflicts, resolving them or framing open debates.\n
+4. Each topic should be a deep dive paragraph, not a bullet point list.\n
+5. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
+6. Do not worry about covering all the topics, just dive deep into each topic.\n
+7. ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+8. ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
+9. **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.\n
+10. **Never repeat a heading that is already present in the Existing Draft. Even if it is to continue the topic.**\n
+11/ If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.\n 
 `.trim();
 
   /* ───────── USER prompt ───────── */
