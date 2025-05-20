@@ -35,7 +35,7 @@ async function testFinalReport() {
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 12000,
+      targetOutputTokens: 40000,
     },
     models: {
       output: geminiModel,

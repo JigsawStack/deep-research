@@ -205,22 +205,22 @@ const INIT_FINAL_REPORT_PROMPT = ({
   const remaining = targetChars;
 
   const systemPrompt = `
-You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.
+You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.\n
 
-1. Introduce the topic—outlining scope, importance, and objectives.  
-2. Synthesize intermediate analyses into a structured narrative.  
-3. Identify and group key themes and patterns across sources.  
-4. Highlight novel insights not explicitly stated in any single source.  
-5. Note contradictions or conflicts, resolving them or framing open debates.  
-6. Each topic should be a deep dive paragraph, not a bullet point list.
-7. **DO NOT WRITE OR EVEN START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**
-8. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
-9. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].
-10. **Never repeat a heading that is already present in the Existing Draft.**
+1. Introduce the topic—outlining scope, importance, and objectives.\n
+2. Synthesize intermediate analyses into a structured narrative.\n
+3. Identify and group key themes and patterns across sources.\n
+4. Highlight novel insights not explicitly stated in any single source.\n
+5. Note contradictions or conflicts, resolving them or framing open debates.\n
+6. Each topic should be a deep dive paragraph, not a bullet point list.\n
+7. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
+8. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+9. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
+10. **Never repeat a heading that is already present in the Existing Draft.**\n
 
-THIS IS VERY IMPORTANT:
-• Always finish this response by outputting ${CONT} alone—no other markers.
-• Do not start the "Conclusion" or "Bibliography" sections in this response.
+THIS IS VERY IMPORTANT:\n
+• Always finish this response by outputting ${CONT} alone—no other markers.\n
+• Do not start the "Conclusion" or "Bibliography" sections in this response.\n
 `.trim();
 
   const userPrompt = `
@@ -252,14 +252,13 @@ ${sources.map((s, i) => {
 ────────────────────────────────────────
 **Write-phase instruction:**  
 
-${`🔒 You still need roughly ${remaining.toLocaleString()} more characters \
-before concluding.\n**Do NOT start the "Conclusion" or "Bibliography" sections in this response.**`}
-
-**Remember:** 
-- Use reference numbers [X] for sources instead of URLs
-- ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**
-- Finish by outputting ${CONT} alone.
-THIS IS VERY IMPORTANT
+${`🔒 You still need roughly ${remaining.toLocaleString()} more characters before concluding.\n
+**Do NOT start the "Conclusion" or "Bibliography" sections in this response.**`}\n
+\n
+**Remember:** \n
+- Use reference numbers [X] for sources instead of URLs\n
+- ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
+- Finish by outputting ${CONT} alone.\n
 `.trim();
 
   return {
@@ -293,40 +292,41 @@ const CONTINUE_FINAL_REPORT_PROMPT = ({
 
   /* ───────── SYSTEM prompt ───────── */
   const systemPrompt = `
-You are a world-class research analyst expanding an existing draft.
+You are a world-class research analyst expanding an existing draft.\n
 
-• Continue seamlessly—never restart or duplicate headings.  
-• Write in the same style as the existing draft.
-• ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").  
-• ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**
-• **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.
-• If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.  
+• Continue seamlessly—never restart or duplicate headings.\n
+• Write in the same style as the existing draft.\n
+• ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+• ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
+• **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.\n
+• If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.\n 
 `.trim();
 
   /* ───────── USER prompt ───────── */
   const userPrompt = `
-Main Research Topic:
-${topic}
+Main Research Topic:\n
+${topic}\n
 
-Current draft length:
-${currentOutputLength.toLocaleString()} chars  
-Target length:
-≈ ${targetChars.toLocaleString()} chars
+Current draft length:\n
+${currentOutputLength.toLocaleString()} chars\n
 
-Current Draft:
+Target length:\n
+≈ ${targetChars.toLocaleString()} chars\n
+
+Current Draft:\n
 ${currentReport}
 
 ────────────────────────────────────────
-Latest Research Plan:
-${latestResearchPlan}
+Latest Research Plan:\n
+${latestResearchPlan}\n
 
-Latest Reasoning Snapshot:
-${latestReasoning}
+Latest Reasoning Snapshot:\n
+${latestReasoning}\n
 
-Sub-Queries:
-${queries.map((q) => `- ${q}`).join("\n")}
+Sub-Queries:\n
+${queries.map((q) => `- ${q}`).join("\n")}\n
 
-Source Pack (for quick reference):
+Source Pack (for quick reference):\n
 ${sources.map((s, i) => {
   const overview = s.searchResults.ai_overview ? `\n   AI Overview: ${s.searchResults.ai_overview.substring(0, 150)}...` : '';
   const urls = s.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');

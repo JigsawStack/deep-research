@@ -34,7 +34,7 @@ async function basicResearch() {
     },
     report: {
       maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 8000,
+      targetOutputTokens: 40000,
     },
     models: {
       output: geminiModel,
@@ -48,7 +48,7 @@ async function basicResearch() {
   });
 
   // Need to provide prompts array as required by generate method
-  const topic = "how to be a tech genius";
+  const topic = "is it possible to have life on mars";
 
   try {
     console.log("Starting deep research...");
