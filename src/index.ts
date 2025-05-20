@@ -99,7 +99,7 @@ export async function reasoningSearchResults({
   }
 }
 
-export async function processReportForCitations({
+export async function processReportForSources({
   report,
   sources,
 }: {
@@ -111,7 +111,7 @@ export async function processReportForCitations({
   
   // Populate the map with reference numbers and their corresponding source info
   // Log for debugging
-  console.log("Processing sources for citations:", JSON.stringify(sources.slice(0, 1), null, 2));
+  console.log("Processing sources for sources:", JSON.stringify(sources.slice(0, 1), null, 2));
   
   sources.forEach(source => {
     if (source.searchResults && Array.isArray(source.searchResults.results)) {
@@ -129,14 +129,14 @@ export async function processReportForCitations({
   
   console.log(`Reference map size: ${referenceMap.size}`);
   
-  // Enhanced regex to find both single citations [1] and multiple citations [1, 2, 3]
+  // Enhanced regex to find both single sources [1] and multiple sources [1, 2, 3]
   // This matches either:
-  // 1. [number] - A single citation
-  // 2. [number, number, ...] - Multiple comma-separated citations
-  const citationRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+  // 1. [number] - A single source
+  // 2. [number, number, ...] - Multiple comma-separated sources
+  const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
   
   // Replace each citation with markdown links
-  const reportWithLinks = report.replace(citationRegex, (match, referenceString) => {
+  const reportWithLinks = report.replace(sourceRegex, (match, referenceString) => {
     // Split the reference string by commas if it contains multiple references
     const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
     
@@ -308,17 +308,17 @@ export async function generateFinalReport({
     iter++;
   } while (!done);
 
-  // process the report for citations
-  const reportWithCitations = await processReportForCitations({
+  // process the report for sources 
+  const reportWithSources = await processReportForSources({
     report: draft,
     sources,
   });
 
   // write out the final report
-  fs.writeFileSync("logs/final-report.md", reportWithCitations.trim());
+  fs.writeFileSync("logs/final-report.md", reportWithSources.trim());
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
-  return { report: reportWithCitations, debugLog };
+  return { report: reportWithSources, debugLog };
 }
 
 /**
@@ -655,7 +655,7 @@ export class DeepResearch {
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
-    // map the sources to numbers for citations
+    // map the sources to numbers for sources
     const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
 
     const { report, debugLog: finalDebugLog } = await generateFinalReport({
