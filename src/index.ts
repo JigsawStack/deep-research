@@ -153,8 +153,6 @@ export async function processReportForSources({
       const source = referenceMap.get(refNum);
       
       if (source) {
-        // Log for debugging
-        console.log(`Replacing citation [${refNum}] with link to ${source.url}`);
         // Create markdown link with the citation number pointing to the source URL
         return `[[${refNum}](${source.url})]`;
       }
@@ -170,8 +168,6 @@ export async function processReportForSources({
         const source = referenceMap.get(refNum);
         
         if (source) {
-          // Log for debugging
-          console.log(`Replacing citation part ${refNum} with link to ${source.url}`);
           // Create markdown link with the citation number pointing to the source URL
           return `[${refNum}](${source.url})`;
         }
@@ -204,7 +200,6 @@ export async function processReportForSources({
 
   const finalReport = reportWithLinks + bibliography;
 
-  console.log("Done processing report for sources");
   
   // Return the report with links and bibliography
   return finalReport;
@@ -491,11 +486,11 @@ export class DeepResearch {
     this.config = this.validateConfig(config);
 
     // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
     this.aiProvider = new AIProvider({
-      openaiApiKey: this.config.openaiApiKey,
-      geminiApiKey: this.config.geminiApiKey,
-      deepInfraApiKey: this.config.deepInfraApiKey,
+      OPENAI_API_KEY: this.config.OPENAI_API_KEY,
+      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
+      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
     });
 
     this.initModels();
@@ -554,23 +549,23 @@ export class DeepResearch {
         ...(config.report || {}),
       },
       models: mergedModels,
-      jigsawApiKey:
-        config.jigsawApiKey ||
+      JIGSAW_API_KEY:
+        config.JIGSAW_API_KEY ||
         (() => {
-          throw new Error("Jigsaw API key must be provided in config");
+          throw new Error("JIGSAW_API_KEY must be provided in config");
         })(),
-      openaiApiKey:
-        config.openaiApiKey ||
+      OPENAI_API_KEY:
+        config.OPENAI_API_KEY ||
         (() => {
           throw new Error("OpenAI API key must be provided in config");
         })(),
-      geminiApiKey:
-        config.geminiApiKey ||
+      GEMINI_API_KEY:
+        config.GEMINI_API_KEY ||
         (() => {
           throw new Error("Gemini API key must be provided in config");
         })(),
-      deepInfraApiKey:
-        config.deepInfraApiKey ||
+      DEEPINFRA_API_KEY:
+        config.DEEPINFRA_API_KEY ||
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),

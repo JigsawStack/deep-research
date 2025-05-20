@@ -24,8 +24,8 @@ export const DEFAULT_CONFIG = {
   depth: DEFAULT_DEPTH_CONFIG,
   breadth: DEFAULT_BREADTH_CONFIG,
   report: DEFAULT_REPORT_CONFIG,
-  jigsawApiKey: "",
-  openaiApiKey: "",
-  geminiApiKey: "",
-  deepInfraApiKey: "",
+  JIGSAW_API_KEY: "",
+  OPENAI_API_KEY: "",
+  GEMINI_API_KEY: "",
+  DEEPINFRA_API_KEY: "",
 };

@@ -42,10 +42,10 @@ async function testFinalReport() {
       reasoning: deepseekModel,
     },
     // Pass API keys from environment variables to config
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    geminiApiKey: process.env.GEMINI_API_KEY,
-    deepInfraApiKey: process.env.DEEPINFRA_API_KEY,
-    jigsawApiKey: process.env.JIGSAW_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+    JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method

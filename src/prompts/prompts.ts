@@ -39,6 +39,7 @@ Please provide the following two components:
 5. **Generate how broad the research should be:**
     * Generate a number to determine how broad the research should be to fully explore this topic
 
+
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
 
@@ -49,6 +50,7 @@ const DECISION_MAKING_PROMPT = ({
 }) => `
 You are a decision-making assistant.
 
+${getCurrentDateContext()} \n
 
 Chain of Thought:
 """${reasoning}"""
@@ -88,6 +90,8 @@ You are an expert reasoning assistant. Given:
 
   • All queries used:
     ${JSON.stringify(allQueries, null, 2)}
+
+${getCurrentDateContext()} \n
 
 Your task is to evaluate whether this set of inputs collectively provides enough coverage and context to write a thorough, deep-dive research report on the topic. Think step by step and show your full chain-of-thought. Specifically:
 
@@ -129,18 +133,17 @@ const INIT_FINAL_REPORT_PROMPT = ({
   const systemPrompt = `
 You are a world-class research analyst and writer. Produce a single, cohesive deep-research paper.\n
 
-1. Introduce the topic—outlining scope, importance, and objectives.\n
-2. Synthesize intermediate analyses into a structured narrative.\n
-3. Identify and group key themes and patterns across sources.\n
-4. Highlight novel insights not explicitly stated in any single source.\n
-5. Note contradictions or conflicts, resolving them or framing open debates.\n
-6. Each topic should be a deep dive paragraph, not a bullet point list.\n
-7. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
-8. Do not worry about covering all the topics, just dive deep into each topic.\n
-9. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
-10. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-11. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
-12. **Never repeat a heading that is already present in the Existing Draft.**\n
+1. Synthesize intermediate analyses into a structured narrative.\n
+2. Identify and group key themes and patterns across sources.\n
+3. Highlight novel insights not explicitly stated in any single source.\n
+4. Note contradictions or conflicts, resolving them or framing open debates.\n
+5. Each topic should be a deep dive paragraph, not a bullet point list.\n
+6. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
+7. Do not worry about covering all the topics, just dive deep into each topic.\n
+8. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
+9. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+10. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
+11. **Never repeat a heading that is already present in the Existing Draft.**\n
 
 THIS IS VERY IMPORTANT:\n
 • Always finish this response by outputting ${CONT} alone—no other markers.\n
@@ -280,8 +283,6 @@ ${
 
 
 /**
- *
- *
  * Core prompt function that adds current date information to all prompts
  * This ensures all models have the correct temporal context for research
  */

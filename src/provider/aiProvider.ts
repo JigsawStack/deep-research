@@ -20,36 +20,36 @@ export class AIProvider {
    * Initialize the provider with API keys from config and optional custom models
    */
   constructor({
-    openaiApiKey,
-    geminiApiKey,
-    deepInfraApiKey,
+    OPENAI_API_KEY,
+    GEMINI_API_KEY,
+    DEEPINFRA_API_KEY,
     defaultModel,
     reasoningModel,
     outputModel,
   }: {
-    openaiApiKey: string;
-    geminiApiKey: string;
-    deepInfraApiKey: string;
+    OPENAI_API_KEY: string;
+    GEMINI_API_KEY: string;
+    DEEPINFRA_API_KEY: string;
     defaultModel?: LanguageModelV1;
     reasoningModel?: LanguageModelV1;
     outputModel?: LanguageModelV1;
   }) {
     // Check for required API keys
-    if (!openaiApiKey || !geminiApiKey || !deepInfraApiKey) {
-      throw new Error("Missing required API keys. Please provide openaiApiKey, geminiApiKey, and deepInfraApiKey.");
+    if (!OPENAI_API_KEY || !GEMINI_API_KEY || !DEEPINFRA_API_KEY) {
+      throw new Error("Missing required API keys. Please provide OPENAI_API_KEY, GEMINI_API_KEY, and DEEPINFRA_API_KEY.");
     }
 
     // Initialize providers
     const openai = createOpenAI({
-      apiKey: openaiApiKey,
+      apiKey: OPENAI_API_KEY,
     });
 
     const gemini = createGoogleGenerativeAI({
-      apiKey: geminiApiKey,
+      apiKey: GEMINI_API_KEY,
     });
 
     const deepinfra = createDeepInfra({
-      apiKey: deepInfraApiKey,
+      apiKey: DEEPINFRA_API_KEY,
     });
 
     // Store providers
