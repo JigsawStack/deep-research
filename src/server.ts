@@ -1,0 +1,137 @@
+import express from 'express';
+import bodyParser from 'body-parser';
+import 'dotenv/config';
+import { createDeepResearch } from './index';
+
+// Initialize Express app
+const app = express();
+app.use(bodyParser.json());
+
+// For storing active research instances
+const activeResearch = new Map();
+
+// Routes
+// 1. Start a new research session
+app.post('/api/research', async (req, res) => {
+    console.log('POST /api/research - Request received:', { 
+        topic: req.body.topic,
+        configProvided: !!req.body.config 
+        });
+  try {
+    const { config = {} } = req.body;
+    
+    
+    // Create a unique ID for this research session
+    const sessionId = Date.now().toString();
+    
+    // Initialize DeepResearch
+    const deepResearch = createDeepResearch(config);
+    
+    // Store the instance
+    activeResearch.set(sessionId, { deepResearch, status: 'initialized' });
+    
+    return res.json({ 
+      status: 'success', 
+      message: 'Research session initialized',
+      sessionId
+    });
+  } catch (error: any) {
+    console.error('Failed to initialize research:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: error.message || 'Failed to initialize research' 
+    });
+  }
+});
+
+// 2. Run the research for a given session
+app.post('/api/research/run', async (req, res) => {
+  console.log('POST /api/research/run - Request received:', { 
+    topic: req.body.topic,
+    sessionId: req.body.sessionId
+  });
+
+  try {
+    const {topic, sessionId} = req.body;
+    
+    if (!topic) {
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    const session = activeResearch.get(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    // Update status
+    session.status = 'running';
+    
+    // Run the research asynchronously
+    const runPromise = session.deepResearch.generate(topic)
+      .then(result => {
+        session.result = result;
+        session.status = 'completed';
+        return result;
+      })
+      .catch(error => {
+        session.error = error.message || 'Research failed';
+        session.status = 'failed';
+        console.error('Research failed:', error);
+      });
+    
+    // Immediately return a response indicating the research is running
+    return res.json({ 
+      status: 'success', 
+      message: 'Research started',
+      sessionId,
+      topic
+    });
+  } catch (error: any) {
+    console.error('Failed to run research:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: error.message || 'Failed to run research' 
+    });
+  }
+});
+
+// 3. Get the status or result of a research session
+app.get('/api/research/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const session = activeResearch.get(sessionId);
+  
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  // Return the appropriate response based on session status
+  if (session.status === 'completed') {
+    return res.json({
+      status: 'success',
+      sessionStatus: session.status,
+      result: session.result
+    });
+  } else if (session.status === 'failed') {
+    return res.json({
+      status: 'error',
+      sessionStatus: session.status,
+      error: session.error
+    });
+  } else {
+    return res.json({
+      status: 'success',
+      sessionStatus: session.status
+    });
+  }
+});
+
+// Define port
+const PORT = process.env.PORT || 3000;
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+export default app;
