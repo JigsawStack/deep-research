@@ -205,7 +205,7 @@ const INIT_FINAL_REPORT_PROMPT = ({
   const remaining = targetChars;
 
   const systemPrompt = `
-You are a world-class research analyst and writer. Produce a single, cohesive deep-research article.\n
+You are a world-class research analyst and writer. Produce a single, cohesive deep-research paper.\n
 
 1. Introduce the topic—outlining scope, importance, and objectives.\n
 2. Synthesize intermediate analyses into a structured narrative.\n
