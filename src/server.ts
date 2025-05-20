@@ -3,12 +3,37 @@ import bodyParser from 'body-parser';
 import 'dotenv/config';
 import { createDeepResearch } from './index';
 
+// Research result interface
+interface ResearchResult {
+  status: string;
+  data: {
+    text: string;
+    metadata: {
+      topic: string;
+      iterationCount: number;
+      completionStatus: boolean;
+      reasoning: string;
+      researchPlan: string;
+      queries: string[];
+      sources: any[]; // Using any for sources as the exact type depends on your implementation
+    }
+  }
+}
+
+// Session interface
+interface ResearchSession {
+  deepResearch: any; // Type could be more specific based on your DeepResearch implementation
+  status: 'initialized' | 'running' | 'completed' | 'failed';
+  result?: ResearchResult['data']; // Store just the data part
+  error?: string;
+}
+
 // Initialize Express app
 const app = express();
 app.use(bodyParser.json());
 
 // For storing active research instances
-const activeResearch = new Map();
+const activeResearch = new Map<string, ResearchSession>();
 
 // Routes
 // 1. Start a new research session
@@ -69,8 +94,8 @@ app.post('/api/research/run', async (req, res) => {
     
     // Run the research asynchronously
     const runPromise = session.deepResearch.generate(topic)
-      .then(result => {
-        session.result = result;
+      .then((result: ResearchResult) => {
+        session.result = result.data;
         session.status = 'completed';
         return result;
       })
@@ -97,7 +122,7 @@ app.post('/api/research/run', async (req, res) => {
 });
 
 // 3. Get the status or result of a research session
-app.get('/api/research/:sessionId', (req, res) => {
+app.get('/api/research/run/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   const session = activeResearch.get(sessionId);
   

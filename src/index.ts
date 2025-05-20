@@ -205,6 +205,8 @@ export async function processReportForSources({
   });
 
   const finalReport = reportWithLinks + bibliography;
+
+  console.log("Done processing report for sources");
   
   // Return the report with links and bibliography
   return finalReport;
@@ -323,8 +325,8 @@ export async function generateFinalReport({
     sources,
   });
 
+  console.log("Done processing report for sources");
   // write out the final report
-  fs.writeFileSync("logs/final-report.md", reportWithSources.trim());
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
   return { report: reportWithSources, debugLog };
