@@ -29,11 +29,9 @@ import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 export async function decisionMaking({
   reasoning,
   aiProvider,
-  targetOutputTokens,
-}: { reasoning: string; aiProvider: AIProvider; targetOutputTokens: number }) {
+}: { reasoning: string; aiProvider: AIProvider }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
-    targetOutputTokens,
   });
 
   const decisionMakingResponse = await generateObject({
@@ -360,30 +358,38 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().describe("A number between 1-10, where 1 is surface-level and 10 is extremely thorough"),
+        depth: z.number().describe("a number representing the depth of the research"),
+        breadth: z.number().describe("a number representing the breadth of the research"),
       }),
 
       prompt: PROMPTS.research({
         topic,
         pastReasoning,
         pastQueries,
-        maxDepth,
-        maxBreadth,
         targetOutputTokens,
       }),
     });
 
     let subQueries = result.object.subQueries;
+    let depth = result.object.depth;
+    let breadth = result.object.breadth;
 
-    // extra guard rails for max parallel topics
-    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0 && subQueries.length > config.breadth?.maxParallelTopics) {
-      subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
+    if (breadth && breadth > 0 && breadth < config.breadth?.maxParallelTopics) {
+      config.breadth.maxParallelTopics = breadth;
     }
+
+    if (depth && depth > 0 && depth < config.depth?.maxLevel) {
+      config.depth.maxLevel = depth;
+    }
+
+    // limit the subqueries to the breadth
+    subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
 
     return {
       subQueries,
       plan: result.object.plan,
       depth: result.object.depth,
+      breadth: result.object.breadth,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -587,6 +593,7 @@ export class DeepResearch {
         subQueries,
         plan,
         depth: suggestedDepth,
+        breadth: suggestedBreadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
@@ -599,6 +606,7 @@ export class DeepResearch {
       });
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
+      this.config.breadth.maxParallelTopics = suggestedBreadth || this.config.breadth?.maxParallelTopics;
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
@@ -644,7 +652,6 @@ export class DeepResearch {
       const deciding = await decisionMaking({
         reasoning,
         aiProvider: this.aiProvider,
-        targetOutputTokens: this.config.report.targetOutputTokens,
       });
 
       this.latestDecisionMaking = deciding.reason;

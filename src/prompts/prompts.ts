@@ -4,10 +4,8 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   topic,
   pastReasoning,
   pastQueries,
-  maxDepth,
-  maxBreadth,
   targetOutputTokens,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) => `
+}: { topic: string; pastReasoning?: string; pastQueries?: string[]; targetOutputTokens: number }) => `
 You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
 
 The topic for research is: ${topic}
@@ -31,39 +29,32 @@ Please provide the following two components:
     *   These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.
     *   The set of queries should collectively aim to cover the main aspects identified in your research plan.
     *   Ensure queries are distinct and avoid redundancy.
-     
-3.  **Generate a list of sub-topics to research:**
-    * Determine how many iterations of research are needed (depth) to fully explore this topic
+
+3. **Generate how deep the research should be:**
+    * Generate a number to determine how deep the research should be to fully explore this topic
+
+4.  **Generate a list of sub-topics to research:**
     * For each level of depth, identify what new information or perspectives should be explored
-     
-4. **Generate how deep the research should be:**
-    * Generate a number between 1-${maxDepth}, where 1 is surface-level and ${maxDepth} is the max thoroughness 
-    * This number represents how deep the research should be
 
 5. **Generate how broad the research should be:**
-    * Generate a number between 1-${maxBreadth}, where 1 is surface-level and ${maxBreadth} is the max thoroughness 
-    * This number represents how broad the research should be
+    * Generate a number to determine how broad the research should be to fully explore this topic
 
 Your output should empower a researcher to systematically and effectively gather the necessary information to understand the topic in depth.
 `;
 
 const DECISION_MAKING_PROMPT = ({
   reasoning,
-  targetOutputTokens,
 }: {
   reasoning: string;
-  targetOutputTokens: number;
 }) => `
 You are a decision-making assistant.
 
-Your job is to decide whether the provided chain-of-thought reasoning gives enough context to start writing the 
-final report of approximately ${targetOutputTokens * 4} characters.
 
 Chain of Thought:
 """${reasoning}"""
 
 Instructions:
-- If the reasoning is sufficient to cover all major sub-topics at the planned length, set "isComplete" to true.
+- If the reasoning is sufficient to cover all major sub-topics in deep dive, set "isComplete" to true.
 - Otherwise set "isComplete" to false.
 - In either case, provide a brief explanation in "reason" describing your judgement.
 - **Output only** a JSON object with exactly these two keys and no extra text, for example:
@@ -112,75 +103,6 @@ Your task is to evaluate whether this set of inputs collectively provides enough
 
 Begin by stating "Let me think through this step by step," then proceed with your reasoning.  
 `;
-
-const EVALUATION_PROMPT = ({
-  prompt,
-  researchPlan,
-  allQueries,
-  resultsSummary,
-}: {
-  prompt: string;
-  researchPlan: string;
-  allQueries: string[];
-  resultsSummary: string;
-}) => {
-  return `
-    You are an expert research planner. Your task is to analyze search results evaluate them and generate targeted follow-up questions to explore knowledge gaps or go deeper into interesting aspects.
-
-    PROCESS:
-    1. Identify ALL information explicitly requested in the original research goal
-    2. Analyze what specific information has been successfully retrieved in the search results
-    3. Identify ALL information gaps between what was requested and what was found
-    4. For entity-specific gaps: Create targeted queries for each missing attribute of identified entities
-    5. For general knowledge gaps: Create focused queries to find the missing conceptual information
-
-    QUERY GENERATION RULES:
-    - For missing entity attributes:
-      * Create direct queries for each entity-attribute pair (e.g., "LeBron James height")
-    - For general knowledge gaps:
-      * Create focused queries addressing each conceptual gap (e.g., "criteria for ranking basketball players")
-    - Construct queries to retrieve EXACTLY the missing information
-    - Exclude information not required by the original research goal
-    - Prioritize queries for the most critical missing information first
-    
-    FOLLOW-UP QUESTIONS CRITERIA:
-    - Target specific knowledge gaps in current results
-    - Focus on unexplored but relevant aspects
-    - Be specific enough to yield useful information
-    - Avoid repeating already covered information
-    - Phrase as clear, direct questions
-
-    ${getCurrentDateContext()}
-
-    OUTPUT FORMAT:
-    First, briefly state:
-    1. What specific information was found
-    2. What specific information is still missing
-    3. What type of knowledge gaps exist (entity-specific or general knowledge)
-
-    Then provide up to 5 targeted queries that directly address the identified gaps, ordered by importance. Please consider that you
-    need to generate queries that tackle a single goal at a time (searching for A AND B will return bad results). Be specific!
-
-
-    <Research Topic>${prompt}</Research Topic>
-
-    <Research Plan>${researchPlan}</Research Plan>
-
-    <Search Queries Used>${allQueries.join(", ")}</Search Queries Used>
-    
-    <Current Search Results Summary>${resultsSummary}</Current Search Results Summary>
-    
-    Based on the above information, evaluate if we have sufficient research coverage or need additional queries.
-    Identify which aspects of the research plan have been covered and which areas still need investigation.
-    
-    Your response MUST be formatted exactly as follows:
-    
-    IS_COMPLETE: [true or false]
-    REASON: [Your detailed reasoning for why the research is complete or not]
-    QUERIES: [If IS_COMPLETE is false, provide a JSON array of additional search queries like ["query1", "query2"]. If complete, use empty array []]
-    
-    Please ensure there are no thinking tags, reasoning sections, or other markup in your response.`;
-};
 
 // MARKERS
 export const CONT = "@@@CONTINUE@@@";
@@ -378,7 +300,6 @@ When ranking search results, consider recency as a factor - newer information is
 
 // Export all prompts together with date context
 export const PROMPTS = {
-  evaluation: EVALUATION_PROMPT,
   research: RESEARCH_PROMPT_TEMPLATE,
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
