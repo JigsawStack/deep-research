@@ -25,6 +25,7 @@
   "scripts": {
     "build": "pkgroll --minify --sourcemap=inline --src=./src",
     "test": "jest",
+    "test:report": "tsx examples/basic/testFinalReport.ts",
     "lint": "biome lint .",
     "prepare": "npm run build",
     "start": "node dist/index.js",

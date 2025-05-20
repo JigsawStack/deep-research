@@ -37,6 +37,7 @@ export interface ResearchSource {
   title?: string;
   domain?: string;
   isAcademic?: boolean;
+  referenceNumber?: number;
 }
 
 export interface WebSearchResult {
@@ -57,23 +58,3 @@ export interface RecursiveSearchContext {
   exploredQuestions: Set<string>;
 }
 
-export interface DeepResearchResult {
-  answer: string;
-  confidence: number;
-  sources: {
-    url: string;
-    title: string;
-    relevance: number;
-    extractedInfo: string[];
-  }[];
-  citations: {
-    id: string;
-    text: string;
-    sourceIndex: number;
-  }[];
-  searchPath: {
-    question: string;
-    depth: number;
-    parent?: string;
-  }[];
-}

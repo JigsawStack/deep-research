@@ -5,9 +5,9 @@ import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_R
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
-import { generateObject, generateText, LanguageModelV1 } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
-import { CONT, DONE, PROMPTS, REPORT_DONE } from "./prompts/prompts";
+import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
 
 /**
  * Decision making
@@ -70,6 +70,10 @@ export async function reasoningSearchResults({
       prompt: reasoningPrompt,
     });
 
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync("logs")) {
+      fs.mkdirSync("logs", { recursive: true });
+    }
     fs.writeFileSync("logs/reasoningPrompt.md", reasoningPrompt);
     fs.writeFileSync("logs/reasoningTest.md", reasoningResponse.text);
 
@@ -93,6 +97,108 @@ export async function reasoningSearchResults({
     // Throw the error to terminate program execution
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
+}
+
+export async function processReportForSources({
+  report,
+  sources,
+}: {
+  report: string;
+  sources: WebSearchResult[];
+}) {
+  // Create a lookup map for reference numbers to source info
+  const referenceMap = new Map<number, any>();
+  
+  // Populate the map with reference numbers and their corresponding source info
+  // Log for debugging
+  console.log("Processing sources for sources:", JSON.stringify(sources.slice(0, 1), null, 2));
+  
+  sources.forEach(source => {
+    if (source.searchResults && Array.isArray(source.searchResults.results)) {
+      source.searchResults.results.forEach(result => {
+        // Log for debugging
+        console.log("Processing result:", JSON.stringify(result, null, 2));
+        
+        if (result.referenceNumber) {
+          console.log(`Adding reference number ${result.referenceNumber} to map`);
+          referenceMap.set(result.referenceNumber, result);
+        }
+      });
+    }
+  });
+  
+  console.log(`Reference map size: ${referenceMap.size}`);
+  
+  // Enhanced regex to find both single sources [1] and multiple sources [1, 2, 3]
+  // This matches either:
+  // 1. [number] - A single source
+  // 2. [number, number, ...] - Multiple comma-separated sources
+  const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+  
+  // Replace each citation with markdown links
+  const reportWithLinks = report.replace(sourceRegex, (match, referenceString) => {
+    // Split the reference string by commas if it contains multiple references
+    const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
+    
+    // If it's a single reference number
+    if (referenceNumbers.length === 1) {
+      const refNum = referenceNumbers[0];
+      const source = referenceMap.get(refNum);
+      
+      if (source) {
+        // Log for debugging
+        console.log(`Replacing citation [${refNum}] with link to ${source.url}`);
+        // Create markdown link with the citation number pointing to the source URL
+        return `[[${refNum}](${source.url})]`;
+      }
+      
+      // If no matching source found, keep the original citation
+      console.log(`No source found for citation [${refNum}]`);
+      return match;
+    } 
+    // If it's multiple reference numbers
+    else {
+      // Create an array to hold the links
+      const links = referenceNumbers.map(refNum => {
+        const source = referenceMap.get(refNum);
+        
+        if (source) {
+          // Log for debugging
+          console.log(`Replacing citation part ${refNum} with link to ${source.url}`);
+          // Create markdown link with the citation number pointing to the source URL
+          return `[${refNum}](${source.url})`;
+        }
+        
+        // If no matching source found, just return the number
+        console.log(`No source found for citation part ${refNum}`);
+        return `${refNum}`;
+      });
+      
+      // Join the links with commas
+      return `[${links.join(', ')}]`;
+    }
+  });
+  
+  // Generate bibliography section
+  let bibliography = "\n\n## References\n\n";
+  
+  // Sort by reference number for a well-ordered bibliography
+  const sortedReferences = Array.from(referenceMap.entries())
+    .sort((a, b) => a[0] - b[0]);
+  
+  console.log(`Generating bibliography with ${sortedReferences.length} entries`);
+  
+  // Create bibliography entries
+  sortedReferences.forEach(([number, source]) => {
+    const title = source.title || "No title";
+    
+    bibliography += `${number}. [${title}](${source.url})\n`;
+  });
+
+  const finalReport = reportWithLinks + bibliography;
+  
+  // Return the report with links and bibliography
+  return finalReport;
 }
 
 /**
@@ -130,7 +236,7 @@ export async function generateFinalReport({
   let draft = "";
   let done = false;
   let iter = 0;
-  // track which prompt we’re on
+  // track which prompt we're on
   let phase: "initial" | "continuation" | "citation" = "initial";
 
   do {
@@ -149,20 +255,16 @@ export async function generateFinalReport({
     let promptConfig: {
       system: string;
       user: string;
-      // stopSequences: string[];
     };
 
     if (phase === "initial") {
       promptConfig = PROMPTS.initFinalReport(base);
-    } else if (phase === "continuation") {
+    } else {
       promptConfig = PROMPTS.continueFinalReport({
         ...base,
         currentReport: draft,
         currentOutputLength: draft.length,
       });
-    } else {
-      // bibliography-only pass
-      promptConfig = PROMPTS.citation({ currentReport: draft });
     }
 
     debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
@@ -170,15 +272,13 @@ export async function generateFinalReport({
     debugLog.push("USER PROMPT:\n" + promptConfig.user);
 
     // call the model
-    const { text, finishReason } = await generateText({
+    const { text } = await generateText({
       model: aiProvider.getOutputModel(),
       system: promptConfig.system,
       prompt: promptConfig.user,
-      // stopSequences: promptConfig.stopSequences,
     });
 
     debugLog.push("MODEL OUTPUT:\n" + text);
-    debugLog.push("FINISH REASON:\n" + finishReason);
     debugLog.push("PHASE==============================:\n" + phase);
 
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
@@ -194,19 +294,13 @@ export async function generateFinalReport({
         // finished body + conclusion/biblio → move to citation pass
         draft += text.replace(REPORT_DONE, "");
         phase = "citation";
+        done = true;
       } else {
         // no marker (should be rare) – just append
         draft += text;
       }
-    } else {
-      // citation pass: consume final DONE marker if present
-      if (text.includes(DONE)) {
-        draft += text.replace(DONE, "");
-      } else {
-        draft += text;
-      }
-      done = true;
-    }
+    } 
+
 
     // persist debug log each loop
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
@@ -214,11 +308,17 @@ export async function generateFinalReport({
     iter++;
   } while (!done);
 
+  // process the report for sources 
+  const reportWithSources = await processReportForSources({
+    report: draft,
+    sources,
+  });
+
   // write out the final report
-  fs.writeFileSync("logs/final-report.md", draft.trim());
+  fs.writeFileSync("logs/final-report.md", reportWithSources.trim());
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
-  return { report: draft, debugLog };
+  return { report: reportWithSources, debugLog };
 }
 
 /**
@@ -235,10 +335,12 @@ export async function generateResearchPlan({
   aiProvider,
   topic,
   pastReasoning,
-  maxDepth,
   pastQueries,
-  config
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number }) {
+  config,
+  maxDepth,
+  maxBreadth,
+  targetOutputTokens,
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -247,7 +349,7 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().describe("A number between 1-5, where 1 is surface-level and 5 is extremely thorough"),
+        depth: z.number().describe("A number between 1-10, where 1 is surface-level and 10 is extremely thorough"),
       }),
 
       prompt: PROMPTS.research({
@@ -255,17 +357,17 @@ export async function generateResearchPlan({
         pastReasoning,
         pastQueries,
         maxDepth,
+        maxBreadth,
+        targetOutputTokens,
       }),
     });
 
     let subQueries = result.object.subQueries;
 
-    // Limit queries if maxQueries is specified
-    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0) {
+    // extra guard rails for max parallel topics
+    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0 && subQueries.length > config.breadth?.maxParallelTopics) {
       subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
     }
-
-    console.log(`Generated ${subQueries.length} research queries`);
 
     return {
       subQueries,
@@ -309,6 +411,33 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   });
 }
 
+export function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+  const urlMap = new Map<string, number>();
+  let currentNumber = 1;
+
+  return sources.map((result) => {
+    return {
+      question: result.question,
+      searchResults: {
+        ai_overview: result.searchResults.ai_overview,
+        results: result.searchResults.results.map((item) => {
+          // If URL hasn't been seen before, assign it a new number
+          if (!urlMap.has(item.url)) {
+            urlMap.set(item.url, currentNumber++);
+          }
+          
+        return {
+            url: item.url,
+            title: item.title || "",
+            domain: item.domain || "",
+            referenceNumber: urlMap.get(item.url) // Add the reference number
+          };
+        }),
+      },
+    };
+  });
+}
+
 /**
  * Create a new DeepResearch instance
  * 
@@ -328,15 +457,18 @@ export class DeepResearch {
   public finalReport: string = "";
 
   public latestResearchPlan: string = "";
+  public latestReasoning: string = "";
+  public latestDecisionMaking: string = "";
+
+
   public queries: string[] = [];
 
   public sources: WebSearchResult[] = [];
 
-  private aiProvider: AIProvider;
+  public aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
   private isComplete: boolean = false;
   private iterationCount: number = 0;
-  private latestReasoning: string = "";
 
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
@@ -433,12 +565,13 @@ export class DeepResearch {
     debugLog.push(`Running research with topic: ${topic}`);
     this.topic = topic;
     let depth = this.config.depth?.maxLevel;
+    let iteration = 0;
 
     do {
-      this.iterationCount++;
+      iteration++;
       // step 1: generate research plan
-      console.log(`[Step 1] Generating research plan... at ${this.iterationCount}`);
-      debugLog.push(`[Step 1] Generating research plan... at ${this.iterationCount}`);
+      console.log(`[Step 1] Generating research plan... at ${iteration}`);
+      debugLog.push(`[Step 1] Generating research plan... at ${iteration}`);
       const {
         subQueries,
         plan,
@@ -450,9 +583,11 @@ export class DeepResearch {
         pastQueries: this.queries,
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
+        maxBreadth: this.config.breadth?.maxParallelTopics,
+        targetOutputTokens: this.config.report.targetOutputTokens,
       });
 
-      depth = suggestedDepth || this.config.depth?.maxLevel;
+      this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
@@ -488,6 +623,7 @@ export class DeepResearch {
         queries: this.queries,
         aiProvider: this.aiProvider,
       });
+      this.latestReasoning = reasoning;
 
       debugLog.push(`Reasoning: ${reasoning}`);
 
@@ -499,25 +635,31 @@ export class DeepResearch {
         aiProvider: this.aiProvider,
         targetOutputTokens: this.config.report.targetOutputTokens,
       });
+
+      this.latestDecisionMaking = deciding.reason;
       debugLog.push(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
 
-      fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
-      fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
-      fs.writeFileSync("logs/reasoning.json", JSON.stringify(reasoning, null, 2));
-      fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(deciding, null, 2));
-      fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && this.iterationCount < depth);
+    } while (!this.isComplete && iteration < depth);
+
+    fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
+    fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
+    fs.writeFileSync("logs/reasoning.json", JSON.stringify(this.latestReasoning, null, 2));
+    fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(this.latestDecisionMaking, null, 2));
+    fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
+    // map the sources to numbers for sources
+    const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
+
     const { report, debugLog: finalDebugLog } = await generateFinalReport({
-      sources: this.sources,
+      sources: numberedSources,
       topic: this.topic,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
@@ -547,18 +689,19 @@ export class DeepResearch {
     };
   }
 
-  public async testFinalReportGeneration() {
+  public async testFinalReportGeneration({topic}: {topic: string}) {
     // Load data from logs folder
     const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
-    const topic = "what is determinism and why is it the best explanation for the universe?";
     const targetOutputTokens = this.config.report.targetOutputTokens;
     const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
     const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
+    const numberedSources = mapSearchResultsToNumbers({ sources });
+
     // Generate the final report using the loaded data
     const { report, debugLog } = await generateFinalReport({
-      sources,
+      sources: numberedSources,
       topic,
       targetOutputTokens,
       aiProvider: this.aiProvider,
