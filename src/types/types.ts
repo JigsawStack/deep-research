@@ -57,4 +57,3 @@ export interface RecursiveSearchContext {
   previousResults: WebSearchResult[];
   exploredQuestions: Set<string>;
 }
-

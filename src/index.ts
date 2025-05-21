@@ -1,11 +1,11 @@
-// **TODO Cool Feature**
+// **Feature**
 // byo_urls user bring their own urls to do the websearch
 
-// **TODO Cool Feature**
+// **Feature**
 // byo_pdfs as content
 
-// **TODO PROMPT OPTIMIZATION**!!!
-// make it more research-like (latex-style)
+// **TODO **
+// **LLM decides the target length**
 
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
@@ -40,8 +40,10 @@ export async function decisionMaking({
     schema: z.object({
       isComplete: z.boolean().describe("Whether the research is complete"),
       reason: z.string().describe("The reason for the decision"),
+      
     }),
     prompt: decisionMakingPrompt,
+    temperature: 0,
   });
 
   return decisionMakingResponse.object;
@@ -143,7 +145,7 @@ export async function processReportForSources({
   const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
   
   // Replace each citation with markdown links
-  const reportWithLinks = report.replace(sourceRegex, (match, referenceString) => {
+  const reportWithSources = report.replace(sourceRegex, (match, referenceString) => {
     // Split the reference string by commas if it contains multiple references
     const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
     
@@ -198,11 +200,7 @@ export async function processReportForSources({
     bibliography += `${number}. [${title}](${source.url})\n`;
   });
 
-  const finalReport = reportWithLinks + bibliography;
-
-  
-  // Return the report with links and bibliography
-  return finalReport;
+  return {reportWithSources, bibliography};
 }
 
 /**
@@ -230,7 +228,7 @@ export async function generateFinalReport({
 }: {
   sources: WebSearchResult[];
   topic: string;
-  targetOutputTokens: number;
+  targetOutputTokens?: number;
   aiProvider: AIProvider;
   debugLog: string[];
   latestReasoning: string;
@@ -254,6 +252,16 @@ export async function generateFinalReport({
       latestReasoning,
       queries,
     };
+
+    const finalReportPrompt = PROMPTS.finalReport({
+      topic,
+      sources,
+      targetOutputTokens,
+      latestResearchPlan,
+      latestReasoning,
+      queries,
+      phase,
+    });
 
     // pick the right prompt
     let promptConfig: {
@@ -280,6 +288,10 @@ export async function generateFinalReport({
       model: aiProvider.getOutputModel(),
       system: promptConfig.system,
       prompt: promptConfig.user,
+      schema: z.object({
+        text: z.string().describe("The final report"),
+        phase: z.enum(["initial", "continuation", "citation"]).describe("The phase of the report"),
+      }),
     });
 
     debugLog.push("MODEL OUTPUT:\n" + text);
@@ -313,7 +325,7 @@ export async function generateFinalReport({
   } while (!done);
 
   // process the report for sources 
-  const reportWithSources = await processReportForSources({
+  const {reportWithSources, bibliography} = await processReportForSources({
     report: draft,
     sources,
   });
@@ -322,7 +334,7 @@ export async function generateFinalReport({
   // write out the final report
   if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
-  return { report: reportWithSources, debugLog };
+  return { report: reportWithSources, bibliography, debugLog };
 }
 
 /**
@@ -341,10 +353,8 @@ export async function generateResearchPlan({
   pastReasoning,
   pastQueries,
   config,
-  maxDepth,
-  maxBreadth,
   targetOutputTokens,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) {
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -355,6 +365,7 @@ export async function generateResearchPlan({
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().describe("a number representing the depth of the research"),
         breadth: z.number().describe("a number representing the breadth of the research"),
+        targetOutputTokens: z.number().optional().describe("Only output "),
       }),
 
       prompt: PROMPTS.research({
@@ -364,6 +375,7 @@ export async function generateResearchPlan({
         targetOutputTokens,
       }),
     });
+
 
     let subQueries = result.object.subQueries;
     let depth = result.object.depth;
@@ -520,7 +532,7 @@ export class DeepResearch {
    */
   public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
     // maxOutputTokens must be greater than targetOutputLength
-    if (config.report && config.report.maxOutputTokens < config.report.targetOutputTokens) {
+    if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
@@ -597,7 +609,7 @@ export class DeepResearch {
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
         maxBreadth: this.config.breadth?.maxParallelTopics,
-        targetOutputTokens: this.config.report.targetOutputTokens,
+        targetOutputTokens: this.config.report?.targetOutputTokens,
       });
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;

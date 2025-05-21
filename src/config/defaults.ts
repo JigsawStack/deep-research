@@ -1,4 +1,12 @@
-import { ModelConfig } from "../types/types";
+import { LanguageModelV1 } from "ai";
+
+export interface ModelConfig {
+  default?: string | LanguageModelV1;
+  quick?: string | LanguageModelV1;
+  reasoning?: string | LanguageModelV1;
+  output?: string | LanguageModelV1;
+  [key: string]: string | LanguageModelV1 | undefined;
+}
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: "gpt-4.1",
@@ -14,8 +22,12 @@ export const DEFAULT_BREADTH_CONFIG = {
   maxParallelTopics: 3,
 };
 
-export const DEFAULT_REPORT_CONFIG = {
-  targetOutputTokens: 7000,
+interface ReportConfig {
+  maxOutputTokens?: number;
+  targetOutputTokens?: number;
+}
+
+export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   maxOutputTokens: 32000,
 };
 

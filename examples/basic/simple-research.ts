@@ -26,21 +26,9 @@ async function basicResearch() {
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
-    // depth: {
-    //   maxLevel: 3, // Detailed analysis
-    // },
-    // breadth: {
-      // maxParallelTopics: 10,
-    // },
     report: {
-      maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 10000,
+      maxOutputTokens: 8000, // Hard upper limit of tokens
     },
-    // models: {
-      // output: geminiModel,
-      // reasoning: deepseekModel,
-    // },
-    // Pass API keys from environment variables to config
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
