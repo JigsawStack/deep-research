@@ -278,7 +278,7 @@ export async function generateFinalReport({
     debugLog.push("MODEL OUTPUT:\n" + response.object.text);
     debugLog.push("PHASE==============================:\n" + response.object.phase);
 
-    fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
+    fs.writeFileSync("logs/debug.md", debugLog.join("\n"));
 
     if (phase === "continuation") {
       const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
@@ -321,7 +321,7 @@ export async function generateResearchPlan({
   pastQueries,
   pastSources,
   config,
-  targetOutputTokens,
+  // targetOutputTokens,
 }: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     // Generate the research plan using the AI provider
@@ -333,7 +333,7 @@ export async function generateResearchPlan({
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().describe("a number representing the depth of the research"),
         breadth: z.number().describe("a number representing the breadth of the research"),
-        targetOutputTokens: z.number().optional().describe("The target output tokens for the report"),
+        // targetOutputTokens: z.number().optional().describe("The target output tokens for the report"),
       }),
 
       prompt: PROMPTS.research({
@@ -341,7 +341,7 @@ export async function generateResearchPlan({
         pastReasoning,
         pastQueries,
         pastSources,
-        targetOutputTokens,
+        // targetOutputTokens,
       }),
     });
 
@@ -361,14 +361,14 @@ export async function generateResearchPlan({
     // limit the subqueries to the breadth
     subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
 
-    console.log("expected output tokens:", result.object.targetOutputTokens);
+    // console.log("expected output tokens:", result.object.targetOutputTokens);
 
     return {
       subQueries,
       plan: result.object.plan,
       depth: result.object.depth,
       breadth: result.object.breadth,
-      targetOutputTokens: result.object.targetOutputTokens,
+      // targetOutputTokens: result.object.targetOutputTokens,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -573,7 +573,7 @@ export class DeepResearch {
         plan,
         depth: suggestedDepth,
         breadth: suggestedBreadth,
-        targetOutputTokens: suggestedTargetOutputTokens,
+        // targetOutputTokens: suggestedTargetOutputTokens,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
@@ -583,12 +583,12 @@ export class DeepResearch {
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
         maxBreadth: this.config.breadth?.maxParallelTopics,
-        targetOutputTokens: this.config.report?.targetOutputTokens,
+        // targetOutputTokens: this.config.report?.targetOutputTokens,
       });
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
       this.config.breadth.maxParallelTopics = suggestedBreadth || this.config.breadth?.maxParallelTopics;
-      this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
+      // this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
 
@@ -668,7 +668,6 @@ export class DeepResearch {
       queries: this.queries,
     });
 
-    fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
     fs.writeFileSync("logs/finalReport.md", report);
     fs.writeFileSync("logs/bibliography.md", bibliography);
 

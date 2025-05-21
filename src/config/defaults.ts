@@ -10,9 +10,10 @@ export interface ModelConfig {
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: "gpt-4.1",
-  output: "gemini-2-flash",
-  // reasoning: "deepseek-r1",
-  reasoning: "o4-mini",
+  output: "gpt-4.1",
+  // output: "gemini-2-flash",
+  reasoning: "deepseek-r1",
+  // reasoning: "o4-mini",
 };
 
 export const DEFAULT_DEPTH_CONFIG = {

@@ -156,20 +156,20 @@ const FINAL_REPORT_PROMPT = ({
   You are a world-class analyst.\n 
   Your primary purpose is to help users answer their topic/queries.\n
 
-GENERAL GUIDELINES:\n
-  - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.\n
-  - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-  - Do not include external sources apart from the provided sources in the context.\n
-  - Use reference numbers [X] for sources instead of URLs\n
-  - For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].\n
-  - **Never repeat a heading that is already present in the Existing Draft.**\n
+  GENERAL GUIDELINES:\n
+    - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.\n
+    - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+    - Do not include external sources apart from the provided sources in the context.\n
+    - Use reference numbers [X] for sources instead of URLs\n
+    - For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].\n
+    - **Never repeat a heading that is already present in the Existing Draft.**\n
 
-INSTRUCTIONS:\n
-  - Make sure your report is addressing the topic/queries.\n
-  - Make sure your report is comprehensive and covers all the sub-topics.\n
-  - Make sure your report is well-researched and well-cited.\n
-  - Make sure your report is well-written and well-structured.\n
-  - Make sure your report is well-organized and well-formatted.\n
+  INSTRUCTIONS:\n
+    - Make sure your report is addressing the topic/queries.\n
+    - Make sure your report is comprehensive and covers all the sub-topics.\n
+    - Make sure your report is well-researched and well-cited.\n
+    - Make sure your report is well-written and well-structured.\n
+    - Make sure your report is well-organized and well-formatted.\n
   `;
 
   // Determine instructions based on phase
@@ -205,7 +205,7 @@ INSTRUCTIONS:\n
   ${targetOutputTokens ? `Target length:
     ≈ ${(targetOutputTokens * 4).toLocaleString()} characters (${targetOutputTokens} tokens ×4)` : ""}
 
-  **CONTEXT**:\n
+  CONTEXT:\n
     Latest Research Plan:\n
     ${latestResearchPlan}\n
 
