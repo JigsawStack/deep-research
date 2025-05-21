@@ -28,7 +28,6 @@ async function basicResearch() {
   const deepResearch = createDeepResearch({
     report: {
       maxOutputTokens: 5000, // Hard upper limit of tokens
-      // targetOutputTokens: 20000,
     },
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
@@ -39,8 +38,8 @@ async function basicResearch() {
   // Need to provide prompts array as required by generate method
   // const topic = "Which condition of Arrhenius's sixth impossibility theorem do critical-level views violate? Answer Choices: A. Egalitarian Dominance B. General Non-Extreme Priority C. Non-Elitism D. Weak Non-Sadism E. Weak Quality Addition";
   // const topic = "What is meaning of pi?"
-  const topic = "how many samples does PAROT-360V have, it's a benchmark"
-  // const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$"
+  // const topic = "how many samples does PAROT-360V have, it's a benchmark"
+  const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$"
 
   try {
     console.log("Starting deep research...");

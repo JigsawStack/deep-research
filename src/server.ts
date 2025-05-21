@@ -39,7 +39,6 @@ const activeResearch = new Map<string, ResearchSession>();
 // 1. Start a new research session
 app.post('/api/research', async (req, res) => {
     console.log('POST /api/research - Request received:', { 
-        topic: req.body.topic,
         configProvided: !!req.body.config 
         });
   try {

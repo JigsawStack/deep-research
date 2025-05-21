@@ -3,11 +3,9 @@ import { openai } from "@ai-sdk/openai";
 import { LanguageModelV1 } from "ai";
 
 export interface ModelConfig {
-  default?: string | LanguageModelV1;
-  quick?: string | LanguageModelV1;
-  reasoning?: string | LanguageModelV1;
-  output?: string | LanguageModelV1;
-  [key: string]: string | LanguageModelV1 | undefined;
+  default: string | LanguageModelV1;
+  reasoning: string | LanguageModelV1;
+  output: string | LanguageModelV1;
 }
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
@@ -20,11 +18,11 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
 };
 
 export const DEFAULT_DEPTH_CONFIG = {
-  maxLevel: 3,
+  maxDepth: 3,
 };
 
 export const DEFAULT_BREADTH_CONFIG = {
-  maxParallelTopics: 3,
+  maxBreadth: 3,
 };
 
 interface ReportConfig {

@@ -4,10 +4,6 @@
 // **Feature**
 // byo_pdfs as content
 
-
-// **TODO**
-// sources should automatically be mapped
-
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 
@@ -15,7 +11,7 @@ import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_R
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
 
@@ -345,29 +341,11 @@ export async function generateResearchPlan({
       }),
     });
 
-
-    let subQueries = result.object.subQueries;
-    let depth = result.object.depth;
-    let breadth = result.object.breadth;
-
-    if (breadth && breadth > 0 && breadth < config.breadth?.maxParallelTopics) {
-      config.breadth.maxParallelTopics = breadth;
-    }
-
-    if (depth && depth > 0 && depth < config.depth?.maxLevel) {
-      config.depth.maxLevel = depth;
-    }
-
-    // limit the subqueries to the breadth
-    subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
-
-    // console.log("expected output tokens:", result.object.targetOutputTokens);
-
     return {
-      subQueries,
+      subQueries: result.object.subQueries,
       plan: result.object.plan,
-      depth: result.object.depth,
-      breadth: result.object.breadth,
+      suggestedDepth: result.object.depth,
+      suggestedBreadth: result.object.breadth,
       // targetOutputTokens: result.object.targetOutputTokens,
     };
   } catch (error: any) {
@@ -475,9 +453,9 @@ export class DeepResearch {
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
       GEMINI_API_KEY: this.config.GEMINI_API_KEY,
       DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
-      defaultModel: this.config.models.default,
-      reasoningModel: this.config.models.reasoning,
-      outputModel: this.config.models.output,
+      defaultModel: this.config.models.default as LanguageModelV1,
+      reasoningModel: this.config.models.reasoning as LanguageModelV1,
+      outputModel: this.config.models.output as LanguageModelV1,
     });
 
     this.initModels();
@@ -563,7 +541,6 @@ export class DeepResearch {
     const debugLog: string[] = [];
     debugLog.push(`Running research with topic: ${topic}`);
     this.topic = topic;
-    let depth = this.config.depth?.maxLevel;
     let iteration = 0;
 
     do {
@@ -574,8 +551,8 @@ export class DeepResearch {
       const {
         subQueries,
         plan,
-        depth: suggestedDepth,
-        breadth: suggestedBreadth,
+        suggestedDepth,
+        suggestedBreadth,
         // targetOutputTokens: suggestedTargetOutputTokens,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
@@ -584,24 +561,33 @@ export class DeepResearch {
         pastQueries: this.queries,
         pastSources: this.sources,
         config: this.config,
-        maxDepth: this.config.depth?.maxLevel,
-        maxBreadth: this.config.breadth?.maxParallelTopics,
+        maxDepth: this.config.depth?.maxDepth,
+        maxBreadth: this.config.breadth?.maxBreadth,
       });
 
-      this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
-      this.config.breadth.maxParallelTopics = suggestedBreadth || this.config.breadth?.maxParallelTopics;
+      if (suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config.breadth?.maxBreadth) {
+        this.config.breadth.maxBreadth = suggestedBreadth;
+      }
+  
+      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth?.maxDepth) {
+        this.config.depth.maxDepth = suggestedDepth;
+      }
+  
+      // // limit the subqueries to the breadth
+      const limitedQueries = subQueries.slice(0, this.config.breadth?.maxBreadth);
+      
       // this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
-      this.queries = [...(this.queries || []), ...subQueries];
+      this.queries = [...(this.queries || []), ...limitedQueries];
       this.latestResearchPlan = plan;
 
       debugLog.push(`Research plan: ${plan}`);
-      debugLog.push(`Research queries: ${subQueries.join("\n")}`);
+      debugLog.push(`Research queries: ${limitedQueries.join("\n")}`);
 
       // step 2: fire web searches
-      debugLog.push(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
-      console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
+      debugLog.push(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
+      console.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
+      const initialSearchResults = await this.jigsaw.fireWebSearches(limitedQueries);
       console.log(`Received ${initialSearchResults.length} initial search results`);
 
       // step 2.5: deduplicate results
@@ -644,7 +630,7 @@ export class DeepResearch {
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && iteration < depth);
+    } while (!this.isComplete && iteration < this.config.depth?.maxDepth);
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
@@ -654,6 +640,18 @@ export class DeepResearch {
     fs.writeFileSync("logs/reasoning.json", JSON.stringify(this.latestReasoning, null, 2));
     fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(this.latestDecisionMaking, null, 2));
     fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
+
+    // Create the directory structure if it doesn't exist
+    const testDir = "logs/tests/math";
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(`${testDir}/sources.json`, JSON.stringify(this.sources, null, 2));
+    fs.writeFileSync(`${testDir}/queries.json`, JSON.stringify(this.queries, null, 2));
+    fs.writeFileSync(`${testDir}/reasoning.json`, JSON.stringify(this.latestReasoning, null, 2));
+    fs.writeFileSync(`${testDir}/decisionMaking.json`, JSON.stringify(this.latestDecisionMaking, null, 2));
+    fs.writeFileSync(`${testDir}/researchPlan.json`, JSON.stringify(this.latestResearchPlan, null, 2));
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);
