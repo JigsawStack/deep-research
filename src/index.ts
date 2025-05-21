@@ -1,11 +1,8 @@
-// **TODO Cool Feature**
+// **Feature**
 // byo_urls user bring their own urls to do the websearch
 
-// **TODO Cool Feature**
+// **Feature**
 // byo_pdfs as content
-
-// **TODO PROMPT OPTIMIZATION**!!!
-// make it more research-like (latex-style)
 
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
@@ -14,26 +11,23 @@ import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_R
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
-import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
+import { PROMPTS } from "./prompts/prompts";
 
 /**
  * Decision making
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
- * @param targetOutputTokens - The target output tokens
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
   reasoning,
   aiProvider,
-  targetOutputTokens,
-}: { reasoning: string; aiProvider: AIProvider; targetOutputTokens: number }) {
+}: { reasoning: string; aiProvider: AIProvider }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
-    targetOutputTokens,
   });
 
   const decisionMakingResponse = await generateObject({
@@ -42,8 +36,10 @@ export async function decisionMaking({
     schema: z.object({
       isComplete: z.boolean().describe("Whether the research is complete"),
       reason: z.string().describe("The reason for the decision"),
+      
     }),
     prompt: decisionMakingPrompt,
+    temperature: 0,
   });
 
   return decisionMakingResponse.object;
@@ -71,7 +67,7 @@ export async function reasoningSearchResults({
       topic,
       researchPlan: latestResearchPlan,
       searchResults: sources,
-      allQueries: queries,
+      queries: queries,
     });
 
     const reasoningResponse = await generateText({
@@ -119,17 +115,12 @@ export async function processReportForSources({
   const referenceMap = new Map<number, any>();
   
   // Populate the map with reference numbers and their corresponding source info
-  // Log for debugging
-  console.log("Processing sources for sources:", JSON.stringify(sources.slice(0, 1), null, 2));
   
   sources.forEach(source => {
     if (source.searchResults && Array.isArray(source.searchResults.results)) {
       source.searchResults.results.forEach(result => {
-        // Log for debugging
-        console.log("Processing result:", JSON.stringify(result, null, 2));
         
         if (result.referenceNumber) {
-          console.log(`Adding reference number ${result.referenceNumber} to map`);
           referenceMap.set(result.referenceNumber, result);
         }
       });
@@ -145,7 +136,7 @@ export async function processReportForSources({
   const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
   
   // Replace each citation with markdown links
-  const reportWithLinks = report.replace(sourceRegex, (match, referenceString) => {
+  const reportWithSources = report.replace(sourceRegex, (match, referenceString) => {
     // Split the reference string by commas if it contains multiple references
     const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
     
@@ -155,8 +146,6 @@ export async function processReportForSources({
       const source = referenceMap.get(refNum);
       
       if (source) {
-        // Log for debugging
-        console.log(`Replacing citation [${refNum}] with link to ${source.url}`);
         // Create markdown link with the citation number pointing to the source URL
         return `[[${refNum}](${source.url})]`;
       }
@@ -172,8 +161,6 @@ export async function processReportForSources({
         const source = referenceMap.get(refNum);
         
         if (source) {
-          // Log for debugging
-          console.log(`Replacing citation part ${refNum} with link to ${source.url}`);
           // Create markdown link with the citation number pointing to the source URL
           return `[${refNum}](${source.url})`;
         }
@@ -204,10 +191,7 @@ export async function processReportForSources({
     bibliography += `${number}. [${title}](${source.url})\n`;
   });
 
-  const finalReport = reportWithLinks + bibliography;
-  
-  // Return the report with links and bibliography
-  return finalReport;
+  return {reportWithSources, bibliography};
 }
 
 /**
@@ -235,7 +219,7 @@ export async function generateFinalReport({
 }: {
   sources: WebSearchResult[];
   topic: string;
-  targetOutputTokens: number;
+  targetOutputTokens?: number;
   aiProvider: AIProvider;
   debugLog: string[];
   latestReasoning: string;
@@ -243,91 +227,77 @@ export async function generateFinalReport({
   queries: string[];
 }) {
   let draft = "";
-  let done = false;
   let iter = 0;
   // track which prompt we're on
-  let phase: "initial" | "continuation" | "citation" = "initial";
+  let phase: "initial" | "continuation" | "done" = "initial";
 
   do {
     console.log(`[Iteration ${iter}] phase=${phase}`);
-    // build the shared base
-    const base = {
+
+    const finalReportPrompt = PROMPTS.finalReport({
+      currentReport: draft,
       topic,
       sources,
       targetOutputTokens,
       latestResearchPlan,
       latestReasoning,
       queries,
-    };
-
-    // pick the right prompt
-    let promptConfig: {
-      system: string;
-      user: string;
-    };
-
-    if (phase === "initial") {
-      promptConfig = PROMPTS.initFinalReport(base);
-    } else {
-      promptConfig = PROMPTS.continueFinalReport({
-        ...base,
-        currentReport: draft,
-        currentOutputLength: draft.length,
-      });
-    }
-
-    debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
-    debugLog.push("SYSTEM PROMPT:\n" + promptConfig.system);
-    debugLog.push("USER PROMPT:\n" + promptConfig.user);
-
-    // call the model
-    const { text } = await generateText({
-      model: aiProvider.getOutputModel(),
-      system: promptConfig.system,
-      prompt: promptConfig.user,
+      phase,
     });
 
-    debugLog.push("MODEL OUTPUT:\n" + text);
-    debugLog.push("PHASE==============================:\n" + phase);
 
-    fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
+    debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
+    debugLog.push("SYSTEM PROMPT:\n" + finalReportPrompt.system);
+    debugLog.push("USER PROMPT:\n" + finalReportPrompt.user);
 
-    if (phase !== "citation") {
-      // look for our two markers
-      if (text.includes(CONT)) {
-        // still more body to come
-        draft += text.replace(CONT, "");
-        // after first initial chunk, always switch to continuation
-        if (phase === "initial") phase = "continuation";
-      } else if (text.includes(REPORT_DONE)) {
-        // finished body + conclusion/biblio → move to citation pass
-        draft += text.replace(REPORT_DONE, "");
-        phase = "citation";
-        done = true;
-      } else {
-        // no marker (should be rare) – just append
-        draft += text;
+    // call the model
+    const response = await generateObject({
+      model: aiProvider.getOutputModel(),
+      system: finalReportPrompt.system,
+      prompt: finalReportPrompt.user,
+      schema: z.object({
+        text: z.string().describe("The final report"),
+        phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
+      }),
+      experimental_repairText: async ({ text, error }) => {
+        // Simple repair attempt for unclosed JSON strings
+        if (error && error.message && error.message.includes('Unterminated string')) {
+          return text + '"}';
+        }
+        return text;
+      },
+    });
+
+    phase = response.object.phase;
+    draft += response.object.text;
+
+    debugLog.push("MODEL OUTPUT:\n" + response.object.text);
+    debugLog.push("PHASE==============================:\n" + response.object.phase);
+
+    fs.writeFileSync("logs/debug.md", debugLog.join("\n"));
+
+    if (phase === "continuation") {
+      const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
+      if (targetChars && draft.length >= targetChars) {
+        phase = "done";
       }
-    } 
-
+    }
 
     // persist debug log each loop
-    fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
+    fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
 
     iter++;
-  } while (!done);
+  } while (phase !== "done");
 
   // process the report for sources 
-  const reportWithSources = await processReportForSources({
+  const {reportWithSources, bibliography} = await processReportForSources({
     report: draft,
     sources,
   });
 
-  // write out the final report
-  fs.writeFileSync("logs/final-report.md", reportWithSources.trim());
-  if (!done) throw new Error("Iteration cap reached without final completionMarker");
+  console.log("Done processing report for sources");
 
-  return { report: reportWithSources, debugLog };
+  return { report: reportWithSources, bibliography, debugLog };
 }
 
 /**
@@ -345,11 +315,10 @@ export async function generateResearchPlan({
   topic,
   pastReasoning,
   pastQueries,
+  pastSources,
   config,
-  maxDepth,
-  maxBreadth,
-  targetOutputTokens,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens: number }) {
+  // targetOutputTokens,
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -358,30 +327,26 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().describe("A number between 1-10, where 1 is surface-level and 10 is extremely thorough"),
+        depth: z.number().describe("a number representing the depth of the research"),
+        breadth: z.number().describe("a number representing the breadth of the research"),
+        // targetOutputTokens: z.number().optional().describe("The target output tokens for the report"),
       }),
 
       prompt: PROMPTS.research({
         topic,
         pastReasoning,
         pastQueries,
-        maxDepth,
-        maxBreadth,
-        targetOutputTokens,
+        pastSources,
+        // targetOutputTokens,
       }),
     });
 
-    let subQueries = result.object.subQueries;
-
-    // extra guard rails for max parallel topics
-    if (config.breadth?.maxParallelTopics && config.breadth?.maxParallelTopics > 0 && subQueries.length > config.breadth?.maxParallelTopics) {
-      subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
-    }
-
     return {
-      subQueries,
+      subQueries: result.object.subQueries,
       plan: result.object.plan,
-      depth: result.object.depth,
+      suggestedDepth: result.object.depth,
+      suggestedBreadth: result.object.breadth,
+      // targetOutputTokens: result.object.targetOutputTokens,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -483,11 +448,14 @@ export class DeepResearch {
     this.config = this.validateConfig(config);
 
     // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(this.config.jigsawApiKey);
+    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
     this.aiProvider = new AIProvider({
-      openaiApiKey: this.config.openaiApiKey,
-      geminiApiKey: this.config.geminiApiKey,
-      deepInfraApiKey: this.config.deepInfraApiKey,
+      OPENAI_API_KEY: this.config.OPENAI_API_KEY,
+      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
+      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
+      defaultModel: this.config.models.default as LanguageModelV1,
+      reasoningModel: this.config.models.reasoning as LanguageModelV1,
+      outputModel: this.config.models.output as LanguageModelV1,
     });
 
     this.initModels();
@@ -517,7 +485,7 @@ export class DeepResearch {
    */
   public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
     // maxOutputTokens must be greater than targetOutputLength
-    if (config.report && config.report.maxOutputTokens < config.report.targetOutputTokens) {
+    if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
@@ -546,23 +514,23 @@ export class DeepResearch {
         ...(config.report || {}),
       },
       models: mergedModels,
-      jigsawApiKey:
-        config.jigsawApiKey ||
+      JIGSAW_API_KEY:
+        config.JIGSAW_API_KEY ||
         (() => {
-          throw new Error("Jigsaw API key must be provided in config");
+          throw new Error("JIGSAW_API_KEY must be provided in config");
         })(),
-      openaiApiKey:
-        config.openaiApiKey ||
+      OPENAI_API_KEY:
+        config.OPENAI_API_KEY ||
         (() => {
           throw new Error("OpenAI API key must be provided in config");
         })(),
-      geminiApiKey:
-        config.geminiApiKey ||
+      GEMINI_API_KEY:
+        config.GEMINI_API_KEY ||
         (() => {
           throw new Error("Gemini API key must be provided in config");
         })(),
-      deepInfraApiKey:
-        config.deepInfraApiKey ||
+      DEEPINFRA_API_KEY:
+        config.DEEPINFRA_API_KEY ||
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),
@@ -573,7 +541,6 @@ export class DeepResearch {
     const debugLog: string[] = [];
     debugLog.push(`Running research with topic: ${topic}`);
     this.topic = topic;
-    let depth = this.config.depth?.maxLevel;
     let iteration = 0;
 
     do {
@@ -584,31 +551,43 @@ export class DeepResearch {
       const {
         subQueries,
         plan,
-        depth: suggestedDepth,
+        suggestedDepth,
+        suggestedBreadth,
+        // targetOutputTokens: suggestedTargetOutputTokens,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
         pastReasoning: this.latestReasoning,
         pastQueries: this.queries,
+        pastSources: this.sources,
         config: this.config,
-        maxDepth: this.config.depth?.maxLevel,
-        maxBreadth: this.config.breadth?.maxParallelTopics,
-        targetOutputTokens: this.config.report.targetOutputTokens,
+        maxDepth: this.config.depth?.maxDepth,
+        maxBreadth: this.config.breadth?.maxBreadth,
       });
 
-      this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
-
-      this.queries = [...(this.queries || []), ...subQueries];
+      if (suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config.breadth?.maxBreadth) {
+        this.config.breadth.maxBreadth = suggestedBreadth;
+      }
+  
+      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth?.maxDepth) {
+        this.config.depth.maxDepth = suggestedDepth;
+      }
+  
+      // // limit the subqueries to the breadth
+      const limitedQueries = subQueries.slice(0, this.config.breadth?.maxBreadth);
+      
+      // this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
+      this.queries = [...(this.queries || []), ...limitedQueries];
       this.latestResearchPlan = plan;
 
       debugLog.push(`Research plan: ${plan}`);
-      debugLog.push(`Research queries: ${subQueries.join("\n")}`);
+      debugLog.push(`Research queries: ${limitedQueries.join("\n")}`);
 
       // step 2: fire web searches
-      debugLog.push(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
-      console.log(`[Step 2] Running initial web searches with ${subQueries.length} queries...`);
+      debugLog.push(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
+      console.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.fireWebSearches(subQueries);
+      const initialSearchResults = await this.jigsaw.fireWebSearches(limitedQueries);
       console.log(`Received ${initialSearchResults.length} initial search results`);
 
       // step 2.5: deduplicate results
@@ -642,7 +621,6 @@ export class DeepResearch {
       const deciding = await decisionMaking({
         reasoning,
         aiProvider: this.aiProvider,
-        targetOutputTokens: this.config.report.targetOutputTokens,
       });
 
       this.latestDecisionMaking = deciding.reason;
@@ -652,7 +630,10 @@ export class DeepResearch {
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && iteration < depth);
+    } while (!this.isComplete && iteration < this.config.depth?.maxDepth);
+
+    // map the sources to numbers for sources
+    this.sources = mapSearchResultsToNumbers({ sources: this.sources });
 
     fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
     fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
@@ -660,15 +641,24 @@ export class DeepResearch {
     fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(this.latestDecisionMaking, null, 2));
     fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
 
+    // Create the directory structure if it doesn't exist
+    const testDir = "logs/tests/math";
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(`${testDir}/sources.json`, JSON.stringify(this.sources, null, 2));
+    fs.writeFileSync(`${testDir}/queries.json`, JSON.stringify(this.queries, null, 2));
+    fs.writeFileSync(`${testDir}/reasoning.json`, JSON.stringify(this.latestReasoning, null, 2));
+    fs.writeFileSync(`${testDir}/decisionMaking.json`, JSON.stringify(this.latestDecisionMaking, null, 2));
+    fs.writeFileSync(`${testDir}/researchPlan.json`, JSON.stringify(this.latestResearchPlan, null, 2));
+
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
-    // map the sources to numbers for sources
-    const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
-
-    const { report, debugLog: finalDebugLog } = await generateFinalReport({
-      sources: numberedSources,
+    const { report, bibliography, debugLog: finalDebugLog } = await generateFinalReport({
+      sources: this.sources,
       topic: this.topic,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
@@ -678,8 +668,8 @@ export class DeepResearch {
       queries: this.queries,
     });
 
-    fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
     fs.writeFileSync("logs/finalReport.md", report);
+    fs.writeFileSync("logs/bibliography.md", bibliography);
 
     return {
       status: "success",
@@ -706,11 +696,9 @@ export class DeepResearch {
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
     const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
-    const numberedSources = mapSearchResultsToNumbers({ sources });
-
     // Generate the final report using the loaded data
     const { report, debugLog } = await generateFinalReport({
-      sources: numberedSources,
+      sources,
       topic,
       targetOutputTokens,
       aiProvider: this.aiProvider,

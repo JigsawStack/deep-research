@@ -26,34 +26,26 @@ async function basicResearch() {
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
-    // depth: {
-    //   maxLevel: 3, // Detailed analysis
-    // },
-    // breadth: {
-      // maxParallelTopics: 10,
-    // },
     report: {
-      maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 10000,
+      maxOutputTokens: 5000, // Hard upper limit of tokens
     },
-    // models: {
-      // output: geminiModel,
-      // reasoning: deepseekModel,
-    // },
-    // Pass API keys from environment variables to config
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    geminiApiKey: process.env.GEMINI_API_KEY,
-    deepInfraApiKey: process.env.DEEPINFRA_API_KEY,
-    jigsawApiKey: process.env.JIGSAW_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+    JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method
-  const topic = "what is love";
+  // const topic = "Which condition of Arrhenius's sixth impossibility theorem do critical-level views violate? Answer Choices: A. Egalitarian Dominance B. General Non-Extreme Priority C. Non-Elitism D. Weak Non-Sadism E. Weak Quality Addition";
+  // const topic = "What is meaning of pi?"
+  // const topic = "how many samples does PAROT-360V have, it's a benchmark"
+  const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$"
 
   try {
     console.log("Starting deep research...");
     const result = await deepResearch.generate(topic);
     // const result = await deepResearch.testGenerate();
+    console.log("result", result.data.text);
 
     return result;
   } catch (error) {

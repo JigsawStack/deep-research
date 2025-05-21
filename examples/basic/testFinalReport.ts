@@ -27,30 +27,19 @@ async function testFinalReport() {
 
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
-    depth: {
-      maxLevel: 3, // Detailed analysis
-    },
-    breadth: {
-      maxParallelTopics: 10,
-    },
     report: {
-      maxOutputTokens: 50000, // Hard upper limit of tokens
-      targetOutputTokens: 40000,
+      maxOutputTokens: 30000, // Hard upper limit of tokens
+      targetOutputTokens: 20000,
     },
-    models: {
-      output: geminiModel,
-      reasoning: deepseekModel,
-    },
-    // Pass API keys from environment variables to config
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    geminiApiKey: process.env.GEMINI_API_KEY,
-    deepInfraApiKey: process.env.DEEPINFRA_API_KEY,
-    jigsawApiKey: process.env.JIGSAW_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+    JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
   // Need to provide prompts array as required by generate method
-  const topic = "how to make a billion dollars";
-
+  const topic = "Which condition of Arrhenius's sixth impossibility theorem do critical-level views violate? Answer Choices: A. Egalitarian Dominance B. General Non-Extreme Priority C. Non-Elitism D. Weak Non-Sadism E. Weak Quality Addition";
+  // const topic = "What is meaning of pi?"
   const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
   const targetOutputTokens = deepResearch.config.report.targetOutputTokens;
   const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
@@ -71,8 +60,8 @@ async function testFinalReport() {
     queries,
   });
 
-  fs.writeFileSync("logs/testReport.md", report);
-  fs.writeFileSync("logs/testDebugLog.md", debugLog.join("\n"));
+  fs.writeFileSync("logs/testFinalReport.md", report);
+  fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
 
 }
 
