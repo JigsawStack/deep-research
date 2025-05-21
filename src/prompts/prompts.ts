@@ -154,15 +154,21 @@ const FINAL_REPORT_PROMPT = ({
       break;
       
     case "continuation":
-      if (!atTarget) {
+      if (atTarget === false) {
         phaseInstructions = `
           ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}
           Finish by outputting ${CONT} alone.\n
+          ${console.log("HERE Remaining", remaining)}
         `;
       } else {
         phaseInstructions = `
-          - Please conclude an answer even if you are unclear about the answer.\n
+          - This is your FINAL response for this question.\n
+          - If the provided sources are insufficient to determine a definitive answer, make your best educated guess based on your understanding of the topic, clearly stating that it's a reasoned guess due to limited source information.\n
+          - For multiple-choice questions where sources don't provide a direct answer, analyze each option and select the most likely one based on your knowledge.\n
+          - YOU MUST conclude your answer now, regardless of whether you feel it's complete.\n
+          - YOU MUST end your response with ${REPORT_DONE} on its own line.\n
           Finish by outputting ${REPORT_DONE} alone.\n
+          ${console.log("HERE At Target", atTarget)}
         `;
       }
       break;
@@ -176,6 +182,7 @@ const FINAL_REPORT_PROMPT = ({
   - Use reference numbers [X] for sources instead of URLs\n
   - For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].\n
   - **Never repeat a heading that is already present in the Existing Draft.**\n
+  - If sources don't provide enough information for a definitive answer, you may use your general knowledge to make an educated guess, clearly indicating when you do so.\n
   `;
 
   const userPrompt = `
