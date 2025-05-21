@@ -4,17 +4,9 @@
 // **Feature**
 // byo_pdfs as content
 
-// **TODO **
-// **LLM decides the target length**
 
 // **TODO**
 // sources should automatically be mapped
-
-// **TODO**
-// remove markers from the report
-
-
-
 
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
@@ -288,22 +280,12 @@ export async function generateFinalReport({
 
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
 
-    // Process the response based on current phase
-    switch (phase) {
-      case "initial":
-        phase = "continuation";
-        break;
-
-      case "continuation":
-        const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
-        if (targetChars && draft.length >= targetChars) {
-          phase = "done";
-        }
-
-      case "done":
-        break;
+    if (phase === "continuation") {
+      const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
+      if (targetChars && draft.length >= targetChars) {
+        phase = "done";
+      }
     }
-
 
     // persist debug log each loop
     fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
@@ -337,9 +319,10 @@ export async function generateResearchPlan({
   topic,
   pastReasoning,
   pastQueries,
+  pastSources,
   config,
   targetOutputTokens,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     // Generate the research plan using the AI provider
     const result = await generateObject({
@@ -357,6 +340,7 @@ export async function generateResearchPlan({
         topic,
         pastReasoning,
         pastQueries,
+        pastSources,
         targetOutputTokens,
       }),
     });
@@ -376,6 +360,8 @@ export async function generateResearchPlan({
 
     // limit the subqueries to the breadth
     subQueries = subQueries.slice(0, config.breadth?.maxParallelTopics);
+
+    console.log("expected output tokens:", result.object.targetOutputTokens);
 
     return {
       subQueries,
@@ -593,6 +579,7 @@ export class DeepResearch {
         topic: this.topic,
         pastReasoning: this.latestReasoning,
         pastQueries: this.queries,
+        pastSources: this.sources,
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
         maxBreadth: this.config.breadth?.maxParallelTopics,
@@ -670,7 +657,7 @@ export class DeepResearch {
     // map the sources to numbers for sources
     const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
 
-    const { report, debugLog: finalDebugLog } = await generateFinalReport({
+    const { report, bibliography, debugLog: finalDebugLog } = await generateFinalReport({
       sources: numberedSources,
       topic: this.topic,
       targetOutputTokens: this.config.report.targetOutputTokens,
@@ -683,6 +670,7 @@ export class DeepResearch {
 
     fs.writeFileSync("logs/debug.md", finalDebugLog.join("\n"));
     fs.writeFileSync("logs/finalReport.md", report);
+    fs.writeFileSync("logs/bibliography.md", bibliography);
 
     return {
       status: "success",
