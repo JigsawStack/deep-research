@@ -28,7 +28,8 @@ async function testFinalReport() {
   // Create instance using the factory function with default model assignments
   const deepResearch = createDeepResearch({
     report: {
-      maxOutputTokens: 8000, // Hard upper limit of tokens
+      maxOutputTokens: 30000, // Hard upper limit of tokens
+      targetOutputTokens: 20000,
     },
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
@@ -38,7 +39,7 @@ async function testFinalReport() {
 
   // Need to provide prompts array as required by generate method
   const topic = "Which condition of Arrhenius's sixth impossibility theorem do critical-level views violate? Answer Choices: A. Egalitarian Dominance B. General Non-Extreme Priority C. Non-Elitism D. Weak Non-Sadism E. Weak Quality Addition";
-
+  // const topic = "What is meaning of pi?"
   const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
   const targetOutputTokens = deepResearch.config.report.targetOutputTokens;
   const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
@@ -59,8 +60,8 @@ async function testFinalReport() {
     queries,
   });
 
-  fs.writeFileSync("logs/testReport.md", report);
-  fs.writeFileSync("logs/testDebugLog.md", debugLog.join("\n"));
+  fs.writeFileSync("logs/testFinalReport.md", report);
+  fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
 
 }
 

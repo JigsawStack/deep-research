@@ -7,6 +7,15 @@
 // **TODO **
 // **LLM decides the target length**
 
+// **TODO**
+// sources should automatically be mapped
+
+// **TODO**
+// remove markers from the report
+
+
+
+
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 
@@ -16,7 +25,7 @@ import { JigsawProvider } from "./provider/jigsaw";
 import fs from "fs";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
-import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
+import { PROMPTS } from "./prompts/prompts";
 
 /**
  * Decision making
@@ -118,17 +127,12 @@ export async function processReportForSources({
   const referenceMap = new Map<number, any>();
   
   // Populate the map with reference numbers and their corresponding source info
-  // Log for debugging
-  console.log("Processing sources for sources:", JSON.stringify(sources.slice(0, 1), null, 2));
   
   sources.forEach(source => {
     if (source.searchResults && Array.isArray(source.searchResults.results)) {
       source.searchResults.results.forEach(result => {
-        // Log for debugging
-        console.log("Processing result:", JSON.stringify(result, null, 2));
         
         if (result.referenceNumber) {
-          console.log(`Adding reference number ${result.referenceNumber} to map`);
           referenceMap.set(result.referenceNumber, result);
         }
       });
@@ -235,10 +239,9 @@ export async function generateFinalReport({
   queries: string[];
 }) {
   let draft = "";
-  let done = false;
   let iter = 0;
   // track which prompt we're on
-  let phase: "initial" | "continuation" = "initial";
+  let phase: "initial" | "continuation" | "done" = "initial";
 
   do {
     console.log(`[Iteration ${iter}] phase=${phase}`);
@@ -266,9 +269,19 @@ export async function generateFinalReport({
       prompt: finalReportPrompt.user,
       schema: z.object({
         text: z.string().describe("The final report"),
-        phase: z.enum(["initial", "continuation", "citation"]).describe("The phase of the report"),
+        phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
       }),
+      experimental_repairText: async ({ text, error }) => {
+        // Simple repair attempt for unclosed JSON strings
+        if (error && error.message && error.message.includes('Unterminated string')) {
+          return text + '"}';
+        }
+        return text;
+      },
     });
+
+    phase = response.object.phase;
+    draft += response.object.text;
 
     debugLog.push("MODEL OUTPUT:\n" + response.object.text);
     debugLog.push("PHASE==============================:\n" + response.object.phase);
@@ -278,46 +291,25 @@ export async function generateFinalReport({
     // Process the response based on current phase
     switch (phase) {
       case "initial":
-        if (response.object.text.includes(CONT)) {
-          // Continue to next chunk
-          draft += response.object.text.replace(CONT, "");
-          phase = "continuation";
-        } else if (response.object.text.includes(REPORT_DONE)) {
-          // Report is complete
-          draft += response.object.text.replace(REPORT_DONE, "");
-          done = true;
-        } else {
-          // No marker - just append
-          draft += response.object.text;
-        }
+        phase = "continuation";
         break;
-        
+
       case "continuation":
-        if (response.object.text.includes(CONT)) {
-          // More content needed
-          draft += response.object.text.replace(CONT, "");
-        } else if (response.object.text.includes(REPORT_DONE)) {
-          // Report is complete
-          draft += response.object.text.replace(REPORT_DONE, "");
-          done = true;
-        } else {
-          // No marker - just append and check if we're at target length
-          draft += response.object.text;
-          // Optionally check if we're at target length to auto-complete
-          const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
-          if (targetChars && draft.length >= targetChars) {
-            done = true;
-          }
+        const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
+        if (targetChars && draft.length >= targetChars) {
+          phase = "done";
         }
+
+      case "done":
         break;
     }
 
 
     // persist debug log each loop
-    fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
+    fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
 
     iter++;
-  } while (!done);
+  } while (phase !== "done");
 
   // process the report for sources 
   const {reportWithSources, bibliography} = await processReportForSources({
@@ -326,8 +318,6 @@ export async function generateFinalReport({
   });
 
   console.log("Done processing report for sources");
-  // write out the final report
-  if (!done) throw new Error("Iteration cap reached without final completionMarker");
 
   return { report: reportWithSources, bibliography, debugLog };
 }
@@ -360,7 +350,7 @@ export async function generateResearchPlan({
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().describe("a number representing the depth of the research"),
         breadth: z.number().describe("a number representing the breadth of the research"),
-        targetOutputTokens: z.number().optional().describe("Only output "),
+        targetOutputTokens: z.number().optional().describe("The target output tokens for the report"),
       }),
 
       prompt: PROMPTS.research({
@@ -392,6 +382,7 @@ export async function generateResearchPlan({
       plan: result.object.plan,
       depth: result.object.depth,
       breadth: result.object.breadth,
+      targetOutputTokens: result.object.targetOutputTokens,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -596,6 +587,7 @@ export class DeepResearch {
         plan,
         depth: suggestedDepth,
         breadth: suggestedBreadth,
+        targetOutputTokens: suggestedTargetOutputTokens,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
@@ -609,7 +601,7 @@ export class DeepResearch {
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
       this.config.breadth.maxParallelTopics = suggestedBreadth || this.config.breadth?.maxParallelTopics;
-
+      this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
       this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
 

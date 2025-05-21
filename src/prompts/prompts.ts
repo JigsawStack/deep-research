@@ -116,8 +116,8 @@ Begin by stating "Let me think through this step by step," then proceed with you
 `;
 
 // MARKERS
-export const CONT = "@@@CONTINUE@@@";
-export const REPORT_DONE = "@@@REPORT_DONE@@@";
+// export const CONT = "@@@CONTINUE@@@";
+// export const REPORT_DONE = "@@@REPORT_DONE@@@";
 
 const FINAL_REPORT_PROMPT = ({
   topic,
@@ -136,29 +136,27 @@ const FINAL_REPORT_PROMPT = ({
   latestReasoning: string;
   queries: string[];
   currentReport: string;
-  phase: "initial" | "continuation";
+  phase: "initial" | "continuation" ;
 }) => {
   const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
   const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
   const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
-
-  console.log(targetChars, remaining, atTarget);
 
   // Determine instructions based on phase
   let phaseInstructions = '';
   switch (phase) {
     case "initial":
       phaseInstructions = `
-        Finish by outputting ${CONT} alone.\n
+        Return phase as "continuation"\n
       `;
       break;
       
     case "continuation":
       if (atTarget === false) {
         phaseInstructions = `
-          ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}
-          Finish by outputting ${CONT} alone.\n
-          ${console.log("HERE Remaining", remaining)}
+          Generate a continuation of the report. No need to include the initial report.\n
+          ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}\n
+          Return phase as "continuation"\n
         `;
       } else {
         phaseInstructions = `
@@ -166,9 +164,8 @@ const FINAL_REPORT_PROMPT = ({
           - If the provided sources are insufficient to determine a definitive answer, make your best educated guess based on your understanding of the topic, clearly stating that it's a reasoned guess due to limited source information.\n
           - For multiple-choice questions where sources don't provide a direct answer, analyze each option and select the most likely one based on your knowledge.\n
           - YOU MUST conclude your answer now, regardless of whether you feel it's complete.\n
-          - YOU MUST end your response with ${REPORT_DONE} on its own line.\n
-          Finish by outputting ${REPORT_DONE} alone.\n
-          ${console.log("HERE At Target", atTarget)}
+
+          Return phase as "done"\n
         `;
       }
       break;
@@ -178,11 +175,12 @@ const FINAL_REPORT_PROMPT = ({
   You are a world-class research analyst and writer.\n 
   Your primary purpose is to help users answer their prompts.\n
 
+  - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.\n
   - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
+  - Do not include sources outside the provided sources.\n
   - Use reference numbers [X] for sources instead of URLs\n
   - For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].\n
   - **Never repeat a heading that is already present in the Existing Draft.**\n
-  - If sources don't provide enough information for a definitive answer, you may use your general knowledge to make an educated guess, clearly indicating when you do so.\n
   `;
 
   const userPrompt = `
@@ -208,9 +206,9 @@ const FINAL_REPORT_PROMPT = ({
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     
-    ${phaseInstructions}
+    ${phaseInstructions}\n
 
-  Main User Prompt:\n
+  Main Topic:\n
   ${topic}\n
   `.trim();
 
