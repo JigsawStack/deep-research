@@ -1,5 +1,3 @@
-// **(TODO)**
-// Keep naming consistent 
 import { WebSearchResult } from "@/types/types";
 
 const RESEARCH_PROMPT_TEMPLATE = ({
@@ -7,8 +5,7 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   pastReasoning,
   pastQueries,
   pastSources,
-  targetOutputTokens,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; pastSources?: WebSearchResult[]; targetOutputTokens?: number }) => `
+}: { topic: string; pastReasoning?: string; pastQueries?: string[]; pastSources?: WebSearchResult[] }) => `
 You are a world-class research planner.\n
 Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
 
@@ -48,11 +45,6 @@ Please provide the following components:
 4. Generate how broad the research should be:\n
     - Generate a number to determine how broad the research should be to fully explore this topic\n
 
-${targetOutputTokens ? ``:`
-  5. Generate the target output number of characters for the report:\n
-    - If the topic requires in depth searching for reading materials and the output is expected to be large, you must set the target output number of tokens to a number that you think works best.
-  
-  `}
 `;
 
 const DECISION_MAKING_PROMPT = ({
@@ -158,10 +150,8 @@ const FINAL_REPORT_PROMPT = ({
 
   GENERAL GUIDELINES:\n
     - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.\n
+    - Only use the sources provided in the context.\n
     - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-    - Do not include external sources apart from the provided sources in the context.\n
-    - Use reference numbers [X] for sources instead of URLs\n
-    - For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].\n
     - **Never repeat a heading that is already present in the Existing Draft.**\n
 
   INSTRUCTIONS:\n
@@ -191,8 +181,7 @@ const FINAL_REPORT_PROMPT = ({
       } else {
         phaseInstructions = `
           - This is your FINAL response for this question.\n
-          - If the provided sources are insufficient, make your best educated guess and give a definitive answer.\n
-          - For multiple-choice questions where sources don't provide a direct answer, analyze each option and select the most likely one based on your knowledge.\n
+          - If the provided sources are insufficient, give your best definitive answer.\n
           - YOU MUST conclude your answer now, regardless of whether you feel it's complete.\n
 
           Return phase as "done"\n

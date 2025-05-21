@@ -475,6 +475,9 @@ export class DeepResearch {
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
       GEMINI_API_KEY: this.config.GEMINI_API_KEY,
       DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
+      defaultModel: this.config.models.default,
+      reasoningModel: this.config.models.reasoning,
+      outputModel: this.config.models.output,
     });
 
     this.initModels();
@@ -583,7 +586,6 @@ export class DeepResearch {
         config: this.config,
         maxDepth: this.config.depth?.maxLevel,
         maxBreadth: this.config.breadth?.maxParallelTopics,
-        // targetOutputTokens: this.config.report?.targetOutputTokens,
       });
 
       this.config.depth.maxLevel = suggestedDepth || this.config.depth?.maxLevel;
@@ -644,6 +646,9 @@ export class DeepResearch {
       this.latestReasoning = reason;
     } while (!this.isComplete && iteration < depth);
 
+    // map the sources to numbers for sources
+    this.sources = mapSearchResultsToNumbers({ sources: this.sources });
+
     fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
     fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
     fs.writeFileSync("logs/reasoning.json", JSON.stringify(this.latestReasoning, null, 2));
@@ -654,11 +659,8 @@ export class DeepResearch {
     debugLog.push(`[Step 5] Generating report...`);
     console.log(`[Step 5] Generating report...`);
 
-    // map the sources to numbers for sources
-    const numberedSources = mapSearchResultsToNumbers({ sources: this.sources });
-
     const { report, bibliography, debugLog: finalDebugLog } = await generateFinalReport({
-      sources: numberedSources,
+      sources: this.sources,
       topic: this.topic,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
@@ -696,11 +698,9 @@ export class DeepResearch {
     const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
     const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
-    const numberedSources = mapSearchResultsToNumbers({ sources });
-
     // Generate the final report using the loaded data
     const { report, debugLog } = await generateFinalReport({
-      sources: numberedSources,
+      sources,
       topic,
       targetOutputTokens,
       aiProvider: this.aiProvider,

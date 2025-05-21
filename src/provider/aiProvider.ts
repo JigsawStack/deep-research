@@ -30,9 +30,9 @@ export class AIProvider {
     OPENAI_API_KEY: string;
     GEMINI_API_KEY: string;
     DEEPINFRA_API_KEY: string;
-    defaultModel?: LanguageModelV1;
-    reasoningModel?: LanguageModelV1;
-    outputModel?: LanguageModelV1;
+    defaultModel: LanguageModelV1;
+    reasoningModel: LanguageModelV1;
+    outputModel: LanguageModelV1;
   }) {
     // Check for required API keys
     if (!OPENAI_API_KEY || !GEMINI_API_KEY || !DEEPINFRA_API_KEY) {
@@ -59,9 +59,9 @@ export class AIProvider {
 
     // Set default models
     this.models = {
-      default: defaultModel || openai.languageModel("gpt-4o"),
-      reasoning: reasoningModel || deepinfra.languageModel("deepseek-ai/DeepSeek-R1"),
-      output: outputModel || gemini.languageModel("gemini-2.0-flash"),
+      default: defaultModel,
+      reasoning: reasoningModel,
+      output: outputModel,
     };
   }
 

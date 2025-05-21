@@ -1,3 +1,5 @@
+import { deepinfra } from "@ai-sdk/deepinfra";
+import { openai } from "@ai-sdk/openai";
 import { LanguageModelV1 } from "ai";
 
 export interface ModelConfig {
@@ -9,10 +11,11 @@ export interface ModelConfig {
 }
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
-  default: "gpt-4.1",
-  output: "gpt-4.1",
+  default: openai.languageModel("gpt-4.1"),
+  output: openai.languageModel("gpt-4.1"),
   // output: "gemini-2-flash",
-  reasoning: "deepseek-r1",
+  // reasoning: "deepseek-r1",
+  reasoning: deepinfra.languageModel("deepseek-ai/DeepSeek-R1"),
   // reasoning: "o4-mini",
 };
 
