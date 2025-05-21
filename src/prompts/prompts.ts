@@ -6,15 +6,16 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   pastQueries,
   targetOutputTokens,
 }: { topic: string; pastReasoning?: string; pastQueries?: string[]; targetOutputTokens?: number }) => `
-You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.
+You are an AI research assistant. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate a given topic.\n
 
-The topic for research is: ${topic}
+The topic for research is: ${topic}\n
 
-${targetOutputTokens ? `The target output number of characters for the report is: ${targetOutputTokens * 4}` : ""}
+${targetOutputTokens ? `The target output number of characters for the report is: ${targetOutputTokens * 4}` : "Determine the target output number of characters for the report based on the topic and the past reasoning and queries."}\n
 
-${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}
+${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}\n
 
-${pastQueries ? `Past queries: ${pastQueries.join(", ")}` : ""}
+${pastQueries ? `Past queries: ${pastQueries.join(", ")}` : ""}\n
+
 
 Please provide the following two components:
 
@@ -50,7 +51,7 @@ const DECISION_MAKING_PROMPT = ({
 }) => `
 You are a decision-making assistant.
 
-${getCurrentDateContext()} \n
+Current datetime is: ${new Date().toISOString()}
 
 Chain of Thought:
 """${reasoning}"""
@@ -70,14 +71,14 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   topic,
   researchPlan,
   searchResults,
-  allQueries,
+  queries,
 }: {
   topic: string;
   researchPlan: string;
   searchResults: WebSearchResult[];
-  allQueries: string[];
+  queries: string[];
 }) => `
-You are an expert reasoning assistant. Given:
+You are an expert reasoning assistant. 
 
   • Topic to address:
     "${topic}"
@@ -85,13 +86,19 @@ You are an expert reasoning assistant. Given:
   • Proposed research plan:
     """${researchPlan}"""
 
-  • Search results obtained (array of { title, snippet, url }):
-    ${JSON.stringify(searchResults, null, 2)}
+  Sub-Queries and Sources:\n
+  ${queries.map((q, i) => {
+    const source = searchResults[i];
+    if (source) {
+      const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
+      const urls = source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
+      return `${i + 1}. **${q}** → ${source.searchResults.results.length} hits${overview}\n${urls}`;
+    }
+    return `${i + 1}. **${q}** (No sources found)`;
+  }).join('\n\n')}
+    
 
-  • All queries used:
-    ${JSON.stringify(allQueries, null, 2)}
-
-${getCurrentDateContext()} \n
+Current datetime is: ${new Date().toISOString()} \n
 
 Your task is to evaluate whether this set of inputs collectively provides enough coverage and context to write a thorough, deep-dive research report on the topic. Think step by step and show your full chain-of-thought. Specifically:
 
@@ -112,173 +119,6 @@ Begin by stating "Let me think through this step by step," then proceed with you
 export const CONT = "@@@CONTINUE@@@";
 export const REPORT_DONE = "@@@REPORT_DONE@@@";
 
-// const INIT_FINAL_REPORT_PROMPT = ({
-//   topic,
-//   sources,
-//   targetOutputTokens,
-//   latestResearchPlan,
-//   latestReasoning,
-//   queries,
-//   phase,
-// }: {
-//   topic: string;
-//   sources: WebSearchResult[];
-//   targetOutputTokens?: number;
-//   latestResearchPlan: string;
-//   latestReasoning: string;
-//   queries: string[];
-//   phase: "initial" | "continuation" | "citation";
-// }) => {
-
-//   const systemPrompt = `
-// You are a world-class research analyst and writer.\n
-
-// 1. Synthesize intermediate analyses into a structured narrative.\n
-// 2. Identify and group key themes and patterns across sources.\n
-// 3. Each topic should be a deep dive paragraph, not a bullet point list.\n
-// 4. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
-// 5. Do not worry about covering all the topics, just dive deep into each topic.\n
-// 6. **ONLY WRITE THE HEADINGS AND BODY OF THE REPORT. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.**\n
-// 7. Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-// 8. Do not cite multiple sources at the same time. For instance if [1, 2, 3], then cite [1], then [2], then [3].\n
-// 9 Use reference numbers [X] for sources instead of URLs\n
-// 10 **For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
-// 11. **Never repeat a heading that is already present in the Existing Draft.**\n
-
-// THIS IS VERY IMPORTANT:\n
-// • Always finish this response by outputting ${CONT} alone—no other markers.\n
-// • Do not start the "Conclusion" or "Bibliography" sections in this response.\n
-// `.trim();
-
-//   const userPrompt = `
-// ${targetOutputTokens ? `Target length:
-// ≈ ${(targetOutputTokens * 4).toLocaleString()} characters (${targetOutputTokens} tokens ×4)` : ""}
-
-// **CONTEXT**:\n
-//   Latest Research Plan:\n
-//   ${latestResearchPlan}\n
-
-//   Latest Reasoning Snapshot:\n
-//   ${latestReasoning}\n
-
-//   Sub-Queries and Sources:\n
-//   ${queries.map((q, i) => {
-//     const source = sources[i];
-//     if (source) {
-//       const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-//       const urls = source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
-//       return `${i + 1}. **${q}** → ${source.searchResults.results.length} hits${overview}\n${urls}`;
-//     }
-//     return `${i + 1}. **${q}** (No sources found)`;
-//   }).join('\n\n')}
-
-// ────────────────────────────────────────
-// **Write-phase instruction:**  
-
-// ${`🔒 You still need roughly ${remaining.toLocaleString()} more characters before concluding.\n
-// **Do NOT start the "Conclusion" or "Bibliography" sections in this response.**`}\n
-// \n
-
-// - Finish by outputting ${CONT} alone.\n
-
-// User Prompt/Topic/Question:
-// ${topic}
-
-// `.trim();
-
-//   return {
-//     system: systemPrompt,
-//     user: userPrompt,
-//   };
-// };
-
-// const CONTINUE_FINAL_REPORT_PROMPT = ({
-//   topic,
-//   sources,
-//   targetOutputTokens,
-//   currentReport,
-//   currentOutputLength,
-//   latestResearchPlan,
-//   latestReasoning,
-//   queries,
-// }: {
-//   topic: string;
-//   sources: WebSearchResult[];
-//   targetOutputTokens?: number;
-//   currentReport: string;
-//   currentOutputLength: number;
-//   latestResearchPlan: string;
-//   latestReasoning: string;
-//   queries: string[];
-// }) => {
-//   const targetChars = targetOutputTokens * 4;
-//   const remaining = Math.max(targetChars - currentOutputLength, 0);
-//   const atTarget = currentOutputLength >= targetChars;
-
-//   /* ───────── SYSTEM prompt ───────── */
-//   const systemPrompt = `
-// You are a world-class research analyst expanding an existing draft.\n
-
-// 1. Continue seamlessly—never restart or duplicate headings.\n
-// 2. Write in the same style as the existing draft.\n
-// 3. Note contradictions or conflicts, resolving them or framing open debates.\n
-// 4. Each topic should be a deep dive paragraph, not a bullet point list.\n
-// 5. Each topic will not be repeated in the report. So make sure to cover all the topics, diving deep into each one.\n
-// 6. Do not worry about covering all the topics, just dive deep into each topic.\n
-// 7. ** YOU MUST: ** Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-// 8. ** For multiple sources, each source should have it's own bracket []. Something like this: [1][2][3].**\n
-// 9. **USE ONLY THE SOURCES PROVIDED.** There should be no other sources than the ones provided.\n
-// 10. **Never repeat a heading that is already present in the Existing Draft. Even if it is to continue the topic.**\n
-// 11/ If **${atTarget ? "we have reached the target length" : "we have not yet reached the target"}**, follow the instructions below.\n 
-// `.trim();
-
-//   /* ───────── USER prompt ───────── */
-//   const userPrompt = `
-// Main Research Topic:\n
-// ${topic}\n
-
-// Current draft length:\n
-// ${currentOutputLength.toLocaleString()} chars\n
-
-// Target length:\n
-// ≈ ${targetChars.toLocaleString()} chars\n
-
-// Current Draft:\n
-// ${currentReport}
-
-// ────────────────────────────────────────
-// Latest Research Plan:\n
-// ${latestResearchPlan}\n
-
-// Latest Reasoning Snapshot:\n
-// ${latestReasoning}\n
-
-// Sub-Queries:\n
-// ${queries.map((q) => `- ${q}`).join("\n")}\n
-
-// Source Pack (for quick reference):\n
-// ${sources.map((s, i) => {
-//   const overview = s.searchResults.ai_overview ? `\n   AI Overview: ${s.searchResults.ai_overview.substring(0, 150)}...` : '';
-//   const urls = s.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
-//   return `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits${overview}\n${urls}`;
-// }).join('\n\n')}
-
-// ────────────────────────────────────────
-// ${
-//   !atTarget
-//     ? `🔒 **Continue body sections only.** You still need ≈${remaining.toLocaleString()} characters.  
-//        Finish this response by outputting ${CONT} alone. DO NOT START THE CONCLUSION OR BIBLIOGRAPHY IN THIS RESPONSE.`
-//     : `✅ **Target reached.** Now write the **Conclusion** in full, DO NOT START THE BIBLIOGRAPHY IN THIS RESPONSE.
-//        and finish by outputting ${REPORT_DONE} alone.`
-// }
-// `.trim();
-
-//   return {
-//     system: systemPrompt,
-//     user: userPrompt,
-//   };
-// };
-
 const FINAL_REPORT_PROMPT = ({
   topic,
   sources,
@@ -296,15 +136,41 @@ const FINAL_REPORT_PROMPT = ({
   latestReasoning: string;
   queries: string[];
   currentReport: string;
-  phase: "initial" | "continuation" | "citation";
+  phase: "initial" | "continuation";
 }) => {
   const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
   const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
   const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
 
+  console.log(targetChars, remaining, atTarget);
+
+  // Determine instructions based on phase
+  let phaseInstructions = '';
+  switch (phase) {
+    case "initial":
+      phaseInstructions = `
+        Finish by outputting ${CONT} alone.\n
+      `;
+      break;
+      
+    case "continuation":
+      if (!atTarget) {
+        phaseInstructions = `
+          ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}
+          Finish by outputting ${CONT} alone.\n
+        `;
+      } else {
+        phaseInstructions = `
+          - Please conclude an answer even if you are unclear about the answer.\n
+          Finish by outputting ${REPORT_DONE} alone.\n
+        `;
+      }
+      break;
+  }
+
   const systemPrompt = `
   You are a world-class research analyst and writer.\n 
-  Your primary purpose is to help users with tasks that require extensive online research.\n
+  Your primary purpose is to help users answer their prompts.\n
 
   - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
   - Use reference numbers [X] for sources instead of URLs\n
@@ -323,27 +189,19 @@ const FINAL_REPORT_PROMPT = ({
     Latest Reasoning Snapshot:\n
     ${latestReasoning}\n
 
-    Sub-Queries:\n
-    ${queries.map((q) => `- ${q}`).join("\n")}\n
-
-
-    Source Pack (for quick reference):\n
-    ${sources.map((s, i) => {
-      const overview = s.searchResults.ai_overview ? `\n   AI Overview: ${s.searchResults.ai_overview.substring(0, 150)}...` : '';
-      const urls = s.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
-      return `${i + 1}. **${s.question}** → ${s.searchResults.results.length} hits${overview}\n${urls}`;
+    Sub-Queries and Sources:\n
+    ${queries.map((q, i) => {
+      const source = sources[i];
+      if (source) {
+        const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
+        return `${i + 1}. **${q}**${overview}\n${source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n')}`;
+      }
+      return `${i + 1}. **${q}** (No sources found)`;
     }).join('\n\n')}
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     
-  ${phase === "initial" ? `
-    Finish by outputting ${CONT} alone.\n
-  ` : phase === "continuation" && !atTarget ? `
-    ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}
-    Finish by outputting ${CONT} alone.\n
-  ` : `
-    Finish by outputting ${REPORT_DONE} alone.\n
-  `}
+    ${phaseInstructions}
 
   Main User Prompt:\n
   ${topic}\n
@@ -356,20 +214,10 @@ const FINAL_REPORT_PROMPT = ({
 };
 
 
-/**
- * Core prompt function that adds current date information to all prompts
- * This ensures all models have the correct temporal context for research
- */
-const getCurrentDateContext = () => {
-  return `Current datetime is: ${new Date().toISOString()}`;
-};
-
 // Export all prompts together with date context
 export const PROMPTS = {
   research: RESEARCH_PROMPT_TEMPLATE,
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
-  // initFinalReport: INIT_FINAL_REPORT_PROMPT,
-  // continueFinalReport: CONTINUE_FINAL_REPORT_PROMPT,
   finalReport: FINAL_REPORT_PROMPT,
 };

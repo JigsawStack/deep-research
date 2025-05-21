@@ -23,7 +23,6 @@ import { CONT, PROMPTS, REPORT_DONE } from "./prompts/prompts";
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
- * @param targetOutputTokens - The target output tokens
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
@@ -71,7 +70,7 @@ export async function reasoningSearchResults({
       topic,
       researchPlan: latestResearchPlan,
       searchResults: sources,
-      allQueries: queries,
+      queries: queries,
     });
 
     const reasoningResponse = await generateText({
@@ -239,20 +238,10 @@ export async function generateFinalReport({
   let done = false;
   let iter = 0;
   // track which prompt we're on
-  let phase: "initial" | "continuation" | "citation" = "initial";
+  let phase: "initial" | "continuation" = "initial";
 
   do {
     console.log(`[Iteration ${iter}] phase=${phase}`);
-    // build the shared base
-    const base = {
-      topic,
-      sources,
-      targetOutputTokens,
-      latestResearchPlan,
-      latestReasoning,
-      queries,
-    };
-
 
     const finalReportPrompt = PROMPTS.finalReport({
       currentReport: draft,
@@ -286,23 +275,42 @@ export async function generateFinalReport({
 
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
 
-    if (phase !== "citation") {
-      // look for our two markers
-      if (response.object.text.includes(CONT)) {
-        // still more body to come
-        draft += response.object.text.replace(CONT, "");
-        // after first initial chunk, always switch to continuation
-        if (phase === "initial") phase = "continuation";
-      } else if (response.object.text.includes(REPORT_DONE)) {
-        // finished body + conclusion/biblio → move to citation pass
-        draft += response.object.text.replace(REPORT_DONE, "");
-        phase = "citation";
-        done = true;
-      } else {
-        // no marker (should be rare) – just append
-        draft += response.object.text;
-      }
-    } 
+    // Process the response based on current phase
+    switch (phase) {
+      case "initial":
+        if (response.object.text.includes(CONT)) {
+          // Continue to next chunk
+          draft += response.object.text.replace(CONT, "");
+          phase = "continuation";
+        } else if (response.object.text.includes(REPORT_DONE)) {
+          // Report is complete
+          draft += response.object.text.replace(REPORT_DONE, "");
+          done = true;
+        } else {
+          // No marker - just append
+          draft += response.object.text;
+        }
+        break;
+        
+      case "continuation":
+        if (response.object.text.includes(CONT)) {
+          // More content needed
+          draft += response.object.text.replace(CONT, "");
+        } else if (response.object.text.includes(REPORT_DONE)) {
+          // Report is complete
+          draft += response.object.text.replace(REPORT_DONE, "");
+          done = true;
+        } else {
+          // No marker - just append and check if we're at target length
+          draft += response.object.text;
+          // Optionally check if we're at target length to auto-complete
+          const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
+          if (targetChars && draft.length >= targetChars) {
+            done = true;
+          }
+        }
+        break;
+    }
 
 
     // persist debug log each loop
