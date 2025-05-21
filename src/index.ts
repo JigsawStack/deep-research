@@ -253,7 +253,9 @@ export async function generateFinalReport({
       queries,
     };
 
+
     const finalReportPrompt = PROMPTS.finalReport({
+      currentReport: draft,
       topic,
       sources,
       targetOutputTokens,
@@ -263,57 +265,42 @@ export async function generateFinalReport({
       phase,
     });
 
-    // pick the right prompt
-    let promptConfig: {
-      system: string;
-      user: string;
-    };
-
-    if (phase === "initial") {
-      promptConfig = PROMPTS.initFinalReport(base);
-    } else {
-      promptConfig = PROMPTS.continueFinalReport({
-        ...base,
-        currentReport: draft,
-        currentOutputLength: draft.length,
-      });
-    }
 
     debugLog.push(`\n[Iteration ${iter}] phase=${phase}`);
-    debugLog.push("SYSTEM PROMPT:\n" + promptConfig.system);
-    debugLog.push("USER PROMPT:\n" + promptConfig.user);
+    debugLog.push("SYSTEM PROMPT:\n" + finalReportPrompt.system);
+    debugLog.push("USER PROMPT:\n" + finalReportPrompt.user);
 
     // call the model
-    const { text } = await generateText({
+    const response = await generateObject({
       model: aiProvider.getOutputModel(),
-      system: promptConfig.system,
-      prompt: promptConfig.user,
+      system: finalReportPrompt.system,
+      prompt: finalReportPrompt.user,
       schema: z.object({
         text: z.string().describe("The final report"),
         phase: z.enum(["initial", "continuation", "citation"]).describe("The phase of the report"),
       }),
     });
 
-    debugLog.push("MODEL OUTPUT:\n" + text);
-    debugLog.push("PHASE==============================:\n" + phase);
+    debugLog.push("MODEL OUTPUT:\n" + response.object.text);
+    debugLog.push("PHASE==============================:\n" + response.object.phase);
 
     fs.writeFileSync("logs/debug-log.md", debugLog.join("\n"));
 
     if (phase !== "citation") {
       // look for our two markers
-      if (text.includes(CONT)) {
+      if (response.object.text.includes(CONT)) {
         // still more body to come
-        draft += text.replace(CONT, "");
+        draft += response.object.text.replace(CONT, "");
         // after first initial chunk, always switch to continuation
         if (phase === "initial") phase = "continuation";
-      } else if (text.includes(REPORT_DONE)) {
+      } else if (response.object.text.includes(REPORT_DONE)) {
         // finished body + conclusion/biblio → move to citation pass
-        draft += text.replace(REPORT_DONE, "");
+        draft += response.object.text.replace(REPORT_DONE, "");
         phase = "citation";
         done = true;
       } else {
         // no marker (should be rare) – just append
-        draft += text;
+        draft += response.object.text;
       }
     } 
 
