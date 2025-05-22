@@ -45,6 +45,8 @@ export async function decisionMaking({
   return decisionMakingResponse.object;
 }
 
+
+
 /**
  * Reasoning about the search results
  * 
@@ -66,7 +68,7 @@ export async function reasoningSearchResults({
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
       topic,
       researchPlan: latestResearchPlan,
-      searchResults: sources,
+      sources: sources,
       queries: queries,
     });
 
@@ -316,8 +318,6 @@ export async function generateResearchPlan({
   pastReasoning,
   pastQueries,
   pastSources,
-  config,
-  // targetOutputTokens,
 }: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     // Generate the research plan using the AI provider
@@ -329,7 +329,6 @@ export async function generateResearchPlan({
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().describe("a number representing the depth of the research"),
         breadth: z.number().describe("a number representing the breadth of the research"),
-        // targetOutputTokens: z.number().optional().describe("The target output tokens for the report"),
       }),
 
       prompt: PROMPTS.research({
@@ -337,7 +336,6 @@ export async function generateResearchPlan({
         pastReasoning,
         pastQueries,
         pastSources,
-        // targetOutputTokens,
       }),
     });
 
@@ -346,7 +344,6 @@ export async function generateResearchPlan({
       plan: result.object.plan,
       suggestedDepth: result.object.depth,
       suggestedBreadth: result.object.breadth,
-      // targetOutputTokens: result.object.targetOutputTokens,
     };
   } catch (error: any) {
     console.error(`Error generating research plan: ${error.message || error}`);
@@ -359,9 +356,9 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
 
   return sources.map((result) => {
     return {
-      question: result.question,
+      query: result.query,
       searchResults: {
-        ai_overview: result.searchResults.ai_overview,
+        // ai_overview: result.searchResults.ai_overview,
         results: result.searchResults.results
           .filter((item) => {
             // Skip if we've seen this URL before
@@ -378,6 +375,7 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
               url: item.url,
               title: item.title || "",
               domain: item.domain || "",
+              content: item.content || "",
             };
           }),
       },
@@ -385,15 +383,15 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   });
 }
 
-export function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, number>();
   let currentNumber = 1;
 
   return sources.map((result) => {
     return {
-      question: result.question,
+      query: result.query,
       searchResults: {
-        ai_overview: result.searchResults.ai_overview,
+        // ai_overview: result.searchResults.ai_overview,
         results: result.searchResults.results.map((item) => {
           // If URL hasn't been seen before, assign it a new number
           if (!urlMap.has(item.url)) {
@@ -404,7 +402,8 @@ export function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResul
             url: item.url,
             title: item.title || "",
             domain: item.domain || "",
-            referenceNumber: urlMap.get(item.url) // Add the reference number
+            referenceNumber: urlMap.get(item.url) || 0,
+            content: item.content || "",
           };
         }),
       },
@@ -545,15 +544,15 @@ export class DeepResearch {
 
     do {
       iteration++;
-      // step 1: generate research plan
+
       console.log(`[Step 1] Generating research plan... at ${iteration}`);
       debugLog.push(`[Step 1] Generating research plan... at ${iteration}`);
+
       const {
         subQueries,
         plan,
         suggestedDepth,
         suggestedBreadth,
-        // targetOutputTokens: suggestedTargetOutputTokens,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         topic: this.topic,
@@ -576,7 +575,6 @@ export class DeepResearch {
       // // limit the subqueries to the breadth
       const limitedQueries = subQueries.slice(0, this.config.breadth?.maxBreadth);
       
-      // this.config.report.targetOutputTokens = this.config.report.targetOutputTokens || suggestedTargetOutputTokens;
       this.queries = [...(this.queries || []), ...limitedQueries];
       this.latestResearchPlan = plan;
 
@@ -634,24 +632,6 @@ export class DeepResearch {
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
-
-    fs.writeFileSync("logs/sources.json", JSON.stringify(this.sources, null, 2));
-    fs.writeFileSync("logs/queries.json", JSON.stringify(this.queries, null, 2));
-    fs.writeFileSync("logs/reasoning.json", JSON.stringify(this.latestReasoning, null, 2));
-    fs.writeFileSync("logs/decisionMaking.json", JSON.stringify(this.latestDecisionMaking, null, 2));
-    fs.writeFileSync("logs/researchPlan.json", JSON.stringify(this.latestResearchPlan, null, 2));
-
-    // Create the directory structure if it doesn't exist
-    const testDir = "logs/tests/math";
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(`${testDir}/sources.json`, JSON.stringify(this.sources, null, 2));
-    fs.writeFileSync(`${testDir}/queries.json`, JSON.stringify(this.queries, null, 2));
-    fs.writeFileSync(`${testDir}/reasoning.json`, JSON.stringify(this.latestReasoning, null, 2));
-    fs.writeFileSync(`${testDir}/decisionMaking.json`, JSON.stringify(this.latestDecisionMaking, null, 2));
-    fs.writeFileSync(`${testDir}/researchPlan.json`, JSON.stringify(this.latestResearchPlan, null, 2));
 
     // step 5: generating report
     debugLog.push(`[Step 5] Generating report...`);

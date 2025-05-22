@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { createDeepResearch } from "../../src/index";
+import fs from "fs";
 
 // Basic usage example
 async function basicResearch() {
@@ -45,7 +46,18 @@ async function basicResearch() {
     console.log("Starting deep research...");
     const result = await deepResearch.generate(topic);
     // const result = await deepResearch.testGenerate();
+    
+    const testDir = "logs/tests/math_with_content";
+
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
     console.log("result", result.data.text);
+
+    fs.writeFileSync("logs/research.json", JSON.stringify(result.data.metadata.researchPlan, null, 2));
+    fs.writeFileSync("logs/queries.json", JSON.stringify(result.data.metadata.queries, null, 2));
+    fs.writeFileSync("logs/sources.json", JSON.stringify(result.data.metadata.sources, null, 2));
+    fs.writeFileSync("logs/reasoning.json", JSON.stringify(result.data.metadata.reasoning, null, 2));
 
     return result;
   } catch (error) {

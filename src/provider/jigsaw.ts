@@ -1,8 +1,12 @@
 import { JigsawStack } from "jigsawstack";
 import "dotenv/config";
-import { ResearchSource } from "@/types/types";
+import { ResearchSource, WebSearchResult } from "@/types/types";
 import { ContentCleaner } from "@utils/utils";
 import { retryAsync, createExponetialDelay } from "ts-retry";
+import { AIProvider } from "./aiProvider";
+import { generateObject, generateText } from "ai";
+import z from "zod";
+import { PROMPTS } from "@/prompts/prompts";
 
 export class JigsawProvider {
   private static instance: JigsawProvider;
@@ -21,6 +25,42 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
+  private async context_generator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
+    try {
+      // Generate context for each query's search results
+      const contextResults = await Promise.all(
+        queries.map(async (query) => {
+          // Extract content from sources for this query
+          const querySources = sources.find(source => source.query=== query)?.searchResults.results || [];
+
+          const response = await generateObject({
+            model: aiProvider.getDefaultModel(),
+            prompt: PROMPTS.contextGeneration({
+              topic: topic,
+              queries: [query],
+              sources: querySources,
+            }),
+            schema: z.object({
+              context: z.string().describe("The context overview"),
+              hasContent: z.boolean().describe("If there are contents provided in the sources, if not, return false"),
+            }),
+          });
+          
+          return {
+            query: query,
+            context: response.object.context,
+            hasContent: response.object.hasContent
+          };
+        })
+      );
+      
+      return contextResults;
+    } catch (error) {
+      console.error("Error generating context overview:", error);
+      return "Error generating context overview.";
+    }
+  }
+
   public async fireWebSearches(queries: string[]) {
     // Map each query to a promise that resolves to a search result
     const searchPromises = queries.map(async (query) => {
@@ -30,7 +70,7 @@ export class JigsawProvider {
           async () => {
             const response = await this.jigsawInstance.web.search({
               query,
-              ai_overview: true,
+              ai_overview: false,
             });
             return response;
           },
@@ -55,6 +95,7 @@ export class JigsawProvider {
           const source: ResearchSource = {
             url: result.url || "",
             title: result.title || "",
+            content: result.content || "",
           };
           const cleaned = ContentCleaner.cleanContent(source);
           return {
@@ -64,18 +105,16 @@ export class JigsawProvider {
           } as ResearchSource;
         });
         return {
-          question: query,
+          query: query,
           searchResults: {
-            ai_overview: results.ai_overview || "",
             results: cleanedResults,
           },
         };
       } catch (error) {
         console.error("Full error details:", error);
         return {
-          question: query,
+          query: query,
           searchResults: {
-            ai_overview: "Error fetching results",
             results: [],
           },
         };

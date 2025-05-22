@@ -1,4 +1,28 @@
-import { WebSearchResult } from "@/types/types";
+import { ResearchSource, WebSearchResult } from "@/types/types";
+
+const CONTEXT_GENERATION_PROMPT = ({
+  topic,
+  queries,
+  sources,
+}: { topic: string; queries: string[]; sources: ResearchSource[] }) => `
+You are a world-class context generator.\n
+Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
+Extract all all the information from the sources that is relevant to the main topic.\n
+
+Main Topic:\n
+${topic}\n
+
+Sub-Queries and Sources:\n
+${queries?.map((q) => {
+  const sourcesForQuery = sources?.filter(s => s.url && s.url.length > 0);
+  if (sourcesForQuery && sourcesForQuery.length > 0) {
+    return `**${q}**\n${sourcesForQuery.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
+  }
+  return `**${q}** (No sources found)`;
+}).join('\n\n')}
+`.trim();
 
 const RESEARCH_PROMPT_TEMPLATE = ({
   topic,
@@ -14,15 +38,16 @@ The topic is: ${topic}\n
 
 ${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}\n
 
-Past Queries and Sources:\n
+Sub-Queries and Sources:\n
 ${pastQueries?.map((q, i) => {
   const source = pastSources?.[i];
   if (source) {
-    const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-    return `${i + 1}. **${q}**${overview}\n${source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n')}`;
+    return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
   }
   return `${i + 1}. **${q}** (No sources found)`;
-}).join('\n\n') || ''}
+}).join('\n\n')}
 
 
 Please provide the following components:
@@ -44,8 +69,7 @@ Please provide the following components:
 
 4. Generate how broad the research should be:\n
     - Generate a number to determine how broad the research should be to fully explore this topic\n
-
-`;
+`.trim();
 
 const DECISION_MAKING_PROMPT = ({
   reasoning,
@@ -68,18 +92,20 @@ INSTRUCTIONS:\n
     "isComplete": true,
     "reason": "The reasoning covers all identified gaps and the target length is adequate."
   }
-`;
+`.trim();
 
 const REASONING_SEARCH_RESULTS_PROMPT = ({
   topic,
   researchPlan,
-  searchResults,
   queries,
+  sources,
+  contentLength = 1000,
 }: {
   topic: string;
   researchPlan: string;
-  searchResults: WebSearchResult[];
   queries: string[];
+  sources: WebSearchResult[];
+  contentLength?: number;
 }) => `
 You are an world-class reasoning researcher.\n
 
@@ -89,16 +115,16 @@ You are an world-class reasoning researcher.\n
   • Proposed research plan:\n
     """${researchPlan}"""\n
 
-  Sub-Queries and Sources:\n
-  ${queries.map((q, i) => {
-    const source = searchResults[i];
-    if (source) {
-      const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-      const urls = source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
-      return `${i + 1}. **${q}** → ${source.searchResults.results.length} hits${overview}\n${urls}`;
-    }
-    return `${i + 1}. **${q}** (No sources found)`;
-  }).join('\n\n')}
+      Sub-Queries and Sources:\n
+    ${queries.map((q, i) => {
+      const source = sources[i];
+      if (source) {
+        return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
+        [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+        Content: ${r.content ? r.content.substring(0, contentLength) + '...' : 'No content available'}`).join('\n')}`;
+      }
+      return `${i + 1}. **${q}** (No sources found)`;
+    }).join('\n\n')}
     
 
 Current datetime is: ${new Date().toISOString()} \n
@@ -119,7 +145,7 @@ Specifically:\n
    - suggestions: [list of concrete next queries or source types]\n
 
 Begin by stating "Let me think through this step by step," then proceed with your reasoning.\n
-`;
+`.trim();
 
 const FINAL_REPORT_PROMPT = ({
   topic,
@@ -205,8 +231,9 @@ const FINAL_REPORT_PROMPT = ({
     ${queries.map((q, i) => {
       const source = sources[i];
       if (source) {
-        const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-        return `${i + 1}. **${q}**${overview}\n${source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n')}`;
+        return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
+        [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+        Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
       }
       return `${i + 1}. **${q}** (No sources found)`;
     }).join('\n\n')}
@@ -232,4 +259,5 @@ export const PROMPTS = {
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
   finalReport: FINAL_REPORT_PROMPT,
+  contextGeneration: CONTEXT_GENERATION_PROMPT,
 };
