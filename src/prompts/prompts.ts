@@ -93,7 +93,7 @@ const DECISION_MAKING_PROMPT = ({
   topic: string;
 }) => {
   const systemPrompt = `
-You are a world-class decision-making researcher.\n
+You are a world-class analyst.\n
 Your primary purpose is to help decide if the reasoning is sufficient to answer the main topic.\n
 
 Current datetime is: ${new Date().toISOString()}\n
@@ -122,8 +122,6 @@ ${topic}\n
   };
 };
 
-
-
 const REASONING_SEARCH_RESULTS_PROMPT = ({
   topic,
   researchPlan,
@@ -136,27 +134,24 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   sources: WebSearchResult[];
 }) => {
   const systemPrompt = `
-You are an world-class reasoning researcher.\n
+You are a world-class analyst.\n
 Your primary purpose is to help reason if the the topic, 
-queries, sources, and research plan are sufficient to answer the topic.\n
+queries, sources, and research plan are sufficient to answer the main topic.\n
 
 INSTRUCTIONS:\n
 - Think step by step and show your full chain-of-thought. \n
 - Specifically, decompose the topic into its major sub-topics or dimensions.\n
 - Map each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
-- Identify gaps—sub-topics not covered or weakly supported.\n
 - Assess the quality, relevance, and diversity of the sources provided.\n
+- Identify gaps—sub-topics not covered or weakly supported.\n
 - Recommend additional queries, source types, or angles needed to fill those gaps.\n
   `.trim();
 
   const userPrompt = `
-• Topic to address:\n
-"${topic}"\n
-
-• Proposed research plan:\n
+Proposed research plan:\n
 """${researchPlan}"""\n
 
-• Context for each query:\n
+Context for each query:\n
 ${queries?.map((q) => {
   const sourcesForQuery = sources?.find(s => s.query === q);
   if (sourcesForQuery) {
@@ -167,6 +162,9 @@ ${queries?.map((q) => {
     throw new Error(`No sources found for query: ${q}`);
   }
 }).join('\n\n')}
+
+Main Topic:\n
+"${topic}"\n
 
 Begin by stating "Let me think through this step by step," then proceed with your reasoning.\n
   `.trim();

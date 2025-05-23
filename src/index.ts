@@ -14,6 +14,7 @@ import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
+import { logger } from "./utils/logger";
 
 /**
  * Decision making
@@ -72,7 +73,7 @@ export async function reasoningSearchResults({
       queries: queries,
     });
 
-    console.log("REASONING WITH", reasoningPrompt);
+    logger.log("REASONING WITH", reasoningPrompt);
 
     const reasoningResponse = await generateText({
       model: aiProvider.getReasoningModel(),
@@ -94,8 +95,8 @@ export async function reasoningSearchResults({
     // Option 3: If no structured reasoning available, return the full text
     return reasoningResponse.text;
   } catch (error: any) {
-    console.error("Fatal error in reasoningSearchResults:", error.message || error);
-    console.error(`  Error details:`, error);
+    logger.error("Fatal error in reasoningSearchResults:", error.message || error);
+    logger.error(`  Error details:`, error);
 
     // Throw the error to terminate program execution
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
@@ -125,7 +126,7 @@ export async function processReportForSources({
     }
   });
   
-  console.log(`Reference map size: ${referenceMap.size}`);
+  logger.log(`Reference map size: ${referenceMap.size}`);
   
   // Enhanced regex to find both single sources [1] and multiple sources [1, 2, 3]
   // This matches either:
@@ -149,7 +150,7 @@ export async function processReportForSources({
       }
       
       // If no matching source found, keep the original citation
-      console.log(`No source found for citation [${refNum}]`);
+      logger.log(`No source found for citation [${refNum}]`);
       return match;
     } 
     // If it's multiple reference numbers
@@ -164,7 +165,7 @@ export async function processReportForSources({
         }
         
         // If no matching source found, just return the number
-        console.log(`No source found for citation part ${refNum}`);
+        logger.log(`No source found for citation part ${refNum}`);
         return `${refNum}`;
       });
       
@@ -180,7 +181,7 @@ export async function processReportForSources({
   const sortedReferences = Array.from(referenceMap.entries())
     .sort((a, b) => a[0] - b[0]);
   
-  console.log(`Generating bibliography with ${sortedReferences.length} entries`);
+  logger.log(`Generating bibliography with ${sortedReferences.length} entries`);
   
   // Create bibliography entries
   sortedReferences.forEach(([number, source]) => {
@@ -228,7 +229,7 @@ export async function generateFinalReport({
   let phase: "initial" | "continuation" | "done" = "initial";
 
   do {
-    console.log(`[Iteration ${iter}] phase=${phase}`);
+    logger.log(`[Iteration ${iter}] phase=${phase}`);
 
     const finalReportPrompt = PROMPTS.finalReport({
       currentReport: draft,
@@ -242,9 +243,9 @@ export async function generateFinalReport({
     });
 
 
-    console.log(`\n[Iteration ${iter}] phase=${phase}`);
-    console.log("SYSTEM PROMPT:\n" + finalReportPrompt.system);
-    console.log("USER PROMPT:\n" + finalReportPrompt.user);
+    logger.log(`\n[Iteration ${iter}] phase=${phase}`);
+    logger.log("SYSTEM PROMPT:\n" + finalReportPrompt.system);
+    logger.log("USER PROMPT:\n" + finalReportPrompt.user);
 
     // call the model
     const response = await generateObject({
@@ -267,8 +268,8 @@ export async function generateFinalReport({
     phase = response.object.phase;
     draft += response.object.text;
 
-    console.log("MODEL OUTPUT:\n" + response.object.text);
-    console.log("PHASE==============================:\n" + response.object.phase);
+    logger.log("MODEL OUTPUT:\n" + response.object.text);
+    logger.log("PHASE==============================:\n" + response.object.phase);
 
 
     if (phase === "continuation") {
@@ -287,7 +288,7 @@ export async function generateFinalReport({
     sources,
   });
 
-  console.log("Done processing report for sources");
+  logger.log("Done processing report for sources");
 
   return { report: reportWithSources, bibliography };
 }
@@ -330,7 +331,7 @@ export async function generateResearchPlan({
       }),
     });
 
-    console.log("Research Prompts", PROMPTS.research({
+    logger.log("Research Prompts", PROMPTS.research({
       topic,
       reasoning: pastReasoning,
       queries: pastQueries,
@@ -344,7 +345,7 @@ export async function generateResearchPlan({
       suggestedBreadth: result.object.breadth,
     };
   } catch (error: any) {
-    console.error(`Error generating research plan: ${error.message || error}`);
+    logger.error(`Error generating research plan: ${error.message || error}`);
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
 }
@@ -447,6 +448,12 @@ export class DeepResearch {
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
 
+    // Configure logger based on config
+    if (config.logging && config.logging.enabled !== undefined) {
+      logger.setEnabled(config.logging.enabled);
+    }
+
+
     // Initialize AIProvider with API keys from config
     this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
     this.aiProvider = new AIProvider({
@@ -533,18 +540,22 @@ export class DeepResearch {
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),
+      logging: {
+        ...DEFAULT_CONFIG.logging,
+        ...(config.logging || {}),
+      },
     };
   }
 
   public async generate(topic: string) {
-    console.log(`Running research with topic: ${topic}`);
+    logger.log(`Running research with topic: ${topic}`);
     this.topic = topic;
     let iteration = 0;
 
     do {
       iteration++;
 
-      console.log(`[Step 1] Generating research plan... at ${iteration}`);
+      logger.log(`[Step 1] Generating research plan... at ${iteration}`);
 
       const {
         subQueries,
@@ -576,18 +587,18 @@ export class DeepResearch {
       this.queries = [...(this.queries || []), ...limitedQueries];
       this.latestResearchPlan = plan;
 
-      console.log(`Research plan: ${this.latestResearchPlan}`);
-      console.log(`Research queries: ${this.queries.join("\n")}`);
-      console.log(`Research depth and breadth: ${this.config.depth?.maxDepth} ${this.config.breadth?.maxBreadth}`);
+      logger.log(`Research plan: ${this.latestResearchPlan}`);
+      logger.log(`Research queries: ${this.queries.join("\n")}`);
+      logger.log(`Research depth and breadth: ${this.config.depth?.maxDepth} ${this.config.breadth?.maxBreadth}`);
 
       // step 2: fire web searches
-      console.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
+      logger.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
 
       const initialSearchResults = await this.jigsaw.searchAndGenerateContext(limitedQueries, this.topic, this.aiProvider);
       
       // step 2.5: deduplicate results
-      console.log(`Received ${initialSearchResults.length} initial search results`);
-      console.log(`[Step 2.5] Deduplicating search results...`);
+      logger.log(`Received ${initialSearchResults.length} initial search results`);
+      logger.log(`[Step 2.5] Deduplicating search results...`);
 
       this.sources = [...this.sources, ...initialSearchResults];
 
@@ -595,10 +606,10 @@ export class DeepResearch {
 
       // save it to the class for later use
       this.sources = deduplicatedResults;
-      console.log("DEDUPLICATED RESULTS", deduplicatedResults);
+      logger.log("DEDUPLICATED RESULTS", deduplicatedResults);
 
       // step 3: reasoning about the search results
-      console.log(`[Step 3] Reasoning about the search results...`);
+      logger.log(`[Step 3] Reasoning about the search results...`);
       const reasoning = await reasoningSearchResults({
         topic: this.topic,
         latestResearchPlan: this.latestResearchPlan,
@@ -608,10 +619,10 @@ export class DeepResearch {
       });
       this.latestReasoning = reasoning;
 
-      console.log(`Reasoning: ${reasoning}`);
+      logger.log(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
-      console.log(`[Step 4] Decision making...`);
+      logger.log(`[Step 4] Decision making...`);
       const deciding = await decisionMaking({
         reasoning,
         topic: this.topic,
@@ -619,7 +630,7 @@ export class DeepResearch {
       });
 
       this.latestDecisionMakingReason = deciding.reason;
-      console.log(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
+      logger.log(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
 
 
       const { isComplete, reason } = deciding;
@@ -631,7 +642,7 @@ export class DeepResearch {
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
 
     // step 5: generating report
-    console.log(`[Step 5] Generating report...`);
+    logger.log(`[Step 5] Generating report...`);
 
     const { report, bibliography } = await generateFinalReport({
       sources: this.sources,

@@ -30,10 +30,16 @@ async function basicResearch() {
     report: {
       maxOutputTokens: 5000, // Hard upper limit of tokens
     },
+    depth:{
+      maxDepth: 8
+    },
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
     JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
+    logging: {
+      enabled: true,
+    },
   });
 
   // Need to provide prompts array as required by generate method
@@ -53,7 +59,7 @@ Output the concatenation of c1, c2, c4, and c5 (make all characters lowercase).`
     const result = await deepResearch.generate(topic);
     // const result = await deepResearch.testGenerate();
     
-    const testDir = "logs/tests/yeyo";
+    const testDir = "logs/tests/activate_function";
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
