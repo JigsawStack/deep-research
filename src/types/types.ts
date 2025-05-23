@@ -36,16 +36,18 @@ export interface ResearchSource {
   url: string;
   title?: string;
   domain?: string;
+  content?: string;
   isAcademic?: boolean;
   referenceNumber?: number;
+  snippets?: string[];
 }
 
 export interface WebSearchResult {
-  question: string;
+  query: string;
   searchResults: {
-    ai_overview: string;
     results: ResearchSource[];
   };
+  context?: string;
 }
 
 // Recursive search context to track states between recursion levels

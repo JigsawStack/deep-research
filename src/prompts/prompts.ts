@@ -1,125 +1,179 @@
-import { WebSearchResult } from "@/types/types";
+import { ResearchSource, WebSearchResult } from "@/types/types";
+
+const CONTEXT_GENERATION_PROMPT = ({
+  topic,
+  queries,
+  research_sources,
+}: { topic: string; queries: string[]; research_sources: ResearchSource[] }) => `
+You are a world-class context generator.\n
+Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
+Extract all the information from the sources that is relevant to the main topic.\n
+
+Main Topic:\n
+${topic}\n
+
+Sub-Queries and Sources:\n
+${queries?.map((q) => {
+  const sourcesForQuery = research_sources?.filter(s => s.url && s.url.length > 0);
+  if (sourcesForQuery && sourcesForQuery.length > 0) {
+    return `**${q}**\n${sourcesForQuery.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
+  }
+  return `**${q}** (No sources found)`;
+}).join('\n\n')}
+`.trim();
 
 const RESEARCH_PROMPT_TEMPLATE = ({
   topic,
-  pastReasoning,
-  pastQueries,
-  pastSources,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; pastSources?: WebSearchResult[] }) => `
-You are a world-class research planner.\n
-Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
+  reasoning,
+  queries,
+  sources,
+}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
+  const systemPrompt = `
+  You are a world-class research planner.\n
+  Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
 
+  INSTRUCTIONS:\n
+  1. A Detailed Research Plan:\n
+      - Clearly outline the overall research strategy and methodology you propose.\n
+      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.\n
+      - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.\n
+      - The plan should be logical, actionable, and designed for efficient information gathering.\n
 
+  2. A List of Focused Search Queries:\n
+      - Generate a list of specific and targeted search queries.\n
+      - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.\n
+      - The set of queries should collectively aim to cover the main aspects identified in your research plan.\n
+      - Ensure queries are distinct and avoid redundancy.\n
+    
+  3. Generate how deep the research should be:\n
+      - Generate a number to determine how deep the research should be to fully explore this topic\n
+
+  4. Generate how broad the research should be:\n
+      - Generate a number to determine how broad the research should be to fully explore this topic\n
+    
+  OUTPUT:\n
+    - A JSON object with the following keys:\n
+      - "researchPlan": A detailed research plan\n
+      - "queries": A list of search queries\n
+      - "depth": A number representing the depth of the research\n
+      - "breadth": A number representing the breadth of the research\n
+  `.trim();
+
+  const userPrompt = `
 The topic is: ${topic}\n
 
-${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}\n
+${reasoning ? `Past reasoning: ${reasoning}` : ""}\n
 
-Past Queries and Sources:\n
-${pastQueries?.map((q, i) => {
-  const source = pastSources?.[i];
-  if (source) {
-    const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-    return `${i + 1}. **${q}**${overview}\n${source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n')}`;
+${queries ? `
+Sub-Queries and Sources:
+${queries.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
   }
-  return `${i + 1}. **${q}** (No sources found)`;
-}).join('\n\n') || ''}
+  return `**${q}** (No sources found)`;
+}).join('\n\n')}` : ''}
+  `.trim();
 
-
-Please provide the following components:
-
-1. A Detailed Research Plan:\n
-    - Clearly outline the overall research strategy and methodology you propose.\n
-    - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.\n
-    - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.\n
-    - The plan should be logical, actionable, and designed for efficient information gathering.\n
-
-2. A List of Focused Search Queries:\n
-    - Generate a list of specific and targeted search queries.\n
-    - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.\n
-    - The set of queries should collectively aim to cover the main aspects identified in your research plan.\n
-    - Ensure queries are distinct and avoid redundancy.\n
-  
-3. Generate how deep the research should be:\n
-    - Generate a number to determine how deep the research should be to fully explore this topic\n
-
-4. Generate how broad the research should be:\n
-    - Generate a number to determine how broad the research should be to fully explore this topic\n
-
-`;
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+};
 
 const DECISION_MAKING_PROMPT = ({
+  topic,
   reasoning,
 }: {
   reasoning: string;
-}) => `
-You are a world-class decision-making researcher.\n
+  topic: string;
+}) => {
+  const systemPrompt = `
+You are a world-class analyst.\n
+Your primary purpose is to help decide if the reasoning is sufficient to answer the main topic.\n
 
 Current datetime is: ${new Date().toISOString()}\n
 
-Chain of Thought:\n
-"""${reasoning}"""\n
-
 INSTRUCTIONS:\n
-- If the reasoning is sufficient to cover all major sub-topics in deep dive, set "isComplete" to true.\n
-- Otherwise set "isComplete" to false.\n
+- If the reasoning is sufficient to answer the main topic set "isComplete" to true.\n
 - In either case, provide a brief explanation in "reason" describing your judgement.\n
 - **Output only** a JSON object with exactly these two keys and no extra text, for example:
   {
     "isComplete": true,
-    "reason": "The reasoning covers all identified gaps and the target length is adequate."
+    "reason": "The reasoning is sufficient to answer the main topic."
   }
-`;
+`.trim();
+
+  const userPrompt = `
+Chain of Thought:\n
+"""${reasoning}"""\n
+
+Main Topic:\n
+${topic}\n
+`.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+};
 
 const REASONING_SEARCH_RESULTS_PROMPT = ({
   topic,
   researchPlan,
-  searchResults,
   queries,
+  sources,
 }: {
   topic: string;
   researchPlan: string;
-  searchResults: WebSearchResult[];
   queries: string[];
-}) => `
-You are an world-class reasoning researcher.\n
-
-  • Topic to address:\n
-    "${topic}"\n
-
-  • Proposed research plan:\n
-    """${researchPlan}"""\n
-
-  Sub-Queries and Sources:\n
-  ${queries.map((q, i) => {
-    const source = searchResults[i];
-    if (source) {
-      const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-      const urls = source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n');
-      return `${i + 1}. **${q}** → ${source.searchResults.results.length} hits${overview}\n${urls}`;
-    }
-    return `${i + 1}. **${q}** (No sources found)`;
-  }).join('\n\n')}
-    
-
-Current datetime is: ${new Date().toISOString()} \n
+  sources: WebSearchResult[];
+}) => {
+  const systemPrompt = `
+You are a world-class analyst.\n
+Your primary purpose is to help reason if the the topic, 
+queries, sources, and research plan are sufficient to answer the main topic.\n
 
 INSTRUCTIONS:\n
-Your task is to evaluate whether this set of queries and sources collectively provides enough coverage
-to answer the topic. Think step by step and show your full chain-of-thought. \n
+- Think step by step and show your full chain-of-thought. \n
+- Specifically, decompose the topic into its major sub-topics or dimensions.\n
+- Map each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
+- Assess the quality, relevance, and diversity of the sources provided.\n
+- Identify gaps—sub-topics not covered or weakly supported.\n
+- Recommend additional queries, source types, or angles needed to fill those gaps.\n
+  `.trim();
 
-Specifically:\n
-1. **Decompose** the topic into its major sub-topics or dimensions.\n
-2. **Map** each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
-3. **Identify** gaps—sub-topics not covered or weakly supported.\n
-4. **Assess** the quality, relevance, and diversity of the sources provided.\n
-5. **Recommend** additional queries, source types, or angles needed to fill those gaps.\n
-6. **Summarize** at the end with a JSON object containing:\n
-   - sufficiency: "sufficient" or "insufficient"\n
-   - missingAreas: [list of uncovered sub-topics]\n
-   - suggestions: [list of concrete next queries or source types]\n
+  const userPrompt = `
+Proposed research plan:\n
+"""${researchPlan}"""\n
+
+Context for each query:\n
+${queries?.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery) {
+    return `**Query: ${q}**\n
+    Context: ${sourcesForQuery.context}\n
+    URLs: ${sourcesForQuery.searchResults.results.map(r => r.url).join(', ')}`;
+  } else {
+    throw new Error(`No sources found for query: ${q}`);
+  }
+}).join('\n\n')}
+
+Main Topic:\n
+"${topic}"\n
 
 Begin by stating "Let me think through this step by step," then proceed with your reasoning.\n
-`;
+  `.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+}
 
 const FINAL_REPORT_PROMPT = ({
   topic,
@@ -202,14 +256,16 @@ const FINAL_REPORT_PROMPT = ({
     ${latestReasoning}\n
 
     Sub-Queries and Sources:\n
-    ${queries.map((q, i) => {
-      const source = sources[i];
-      if (source) {
-        const overview = source.searchResults.ai_overview ? `\n   AI Overview: ${source.searchResults.ai_overview.substring(0, 150)}...` : '';
-        return `${i + 1}. **${q}**${overview}\n${source.searchResults.results.map(r => `   [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})`).join('\n')}`;
+    ${queries?.map((q) => {
+      const sourcesForQuery = sources?.find(s => s.query === q);
+      if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+        return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
+        [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+        Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
       }
-      return `${i + 1}. **${q}** (No sources found)`;
+      return `**${q}** (No sources found)`;
     }).join('\n\n')}
+
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     
@@ -232,4 +288,5 @@ export const PROMPTS = {
   reasoningSearchResults: REASONING_SEARCH_RESULTS_PROMPT,
   decisionMaking: DECISION_MAKING_PROMPT,
   finalReport: FINAL_REPORT_PROMPT,
+  contextGeneration: CONTEXT_GENERATION_PROMPT,
 };

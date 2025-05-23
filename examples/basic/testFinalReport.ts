@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
-import { createDeepResearch, generateFinalReport, mapSearchResultsToNumbers } from "../../src/index";
+import { createDeepResearch, generateFinalReport} from "../../src/index";
 import fs from "fs";
 
 // Basic usage example
@@ -46,23 +46,19 @@ async function testFinalReport() {
   const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
   const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
 
-  const numberedSources = mapSearchResultsToNumbers({ sources });
 
   // Generate the final report using the loaded data
-  const { report, debugLog } = await generateFinalReport({
-    sources: numberedSources,
+  const { report } = await generateFinalReport({
+    sources,
     topic,
     targetOutputTokens,
     aiProvider: deepResearch.aiProvider,
-    debugLog: [],
     latestResearchPlan,
     latestReasoning,
     queries,
   });
 
   fs.writeFileSync("logs/testFinalReport.md", report);
-  fs.writeFileSync("logs/report-log.md", debugLog.join("\n"));
-
 }
 
 // Run the research

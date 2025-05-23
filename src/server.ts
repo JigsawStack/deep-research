@@ -2,7 +2,9 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import 'dotenv/config';
 import { createDeepResearch } from './index';
+import { logger } from './utils/logger';
 
+logger.setEnabled(false);
 // Research result interface
 interface ResearchResult {
   status: string;
