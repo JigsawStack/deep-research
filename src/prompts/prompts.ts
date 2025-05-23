@@ -100,13 +100,11 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   researchPlan,
   queries,
   sources,
-  contentLength = 1000,
 }: {
   topic: string;
   researchPlan: string;
   queries: string[];
   sources: WebSearchResult[];
-  contentLength?: number;
 }) => `
 You are an world-class reasoning researcher.\n
 
@@ -116,13 +114,14 @@ You are an world-class reasoning researcher.\n
   • Proposed research plan:\n
     """${researchPlan}"""\n
 
-  Sub-Queries and Sources:\n
+  Sub-Queries Sources and Context:\n
   ${queries?.map((q) => {
     const sourcesForQuery = sources?.find(s => s.query === q);
     if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
       return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
       [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-      Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
+      Context: ${sourcesForQuery.context}\n
+      `).join('\n')}`;
     }
     return `**${q}** (No sources found)`;
   }).join('\n\n')}
