@@ -86,27 +86,43 @@ ${queries.map((q) => {
 };
 
 const DECISION_MAKING_PROMPT = ({
+  topic,
   reasoning,
 }: {
   reasoning: string;
-}) => `
+  topic: string;
+}) => {
+  const systemPrompt = `
 You are a world-class decision-making researcher.\n
+Your primary purpose is to help decide if the reasoning is sufficient to answer the main topic.\n
 
 Current datetime is: ${new Date().toISOString()}\n
 
-Chain of Thought:\n
-"""${reasoning}"""\n
-
 INSTRUCTIONS:\n
-- If the reasoning is sufficient to cover all major sub-topics in deep dive, set "isComplete" to true.\n
-- Otherwise set "isComplete" to false.\n
+- If the reasoning is sufficient to answer the main topic set "isComplete" to true.\n
 - In either case, provide a brief explanation in "reason" describing your judgement.\n
 - **Output only** a JSON object with exactly these two keys and no extra text, for example:
   {
     "isComplete": true,
-    "reason": "The reasoning covers all identified gaps and the target length is adequate."
+    "reason": "The reasoning is sufficient to answer the main topic."
   }
 `.trim();
+
+  const userPrompt = `
+Chain of Thought:\n
+"""${reasoning}"""\n
+
+Main Topic:\n
+${topic}\n
+`.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+};
+
+
 
 const REASONING_SEARCH_RESULTS_PROMPT = ({
   topic,

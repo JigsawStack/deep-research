@@ -24,10 +24,12 @@ import { PROMPTS } from "./prompts/prompts";
  */
 export async function decisionMaking({
   reasoning,
+  topic,
   aiProvider,
-}: { reasoning: string; aiProvider: AIProvider }) {
+}: { reasoning: string; topic: string; aiProvider: AIProvider }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
+    topic,
   });
 
   const decisionMakingResponse = await generateObject({
@@ -36,9 +38,9 @@ export async function decisionMaking({
     schema: z.object({
       isComplete: z.boolean().describe("Whether the research is complete"),
       reason: z.string().describe("The reason for the decision"),
-      
     }),
-    prompt: decisionMakingPrompt,
+    system: decisionMakingPrompt.system,
+    prompt: decisionMakingPrompt.user,
     temperature: 0,
   });
 
@@ -77,26 +79,19 @@ export async function reasoningSearchResults({
       system: reasoningPrompt.system,
       prompt: reasoningPrompt.user,
     });
-
-    
-    console.log("REASONING DETAILS", reasoningResponse.reasoningDetails);
     
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
-      console.log("REASONING RESPONSE TEXT", reasoningResponse.reasoning);
       return reasoningResponse.reasoning;
     }
 
-    // Option 2: Extract content between <think> or <thinking> tags
+    // Option 2: Extract content between <think> or <thinking> tags (deepseek-r1 uses this)
     const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
     if (thinkingMatch) {
-      console.log("THINKING MATCH1", thinkingMatch[1]);
-      console.log("THINKING MATCH2", thinkingMatch[2]);
       return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
     }
 
     // Option 3: If no structured reasoning available, return the full text
-    console.log("REASONING RESPONSE TEXT", reasoningResponse.text);
     return reasoningResponse.text;
   } catch (error: any) {
     console.error("Fatal error in reasoningSearchResults:", error.message || error);
@@ -437,7 +432,7 @@ export class DeepResearch {
 
   public latestResearchPlan: string = "";
   public latestReasoning: string = "";
-  public latestDecisionMaking: string = "";
+  public latestDecisionMakingReason: string = "";
 
 
   public queries: string[] = [];
@@ -600,7 +595,7 @@ export class DeepResearch {
 
       // save it to the class for later use
       this.sources = deduplicatedResults;
-      console.log(deduplicatedResults);
+      console.log("DEDUPLICATED RESULTS", deduplicatedResults);
 
       // step 3: reasoning about the search results
       console.log(`[Step 3] Reasoning about the search results...`);
@@ -619,10 +614,11 @@ export class DeepResearch {
       console.log(`[Step 4] Decision making...`);
       const deciding = await decisionMaking({
         reasoning,
+        topic: this.topic,
         aiProvider: this.aiProvider,
       });
 
-      this.latestDecisionMaking = deciding.reason;
+      this.latestDecisionMakingReason = deciding.reason;
       console.log(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
 
 
