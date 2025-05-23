@@ -47,17 +47,17 @@ async function basicResearch() {
     const result = await deepResearch.generate(topic);
     // const result = await deepResearch.testGenerate();
     
-    const testDir = "logs/tests/math_with_content";
+    const testDir = "logs/tests/math_with_context_generated";
 
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
     console.log("result", result.data.text);
 
-    fs.writeFileSync("logs/research.json", JSON.stringify(result.data.metadata.researchPlan, null, 2));
-    fs.writeFileSync("logs/queries.json", JSON.stringify(result.data.metadata.queries, null, 2));
-    fs.writeFileSync("logs/sources.json", JSON.stringify(result.data.metadata.sources, null, 2));
-    fs.writeFileSync("logs/reasoning.json", JSON.stringify(result.data.metadata.reasoning, null, 2));
+    fs.writeFileSync(`${testDir}/research.json`, JSON.stringify(result.data.metadata.researchPlan, null, 2));
+    fs.writeFileSync(`${testDir}/queries.json`, JSON.stringify(result.data.metadata.queries, null, 2));
+    fs.writeFileSync(`${testDir}/sources2.json`, JSON.stringify(result.data.metadata.sources, null, 2));
+    fs.writeFileSync(`${testDir}/reasoning.json`, JSON.stringify(result.data.metadata.reasoning, null, 2));
 
     return result;
   } catch (error) {

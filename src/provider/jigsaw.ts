@@ -25,32 +25,44 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  private async context_generator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
+  public async context_generator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
     try {
       // Generate context for each query's search results
       const contextResults = await Promise.all(
         queries.map(async (query) => {
           // Extract content from sources for this query
-          const querySources = sources.find(source => source.query=== query)?.searchResults.results || [];
+          const querySources = sources.find(source => source.query === query)?.searchResults.results || [];
+          
+          // Process sources to use snippets when content is empty
+          const processedSources = querySources.map(source => {
+            if (!source.content || source.content.trim() === '') {
+              // If content is empty but snippets are available, join snippets as content
+              if (source.snippets && source.snippets.length > 0) {
+                return {
+                  ...source,
+                  content: source.snippets.join('\n')
+                };
+              } else {
+                // otherwise we dont use the source at all
+                return null;
+              }
+            }
+            return source;
+          }).filter(source => source !== null);
 
           const response = await generateObject({
             model: aiProvider.getDefaultModel(),
             prompt: PROMPTS.contextGeneration({
               topic: topic,
               queries: [query],
-              sources: querySources,
+              sources: processedSources,
             }),
             schema: z.object({
               context: z.string().describe("The context overview"),
-              hasContent: z.boolean().describe("If there are contents provided in the sources, if not, return false"),
             }),
           });
           
-          return {
-            query: query,
-            context: response.object.context,
-            hasContent: response.object.hasContent
-          };
+          return response.object.context;
         })
       );
       
@@ -60,6 +72,53 @@ export class JigsawProvider {
       return "Error generating context overview.";
     }
   }
+
+  
+  public async searchAndGenerateContext(queries: string[], topic: string, aiProvider: AIProvider): Promise<WebSearchResult[]> {
+    // Step 1: Fire web searches for all queries
+    const searchResults = await this.fireWebSearches(queries);
+    
+    // Filter out queries with empty search results
+    const nonEmptySearchResults = searchResults.filter(result => 
+      result.searchResults.results && result.searchResults.results.length > 0
+    );
+    
+    // If all results are empty, return an empty array
+    if (nonEmptySearchResults.length === 0) {
+      return [];
+    }
+    
+    // Step 2: Generate context for the search results with non-empty results
+    const contextResults = await this.context_generator({
+      queries: nonEmptySearchResults.map(result => result.query),
+      sources: nonEmptySearchResults,
+      topic,
+      aiProvider
+    });
+    
+    // Step 3: Combine search results with generated contexts
+    const resultsWithContext = nonEmptySearchResults.map((searchResult, index) => {
+      // Filter out sources with empty content and empty snippets
+      const filteredResults = searchResult.searchResults.results.filter(source => 
+        (source.content && source.content.trim() !== '') || 
+        (source.snippets && source.snippets.length > 0)
+      );
+      
+      return {
+        query: searchResult.query,
+        searchResults: {
+          results: filteredResults
+        },
+        context: contextResults[index] || ''
+      };
+    });
+    
+    // Filter out any entries that might have ended up with empty results
+    return resultsWithContext.filter(result => 
+      result.searchResults.results && result.searchResults.results.length > 0
+    );
+  }
+  
 
   public async fireWebSearches(queries: string[]) {
     // Map each query to a promise that resolves to a search result
@@ -75,7 +134,7 @@ export class JigsawProvider {
             return response;
           },
           {
-            delay: createExponetialDelay(1000), // Start with 1s, then grows exponentially
+            delay: createExponetialDelay(2000), // Start with 2s, then grows exponentially
             maxTry: 3,
             onError: (error, currentTry) => {
               console.warn(`API request failed (attempt ${currentTry}/3):`, (error as Error).message);
@@ -96,6 +155,7 @@ export class JigsawProvider {
             url: result.url || "",
             title: result.title || "",
             content: result.content || "",
+            snippets: result.snippets || [],
           };
           const cleaned = ContentCleaner.cleanContent(source);
           return {
@@ -103,7 +163,13 @@ export class JigsawProvider {
             domain: cleaned.domain || "",
             isAcademic: cleaned.isAcademic || false,
           } as ResearchSource;
-        });
+        })
+        // Filter out sources with empty content and empty snippets early
+        .filter(source => 
+          (source.content && source.content.trim() !== '') || 
+          (source.snippets && source.snippets.length > 0)
+        );
+
         return {
           query: query,
           searchResults: {

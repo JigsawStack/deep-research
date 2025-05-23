@@ -39,6 +39,7 @@ export interface ResearchSource {
   content?: string;
   isAcademic?: boolean;
   referenceNumber?: number;
+  snippets?: string[];
 }
 
 export interface WebSearchResult {

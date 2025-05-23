@@ -45,8 +45,6 @@ export async function decisionMaking({
   return decisionMakingResponse.object;
 }
 
-
-
 /**
  * Reasoning about the search results
  * 
@@ -357,8 +355,8 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   return sources.map((result) => {
     return {
       query: result.query,
+      context: result.context || "",
       searchResults: {
-        // ai_overview: result.searchResults.ai_overview,
         results: result.searchResults.results
           .filter((item) => {
             // Skip if we've seen this URL before
@@ -390,6 +388,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
   return sources.map((result) => {
     return {
       query: result.query,
+      context: result.context || "",
       searchResults: {
         // ai_overview: result.searchResults.ai_overview,
         results: result.searchResults.results.map((item) => {
@@ -420,6 +419,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
 export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
   return new DeepResearch(config);
 }
+
 
 /**
  * The DeepResearch class
@@ -585,7 +585,7 @@ export class DeepResearch {
       debugLog.push(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
       console.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.fireWebSearches(limitedQueries);
+      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(limitedQueries, this.topic, this.aiProvider);
       console.log(`Received ${initialSearchResults.length} initial search results`);
 
       // step 2.5: deduplicate results
