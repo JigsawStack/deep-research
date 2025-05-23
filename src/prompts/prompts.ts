@@ -7,7 +7,7 @@ const CONTEXT_GENERATION_PROMPT = ({
 }: { topic: string; queries: string[]; research_sources: ResearchSource[] }) => `
 You are a world-class context generator.\n
 Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
-Extract all all the information from the sources that is relevant to the main topic.\n
+Extract all the information from the sources that is relevant to the main topic.\n
 
 Main Topic:\n
 ${topic}\n
@@ -29,17 +29,46 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   reasoning,
   queries,
   sources,
-}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => `
-You are a world-class research planner.\n
-Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
+}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
+  const systemPrompt = `
+  You are a world-class research planner.\n
+  Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
 
+  INSTRUCTIONS:\n
+  1. A Detailed Research Plan:\n
+      - Clearly outline the overall research strategy and methodology you propose.\n
+      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.\n
+      - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.\n
+      - The plan should be logical, actionable, and designed for efficient information gathering.\n
 
+  2. A List of Focused Search Queries:\n
+      - Generate a list of specific and targeted search queries.\n
+      - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.\n
+      - The set of queries should collectively aim to cover the main aspects identified in your research plan.\n
+      - Ensure queries are distinct and avoid redundancy.\n
+    
+  3. Generate how deep the research should be:\n
+      - Generate a number to determine how deep the research should be to fully explore this topic\n
+
+  4. Generate how broad the research should be:\n
+      - Generate a number to determine how broad the research should be to fully explore this topic\n
+    
+  OUTPUT:\n
+    - A JSON object with the following keys:\n
+      - "researchPlan": A detailed research plan\n
+      - "queries": A list of search queries\n
+      - "depth": A number representing the depth of the research\n
+      - "breadth": A number representing the breadth of the research\n
+  `.trim();
+
+  const userPrompt = `
 The topic is: ${topic}\n
 
 ${reasoning ? `Past reasoning: ${reasoning}` : ""}\n
 
-Sub-Queries and Sources:\n
-${queries?.map((q) => {
+${queries ? `
+Sub-Queries and Sources:
+${queries.map((q) => {
   const sourcesForQuery = sources?.find(s => s.query === q);
   if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
     return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
@@ -47,30 +76,14 @@ ${queries?.map((q) => {
     Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
   }
   return `**${q}** (No sources found)`;
-}).join('\n\n')}
+}).join('\n\n')}` : ''}
+  `.trim();
 
-
-
-Please provide the following components:
-
-1. A Detailed Research Plan:\n
-    - Clearly outline the overall research strategy and methodology you propose.\n
-    - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.\n
-    - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.\n
-    - The plan should be logical, actionable, and designed for efficient information gathering.\n
-
-2. A List of Focused Search Queries:\n
-    - Generate a list of specific and targeted search queries.\n
-    - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.\n
-    - The set of queries should collectively aim to cover the main aspects identified in your research plan.\n
-    - Ensure queries are distinct and avoid redundancy.\n
-  
-3. Generate how deep the research should be:\n
-    - Generate a number to determine how deep the research should be to fully explore this topic\n
-
-4. Generate how broad the research should be:\n
-    - Generate a number to determine how broad the research should be to fully explore this topic\n
-`.trim();
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+};
 
 const DECISION_MAKING_PROMPT = ({
   reasoning,
@@ -105,48 +118,48 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   researchPlan: string;
   queries: string[];
   sources: WebSearchResult[];
-}) => `
+}) => {
+  const systemPrompt = `
 You are an world-class reasoning researcher.\n
-
-  • Topic to address:\n
-    "${topic}"\n
-
-  • Proposed research plan:\n
-    """${researchPlan}"""\n
-
-  Sub-Queries Sources and Context:\n
-  ${queries?.map((q) => {
-    const sourcesForQuery = sources?.find(s => s.query === q);
-    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-      return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
-      [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-      Context: ${sourcesForQuery.context}\n
-      `).join('\n')}`;
-    }
-    return `**${q}** (No sources found)`;
-  }).join('\n\n')}
-
-    
-
-Current datetime is: ${new Date().toISOString()} \n
+Your primary purpose is to help reason if the the topic, 
+queries, sources, and research plan are sufficient to answer the topic.\n
 
 INSTRUCTIONS:\n
-Your task is to evaluate whether this set of queries and sources collectively provides enough coverage
-to answer the topic. Think step by step and show your full chain-of-thought. \n
+- Think step by step and show your full chain-of-thought. \n
+- Specifically, decompose the topic into its major sub-topics or dimensions.\n
+- Map each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
+- Identify gaps—sub-topics not covered or weakly supported.\n
+- Assess the quality, relevance, and diversity of the sources provided.\n
+- Recommend additional queries, source types, or angles needed to fill those gaps.\n
+  `.trim();
 
-Specifically:\n
-1. **Decompose** the topic into its major sub-topics or dimensions.\n
-2. **Map** each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
-3. **Identify** gaps—sub-topics not covered or weakly supported.\n
-4. **Assess** the quality, relevance, and diversity of the sources provided.\n
-5. **Recommend** additional queries, source types, or angles needed to fill those gaps.\n
-6. **Summarize** at the end with a JSON object containing:\n
-   - sufficiency: "sufficient" or "insufficient"\n
-   - missingAreas: [list of uncovered sub-topics]\n
-   - suggestions: [list of concrete next queries or source types]\n
+  const userPrompt = `
+• Topic to address:\n
+"${topic}"\n
+
+• Proposed research plan:\n
+"""${researchPlan}"""\n
+
+• Context for each query:\n
+${queries?.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery) {
+    return `**Query: ${q}**\n
+    Context: ${sourcesForQuery.context}\n
+    URLs: ${sourcesForQuery.searchResults.results.map(r => r.url).join(', ')}`;
+  } else {
+    throw new Error(`No sources found for query: ${q}`);
+  }
+}).join('\n\n')}
 
 Begin by stating "Let me think through this step by step," then proceed with your reasoning.\n
-`.trim();
+  `.trim();
+
+  return {
+    system: systemPrompt,
+    user: userPrompt,
+  };
+}
 
 const FINAL_REPORT_PROMPT = ({
   topic,

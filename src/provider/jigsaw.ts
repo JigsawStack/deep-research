@@ -103,6 +103,11 @@ export class JigsawProvider {
         (source.snippets && source.snippets.length > 0)
       );
       
+      // Skip queries that end up with empty results after filtering
+      if (filteredResults.length === 0) {
+        return null;
+      }
+      
       return {
         query: searchResult.query,
         searchResults: {
@@ -110,12 +115,9 @@ export class JigsawProvider {
         },
         context: contextResults[index] || ''
       };
-    });
+    }).filter(result => result !== null);
     
-    // Filter out any entries that might have ended up with empty results
-    return resultsWithContext.filter(result => 
-      result.searchResults.results && result.searchResults.results.length > 0
-    );
+    return resultsWithContext;
   }
 
   public async fireWebSearches(queries: string[]) {
@@ -148,7 +150,7 @@ export class JigsawProvider {
         }
 
         // Clean and process each search result
-        const cleanedResults = results.results.map((result) => {
+        const cleanedResults = results.results.slice(0, 5).map((result) => {
           const source: ResearchSource = {
             url: result.url ,
             title: result.title,
