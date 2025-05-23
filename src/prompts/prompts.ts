@@ -3,8 +3,8 @@ import { ResearchSource, WebSearchResult } from "@/types/types";
 const CONTEXT_GENERATION_PROMPT = ({
   topic,
   queries,
-  sources,
-}: { topic: string; queries: string[]; sources: ResearchSource[] }) => `
+  research_sources,
+}: { topic: string; queries: string[]; research_sources: ResearchSource[] }) => `
 You are a world-class context generator.\n
 Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
 Extract all all the information from the sources that is relevant to the main topic.\n
@@ -14,11 +14,11 @@ ${topic}\n
 
 Sub-Queries and Sources:\n
 ${queries?.map((q) => {
-  const sourcesForQuery = sources?.filter(s => s.url && s.url.length > 0);
+  const sourcesForQuery = research_sources?.filter(s => s.url && s.url.length > 0);
   if (sourcesForQuery && sourcesForQuery.length > 0) {
     return `**${q}**\n${sourcesForQuery.map(r => `   
     [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-    Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
   }
   return `**${q}** (No sources found)`;
 }).join('\n\n')}
@@ -26,28 +26,29 @@ ${queries?.map((q) => {
 
 const RESEARCH_PROMPT_TEMPLATE = ({
   topic,
-  pastReasoning,
-  pastQueries,
-  pastSources,
-}: { topic: string; pastReasoning?: string; pastQueries?: string[]; pastSources?: WebSearchResult[] }) => `
+  reasoning,
+  queries,
+  sources,
+}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => `
 You are a world-class research planner.\n
 Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
 
 
 The topic is: ${topic}\n
 
-${pastReasoning ? `Past reasoning: ${pastReasoning}` : ""}\n
+${reasoning ? `Past reasoning: ${reasoning}` : ""}\n
 
 Sub-Queries and Sources:\n
-${pastQueries?.map((q, i) => {
-  const source = pastSources?.[i];
-  if (source) {
-    return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
+${queries?.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
     [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-    Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
   }
-  return `${i + 1}. **${q}** (No sources found)`;
+  return `**${q}** (No sources found)`;
 }).join('\n\n')}
+
 
 
 Please provide the following components:
@@ -115,16 +116,17 @@ You are an world-class reasoning researcher.\n
   • Proposed research plan:\n
     """${researchPlan}"""\n
 
-      Sub-Queries and Sources:\n
-    ${queries.map((q, i) => {
-      const source = sources[i];
-      if (source) {
-        return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
-        [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-        Content: ${r.content ? r.content.substring(0, contentLength) + '...' : 'No content available'}`).join('\n')}`;
-      }
-      return `${i + 1}. **${q}** (No sources found)`;
-    }).join('\n\n')}
+  Sub-Queries and Sources:\n
+  ${queries?.map((q) => {
+    const sourcesForQuery = sources?.find(s => s.query === q);
+    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+      return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
+      [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+      Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
+    }
+    return `**${q}** (No sources found)`;
+  }).join('\n\n')}
+
     
 
 Current datetime is: ${new Date().toISOString()} \n
@@ -228,15 +230,16 @@ const FINAL_REPORT_PROMPT = ({
     ${latestReasoning}\n
 
     Sub-Queries and Sources:\n
-    ${queries.map((q, i) => {
-      const source = sources[i];
-      if (source) {
-        return `${i + 1}. **${q}**\n${source.searchResults.results.map(r => `   
+    ${queries?.map((q) => {
+      const sourcesForQuery = sources?.find(s => s.query === q);
+      if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+        return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
         [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-        Content: ${r.content ? r.content : 'No content available'}`).join('\n')}`;
+        Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
       }
-      return `${i + 1}. **${q}** (No sources found)`;
+      return `**${q}** (No sources found)`;
     }).join('\n\n')}
+
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     

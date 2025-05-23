@@ -75,12 +75,6 @@ export async function reasoningSearchResults({
       prompt: reasoningPrompt,
     });
 
-    // Create logs directory if it doesn't exist
-    if (!fs.existsSync("logs")) {
-      fs.mkdirSync("logs", { recursive: true });
-    }
-    fs.writeFileSync("logs/reasoningPrompt.md", reasoningPrompt);
-    fs.writeFileSync("logs/reasoningTest.md", reasoningResponse.text);
 
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
@@ -274,7 +268,6 @@ export async function generateFinalReport({
     debugLog.push("MODEL OUTPUT:\n" + response.object.text);
     debugLog.push("PHASE==============================:\n" + response.object.phase);
 
-    fs.writeFileSync("logs/debug.md", debugLog.join("\n"));
 
     if (phase === "continuation") {
       const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
@@ -331,9 +324,9 @@ export async function generateResearchPlan({
 
       prompt: PROMPTS.research({
         topic,
-        pastReasoning,
-        pastQueries,
-        pastSources,
+        reasoning: pastReasoning,
+        queries: pastQueries,
+        sources: pastSources,
       }),
     });
 
@@ -355,7 +348,7 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   return sources.map((result) => {
     return {
       query: result.query,
-      context: result.context || "",
+      context: result.context,
       searchResults: {
         results: result.searchResults.results
           .filter((item) => {
@@ -368,12 +361,12 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
             return true;
           })
           .map((item) => {
-            // Keep only essential information
             return {
               url: item.url,
-              title: item.title || "",
-              domain: item.domain || "",
-              content: item.content || "",
+              title: item.title,
+              domain: item.domain,
+              content: item.content,
+              snippets: item.snippets,
             };
           }),
       },
@@ -399,10 +392,11 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
           
         return {
             url: item.url,
-            title: item.title || "",
-            domain: item.domain || "",
+            title: item.title,
+            domain: item.domain,
             referenceNumber: urlMap.get(item.url) || 0,
-            content: item.content || "",
+            content: item.content,
+            snippets: item.snippets,
           };
         }),
       },
@@ -586,9 +580,9 @@ export class DeepResearch {
       console.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
 
       const initialSearchResults = await this.jigsaw.searchAndGenerateContext(limitedQueries, this.topic, this.aiProvider);
-      console.log(`Received ${initialSearchResults.length} initial search results`);
-
+      
       // step 2.5: deduplicate results
+      console.log(`Received ${initialSearchResults.length} initial search results`);
       debugLog.push(`[Step 2.5] Deduplicating search results...`);
       console.log(`[Step 2.5] Deduplicating search results...`);
 
@@ -598,6 +592,7 @@ export class DeepResearch {
 
       // save it to the class for later use
       this.sources = deduplicatedResults;
+      console.log(deduplicatedResults);
 
       // step 3: reasoning about the search results
       debugLog.push(`[Step 3] Reasoning about the search results...`);
@@ -648,8 +643,6 @@ export class DeepResearch {
       queries: this.queries,
     });
 
-    fs.writeFileSync("logs/finalReport.md", report);
-    fs.writeFileSync("logs/bibliography.md", bibliography);
 
     return {
       status: "success",
@@ -688,9 +681,6 @@ export class DeepResearch {
       queries,
     });
 
-    // Write the report to file
-    fs.writeFileSync("logs/testReport.md", report);
-    fs.writeFileSync("logs/testDebugLog.md", debugLog.join("\n"));
 
     return report;
   }

@@ -55,7 +55,7 @@ export class JigsawProvider {
             prompt: PROMPTS.contextGeneration({
               topic: topic,
               queries: [query],
-              sources: processedSources,
+              research_sources: processedSources,
             }),
             schema: z.object({
               context: z.string().describe("The context overview"),
@@ -72,7 +72,6 @@ export class JigsawProvider {
       return "Error generating context overview.";
     }
   }
-
   
   public async searchAndGenerateContext(queries: string[], topic: string, aiProvider: AIProvider): Promise<WebSearchResult[]> {
     // Step 1: Fire web searches for all queries
@@ -118,7 +117,6 @@ export class JigsawProvider {
       result.searchResults.results && result.searchResults.results.length > 0
     );
   }
-  
 
   public async fireWebSearches(queries: string[]) {
     // Map each query to a promise that resolves to a search result
@@ -152,21 +150,21 @@ export class JigsawProvider {
         // Clean and process each search result
         const cleanedResults = results.results.map((result) => {
           const source: ResearchSource = {
-            url: result.url || "",
-            title: result.title || "",
-            content: result.content || "",
-            snippets: result.snippets || [],
+            url: result.url ,
+            title: result.title,
+            content: result.content,
+            snippets: result.snippets,
           };
           const cleaned = ContentCleaner.cleanContent(source);
           return {
             ...cleaned,
-            domain: cleaned.domain || "",
-            isAcademic: cleaned.isAcademic || false,
+            domain: cleaned.domain,
+            isAcademic: cleaned.isAcademic,
           } as ResearchSource;
         })
         // Filter out sources with empty content and empty snippets early
         .filter(source => 
-          (source.content && source.content.trim() !== '') || 
+          (source.content && source.content.length > 0) || 
           (source.snippets && source.snippets.length > 0)
         );
 

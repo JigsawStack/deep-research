@@ -56,7 +56,7 @@ async function basicResearch() {
 
     fs.writeFileSync(`${testDir}/research.json`, JSON.stringify(result.data.metadata.researchPlan, null, 2));
     fs.writeFileSync(`${testDir}/queries.json`, JSON.stringify(result.data.metadata.queries, null, 2));
-    fs.writeFileSync(`${testDir}/sources2.json`, JSON.stringify(result.data.metadata.sources, null, 2));
+    fs.writeFileSync(`${testDir}/sources.json`, JSON.stringify(result.data.metadata.sources, null, 2));
     fs.writeFileSync(`${testDir}/reasoning.json`, JSON.stringify(result.data.metadata.reasoning, null, 2));
 
     return result;
