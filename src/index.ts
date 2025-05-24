@@ -1,9 +1,3 @@
-// **Feature**
-// byo_urls user bring their own urls to do the websearch
-
-// **Feature**
-// byo_pdfs as content
-
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 
@@ -21,6 +15,7 @@ import { Logger, logger } from "./utils/logger";
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
+ * @param topic - The topic of the research
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
@@ -103,6 +98,13 @@ export async function reasoningSearchResults({
   }
 }
 
+/**
+ * Process the report for sources
+ * 
+ * @param report - The report to process
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The report with sources
+ */
 export async function processReportForSources({
   report,
   sources,
@@ -196,7 +198,7 @@ export async function processReportForSources({
 /**
  * Generate the final report
  * 
- * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @param topic - The topic of the research
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
@@ -299,8 +301,7 @@ export async function generateFinalReport({
  * @param topic - The topic of the research
  * @param pastReasoning - The past reasoning
  * @param pastQueries - The past queries
- * @param config - The configuration for the DeepResearch instance
- * @param maxDepth - The maximum depth of the research
+ * @param pastSources - The past sources
  */
 export async function generateResearchPlan({
   aiProvider,
@@ -349,7 +350,13 @@ export async function generateResearchPlan({
   }
 }
 
-export function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+/**
+ * Deduplicate search results
+ * 
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The deduplicated search results
+ */
+function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, boolean>();
 
   return sources.map((result) => {
@@ -381,6 +388,13 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   });
 }
 
+
+/**
+ * Map search results to numbers
+ * 
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The search results with numbers
+ */
 function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, number>();
   let currentNumber = 1;
@@ -545,6 +559,12 @@ export class DeepResearch {
     };
   }
 
+  /**
+   * Generate a research report
+   * 
+   * @param topic - The topic of the research
+   * @returns The research report
+   */
   public async generate(topic: string) {
     logger.log(`Running research with topic: ${topic}`);
     this.topic = topic;
@@ -656,7 +676,7 @@ export class DeepResearch {
     return {
       status: "success",
       data: {
-        text: report,
+        text: report + "\n\n" + bibliography,
         metadata: {
           topic: this.topic,
           iterationCount: this.iterationCount,
