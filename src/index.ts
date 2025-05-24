@@ -30,7 +30,7 @@ export async function decisionMaking({
     model: aiProvider.getModel("default"),
     output: "object",
     schema: z.object({
-      isComplete: z.boolean().describe("Whether the research is complete"),
+      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main topic set to true."),
       reason: z.string().describe("The reason for the decision"),
     }),
     system: decisionMakingPrompt.system,
@@ -70,7 +70,7 @@ export async function reasoningSearchResults({
 
     const reasoningResponse = await generateText({
       model: aiProvider.getModel("reasoning"),
-      system: reasoningPrompt.system,
+      // system: reasoningPrompt.system,
       prompt: reasoningPrompt.user,
     });
     
@@ -322,10 +322,10 @@ export async function generateResearchPlan({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: z.object({
-        subQueries: z.array(z.string()).describe("A list of search queries to thoroughly research the topic"),
+        subQueries: z.array(z.string()).min(1).max(3).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().describe("a number representing the depth of the research"),
-        breadth: z.number().describe("a number representing the breadth of the research"),
+        depth: z.number().min(1).max(3).describe("A number representing the depth of the research"),
+        breadth: z.number().min(1).max(3).describe("A number representing the breadth of the research"),
       }),
     });
 

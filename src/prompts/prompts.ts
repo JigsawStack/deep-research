@@ -30,44 +30,32 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   queries,
   sources,
 }: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
-  const systemPrompt = `
-  You are a world-class research planner.\n
-  Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.\n
+  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.
 
-  INSTRUCTIONS:\n
-  1. A Detailed Research Plan:\n
-      - Clearly outline the overall research strategy and methodology you propose.\n
-      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.\n
-      - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.\n
-      - The plan should be logical, actionable, and designed for efficient information gathering.\n
+  INSTRUCTIONS:
+  1. A Detailed Research Plan:
+      - Clearly outline the overall research strategy and methodology you propose.
+      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.
+      - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.
+      - The plan should be logical, actionable, and designed for efficient information gathering.
+  2. A List of Focused Search Queries:
+      - Generate a list of specific and targeted search queries.
+      - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.
+      - The set of queries should collectively aim to cover the main aspects identified in your research plan.
+      - Ensure queries are distinct and avoid redundancy.
+  3. Generate how deep the research should be:
+      - Generate a number to determine how deep the research should be to fully explore this topic
+  4. Generate how broad the research should be:
+      - Generate a number to determine how broad the research should be to fully explore this topic
 
-  2. A List of Focused Search Queries:\n
-      - Generate a list of specific and targeted search queries.\n
-      - These queries should be optimized to yield relevant, high-quality, and diverse search results from search engines.\n
-      - The set of queries should collectively aim to cover the main aspects identified in your research plan.\n
-      - Ensure queries are distinct and avoid redundancy.\n
-    
-  3. Generate how deep the research should be:\n
-      - Generate a number to determine how deep the research should be to fully explore this topic\n
-
-  4. Generate how broad the research should be:\n
-      - Generate a number to determine how broad the research should be to fully explore this topic\n
-    
-  OUTPUT:\n
-    - A JSON object with the following keys:\n
-      - "researchPlan": A detailed research plan\n
-      - "queries": A list of search queries\n
-      - "depth": A number representing the depth of the research\n
-      - "breadth": A number representing the breadth of the research\n
+      Output in the given JSON schema.
   `.trim();
 
   const userPrompt = `
-The topic is: ${topic}\n
-
-${reasoning ? `Past reasoning: ${reasoning}` : ""}\n
+${reasoning ? `Past reasoning: ${reasoning}` : ""}
 
 ${queries ? `
-Sub-Queries and Sources:
+Sub-Queries and Sources previously generated:
 ${queries.map((q) => {
   const sourcesForQuery = sources?.find(s => s.query === q);
   if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
@@ -76,8 +64,10 @@ ${queries.map((q) => {
     Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
   }
   return `**${q}** (No sources found)`;
-}).join('\n\n')}` : ''}
-  `.trim();
+}).join('\n')}` : ''}
+  
+User Prompt: ${topic}
+`.trim();
 
   return {
     system: systemPrompt,
@@ -93,27 +83,21 @@ const DECISION_MAKING_PROMPT = ({
   topic: string;
 }) => {
   const systemPrompt = `
-You are a world-class analyst.\n
-Your primary purpose is to help decide if the reasoning is sufficient to answer the main topic.\n
+You are a world-class analyst. Your primary purpose is to help decide if the data provided is sufficient to complete the given prompt.
 
-Current datetime is: ${new Date().toISOString()}\n
+Current datetime is: ${new Date().toISOString()}
 
-INSTRUCTIONS:\n
-- If the reasoning is sufficient to answer the main topic set "isComplete" to true.\n
-- In either case, provide a brief explanation in "reason" describing your judgement.\n
-- **Output only** a JSON object with exactly these two keys and no extra text, for example:
-  {
-    "isComplete": true,
-    "reason": "The reasoning is sufficient to answer the main topic."
-  }
+INSTRUCTIONS:
+- If the reasoning is sufficient to answer the main topic set "isComplete" to true.
+- In either case, provide a brief explanation in "reason" describing your judgement.
+
+Response in the given JSON schema.
 `.trim();
 
   const userPrompt = `
-Chain of Thought:\n
-"""${reasoning}"""\n
+Context: "${reasoning}"
 
-Main Topic:\n
-${topic}\n
+Prompt: "${topic}"
 `.trim();
 
   return {
@@ -133,25 +117,13 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   queries: string[];
   sources: WebSearchResult[];
 }) => {
-  const systemPrompt = `
-You are a world-class analyst.\n
-Your primary purpose is to help reason if the the topic, 
-queries, sources, and research plan are sufficient to answer the main topic.\n
-
-INSTRUCTIONS:\n
-- Think step by step and show your full chain-of-thought. \n
-- Specifically, decompose the topic into its major sub-topics or dimensions.\n
-- Map each sub-topic to where (if at all) it is covered by the researchPlan, any of the searchResults, or the queries.\n
-- Assess the quality, relevance, and diversity of the sources provided.\n
-- Identify gaps—sub-topics not covered or weakly supported.\n
-- Recommend additional queries, source types, or angles needed to fill those gaps.\n
-  `.trim();
+  const systemPrompt = ``.trim();
 
   const userPrompt = `
-Proposed research plan:\n
-"""${researchPlan}"""\n
+Proposed research plan: 
+"${researchPlan}"
 
-Context for each query:\n
+Context for each query:
 ${queries?.map((q) => {
   const sourcesForQuery = sources?.find(s => s.query === q);
   if (sourcesForQuery) {
@@ -161,13 +133,10 @@ ${queries?.map((q) => {
   } else {
     throw new Error(`No sources found for query: ${q}`);
   }
-}).join('\n\n')}
+}).join('\n')}
 
-Main Topic:\n
-"${topic}"\n
-
-Begin by stating "Let me think through this step by step," then proceed with your reasoning.\n
-  `.trim();
+Prompt: "${topic}"
+`.trim();
 
   return {
     system: systemPrompt,
@@ -194,7 +163,7 @@ const FINAL_REPORT_PROMPT = ({
   currentReport: string;
   phase: "initial" | "continuation" ;
 }) => {
-  const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
+  const targetChars = targetOutputTokens ? targetOutputTokens * 3 : undefined;
   const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
   const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
 
@@ -225,7 +194,6 @@ const FINAL_REPORT_PROMPT = ({
         Do not generate a reference or conclusion section. Return phase as "continuation"\n
       `;
       break;
-      
     case "continuation":
       if (atTarget === false) {
         phaseInstructions = `
@@ -269,7 +237,6 @@ const FINAL_REPORT_PROMPT = ({
 
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
-    
     ${phaseInstructions}\n
 
   Main Topic:\n
