@@ -307,7 +307,7 @@ export async function generateResearchPlan({
   pastReasoning,
   pastQueries,
   pastSources,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: typeof DEFAULT_CONFIG; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
   try {
     const researchPlanPrompt = PROMPTS.research({
       topic,
@@ -428,7 +428,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
  * @param config - The configuration for the DeepResearch instance
  * @returns A new DeepResearch instance
  */
-export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
+export function createDeepResearch(config: DeepResearchConfig) {
   return new DeepResearch(config);
 }
 
@@ -453,7 +453,7 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
 
-  constructor(config: Partial<typeof DEFAULT_CONFIG>) {
+  constructor(config: DeepResearchConfig) {
     this.config = this.validateConfig(config);
 
     if (this.config.logging && this.config.logging.enabled !== undefined) {
@@ -504,7 +504,7 @@ export class DeepResearch {
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
-  public validateConfig(config: Partial<typeof DEFAULT_CONFIG>) {
+  public validateConfig(config: DeepResearchConfig) {
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -594,7 +594,7 @@ export class DeepResearch {
         maxBreadth: this.config.breadth?.maxBreadth,
       });
 
-      if (suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config.breadth?.maxBreadth) {
+      if ( suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config?.breadth?.maxBreadth) {
         this.config.breadth.maxBreadth = suggestedBreadth;
       }
   
