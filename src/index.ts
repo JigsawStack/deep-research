@@ -1,9 +1,8 @@
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
-import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
@@ -437,7 +436,7 @@ export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
  * The DeepResearch class
  */
 export class DeepResearch {
-  public config: typeof DEFAULT_CONFIG;
+  public config: DeepResearchConfig;
   public topic: string = "";
   public finalReport: string = "";
 
@@ -461,12 +460,21 @@ export class DeepResearch {
       this.logger.setEnabled(this.config.logging.enabled);
     }
 
+    const openaiApiKey = this.config?.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    const geminiApiKey = this.config?.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    const deepInfraApiKey = this.config?.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY;
+    const jigsawApiKey = this.config?.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY;
+
+    if (!openaiApiKey || !geminiApiKey || !deepInfraApiKey || !jigsawApiKey) {
+      throw new Error("API keys are not set");
+    }
+
     // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
+    this.jigsaw = JigsawProvider.getInstance(jigsawApiKey);
     this.aiProvider = new AIProvider({
-      OPENAI_API_KEY: this.config.OPENAI_API_KEY,
-      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
-      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
+      OPENAI_API_KEY: openaiApiKey,
+      GEMINI_API_KEY: geminiApiKey,
+      DEEPINFRA_API_KEY: deepInfraApiKey,
       defaultModel: this.config.models.default as LanguageModelV1,
       reasoningModel: this.config.models.reasoning as LanguageModelV1,
       outputModel: this.config.models.output as LanguageModelV1,
