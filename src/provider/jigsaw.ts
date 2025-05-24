@@ -51,7 +51,7 @@ export class JigsawProvider {
           }).filter(source => source !== null);
 
           const response = await generateObject({
-            model: aiProvider.getDefaultModel(),
+            model: aiProvider.getModel("default"),
             prompt: PROMPTS.contextGeneration({
               topic: topic,
               queries: [query],

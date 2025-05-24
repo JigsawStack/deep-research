@@ -1,6 +1,5 @@
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
-
 import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
@@ -29,7 +28,7 @@ export async function decisionMaking({
   });
 
   const decisionMakingResponse = await generateObject({
-    model: aiProvider.getDefaultModel(),
+    model: aiProvider.getModel("default"),
     output: "object",
     schema: z.object({
       isComplete: z.boolean().describe("Whether the research is complete"),
@@ -71,7 +70,7 @@ export async function reasoningSearchResults({
     logger.log("REASONING WITH", reasoningPrompt);
 
     const reasoningResponse = await generateText({
-      model: aiProvider.getReasoningModel(),
+      model: aiProvider.getModel("reasoning"),
       system: reasoningPrompt.system,
       prompt: reasoningPrompt.user,
     });
@@ -250,7 +249,7 @@ export async function generateFinalReport({
 
     // call the model
     const response = await generateObject({
-      model: aiProvider.getOutputModel(),
+      model: aiProvider.getModel("output"),
       system: finalReportPrompt.system,
       prompt: finalReportPrompt.user,
       schema: z.object({
@@ -320,7 +319,7 @@ export async function generateResearchPlan({
     
     // Generate the research plan using the AI provider
     const result = await generateObject({
-      model: aiProvider.getDefaultModel(),
+      model: aiProvider.getModel("default"),
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: z.object({
@@ -388,7 +387,6 @@ function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): 
   });
 }
 
-
 /**
  * Map search results to numbers
  * 
@@ -435,7 +433,6 @@ export function createDeepResearch(config: Partial<typeof DEFAULT_CONFIG>) {
   return new DeepResearch(config);
 }
 
-
 /**
  * The DeepResearch class
  */
@@ -451,9 +448,7 @@ export class DeepResearch {
 
 
   public queries: string[] = [];
-
   public sources: WebSearchResult[] = [];
-
   public aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
   private isComplete: boolean = false;
@@ -487,7 +482,7 @@ export class DeepResearch {
         if (modelValue) {
           if (typeof modelValue !== "string") {
             // It's a LanguageModelV1 instance, add it as a direct model
-            this.aiProvider.addDirectModel(modelType, modelValue);
+            this.aiProvider.setModel(modelType, modelValue);
           }
           // If it's a string, it will be handled by the generateText method
         }

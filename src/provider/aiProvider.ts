@@ -8,6 +8,10 @@ import { createDeepInfra } from "@ai-sdk/deepinfra";
  * AIProvider acts as an abstract factory for different AI model providers
  * It unifies the interface for interacting with different provider types
  */
+
+export type ModelType = "default" | "reasoning" | "output" | string;
+
+
 export class AIProvider {
   private providers: Map<string, ProviderV1> = new Map();
   private models: {
@@ -65,59 +69,12 @@ export class AIProvider {
     };
   }
 
-  /**
-   * Get the default model
-   */
-  getDefaultModel(): LanguageModelV1 {
-    return this.models.default;
+  getModel(key:ModelType){
+    return this.models[key];
   }
-
-  /**
-   * Get the reasoning model
-   */
-  getReasoningModel(): LanguageModelV1 {
-    return this.models.reasoning;
-  }
-
-  /**
-   * Get the output model
-   */
-  getOutputModel(): LanguageModelV1 {
-    return this.models.output;
-  }
-
-  /**
-   * Set the default model
-   */
-  setDefaultModel(model: LanguageModelV1): void {
-    this.models.default = model;
-  }
-
-  /**
-   * Set the reasoning model
-   */
-  setReasoningModel(model: LanguageModelV1): void {
-    this.models.reasoning = model;
-  }
-
-  /**
-   * Set the output model
-   */
-  setOutputModel(model: LanguageModelV1): void {
-    this.models.output = model;
-  }
-
-  /**
-   * Add a direct model
-   */
-  addDirectModel(type: string, model: LanguageModelV1): void {
-    if (type === "default") {
-      this.setDefaultModel(model);
-    } else if (type === "reasoning") {
-      this.setReasoningModel(model);
-    } else if (type === "output") {
-      this.setOutputModel(model);
-    }
+  
+  setModel(key:ModelType,model:LanguageModelV1){
+    this.models[key] = model;
   }
 
   /**
