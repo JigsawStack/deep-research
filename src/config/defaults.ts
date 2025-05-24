@@ -44,6 +44,6 @@ export const DEFAULT_CONFIG = {
   GEMINI_API_KEY: "",
   DEEPINFRA_API_KEY: "",
   logging: {
-    enabled: true,
+    enabled: false,
   },
 };

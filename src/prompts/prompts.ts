@@ -209,6 +209,7 @@ const FINAL_REPORT_PROMPT = ({
     - **Never repeat a heading that is already present in the Existing Draft.**\n
 
   INSTRUCTIONS:\n
+    - generate in the
     - Make sure your report is addressing the topic/queries.\n
     - Make sure your report is comprehensive and covers all the sub-topics.\n
     - Make sure your report is well-researched and well-cited.\n
@@ -221,7 +222,7 @@ const FINAL_REPORT_PROMPT = ({
   switch (phase) {
     case "initial":
       phaseInstructions = `
-        Return phase as "continuation"\n
+        Do not generate a reference or conclusion section. Return phase as "continuation"\n
       `;
       break;
       
@@ -230,7 +231,7 @@ const FINAL_REPORT_PROMPT = ({
         phaseInstructions = `
           Generate a continuation of the report. No need to include the initial report.\n
           ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}\n
-          Return phase as "continuation"\n
+          Do not generate a reference or conclusion section. Return phase as "continuation"\n
         `;
       } else {
         phaseInstructions = `

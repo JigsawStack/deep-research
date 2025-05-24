@@ -14,7 +14,7 @@ import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
-import { logger } from "./utils/logger";
+import { Logger, logger } from "./utils/logger";
 
 /**
  * Decision making
@@ -200,7 +200,6 @@ export async function processReportForSources({
  * @param topic - The topic of the research
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
- * @param debugLog - The debug log
  * @param latestReasoning - The latest reasoning
  * @param latestResearchPlan - The latest research plan
  * @param queries - The queries used to get the search results
@@ -268,8 +267,8 @@ export async function generateFinalReport({
     phase = response.object.phase;
     draft += response.object.text;
 
-    logger.log("MODEL OUTPUT:\n" + response.object.text);
     logger.log("PHASE==============================:\n" + response.object.phase);
+    logger.log("MODEL OUTPUT:\n" + response.object.text);
 
 
     if (phase === "continuation") {
@@ -434,6 +433,7 @@ export class DeepResearch {
   public latestResearchPlan: string = "";
   public latestReasoning: string = "";
   public latestDecisionMakingReason: string = "";
+  public logger = Logger.getInstance();
 
 
   public queries: string[] = [];
@@ -448,11 +448,9 @@ export class DeepResearch {
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
 
-    // Configure logger based on config
-    if (config.logging && config.logging.enabled !== undefined) {
-      logger.setEnabled(config.logging.enabled);
+    if (this.config.logging && this.config.logging.enabled !== undefined) {
+      this.logger.setEnabled(this.config.logging.enabled);
     }
-
 
     // Initialize AIProvider with API keys from config
     this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
@@ -670,29 +668,6 @@ export class DeepResearch {
         },
       },
     };
-  }
-
-  public async testFinalReportGeneration({topic}: {topic: string}) {
-    // Load data from logs folder
-    const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
-    const targetOutputTokens = this.config.report.targetOutputTokens;
-    const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
-    const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
-    const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
-
-    // Generate the final report using the loaded data
-    const { report } = await generateFinalReport({
-      sources,
-      topic,
-      targetOutputTokens,
-      aiProvider: this.aiProvider,
-      latestResearchPlan,
-      latestReasoning,
-      queries,
-    });
-
-
-    return report;
   }
 }
 
