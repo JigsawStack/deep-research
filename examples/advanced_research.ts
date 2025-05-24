@@ -1,0 +1,67 @@
+import "dotenv/config";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { createDeepResearch } from "../src/index";
+import { createOpenAI } from "@ai-sdk/openai";
+
+// Advanced usage example
+async function advancedResearch() {
+
+  // initialize your own AiProviders
+  const gemini = createGoogleGenerativeAI({
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+
+  const deepinfra = createDeepInfra({
+    apiKey: process.env.DEEPINFRA_API_KEY,
+  });
+
+  const openaiProvider = createOpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  // specify your model as found in https://ai-sdk.dev/providers/ai-sdk-providers
+  const geminiModel = gemini("gemini-2.0-flash");
+  const deepseekModel = deepinfra("deepseek-ai/DeepSeek-R1");
+  const openaiModel = openaiProvider("gpt-4o");
+
+  const advancedResearch = createDeepResearch({
+    report: {
+      maxOutputTokens: 30000, // Hard upper limit of tokens
+      targetOutputTokens: 10000,
+    },
+    depth:{
+      maxDepth: 4 // specify how many iterations of research to perform (how deep the research should be)
+    },
+    breadth: {
+      maxBreadth: 3 // specify how many subqueries to generate (how broad the research should be)
+    },
+    models: {
+      output: geminiModel, // pass in specific models
+      reasoning: deepseekModel,
+      default: openaiModel, 
+    },
+    logging: {
+      enabled: true, // enabled to true for console logging
+    },
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+    JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
+  });
+
+  // the topic to research
+  const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
+
+  try {
+    const advancedResult = await advancedResearch.generate(topic); // generate runs the research pipeline
+    console.log("advancedResult", advancedResult.data.text);
+
+  } catch (error) {
+    console.error("Research failed with error:", error);
+    process.exit(1);
+  }
+}
+
+// Run the research
+advancedResearch();

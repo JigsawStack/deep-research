@@ -31,7 +31,7 @@
     "prepare": "npm run build",
     "start": "node dist/index.js",
     "format": "biome check --write .",
-    "dev": "tsx examples/basic/simple-research.ts"
+    "dev": "tsx examples/simple_research.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.2",

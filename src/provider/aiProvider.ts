@@ -157,6 +157,7 @@ export class AIProvider {
       throw new Error(`Error generating text: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
 }
 
 export default AIProvider;

@@ -1,9 +1,3 @@
-// **Feature**
-// byo_urls user bring their own urls to do the websearch
-
-// **Feature**
-// byo_pdfs as content
-
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 
@@ -14,13 +8,14 @@ import fs from "fs";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
-import { logger } from "./utils/logger";
+import { Logger, logger } from "./utils/logger";
 
 /**
  * Decision making
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
+ * @param topic - The topic of the research
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
@@ -103,6 +98,13 @@ export async function reasoningSearchResults({
   }
 }
 
+/**
+ * Process the report for sources
+ * 
+ * @param report - The report to process
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The report with sources
+ */
 export async function processReportForSources({
   report,
   sources,
@@ -196,11 +198,10 @@ export async function processReportForSources({
 /**
  * Generate the final report
  * 
- * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @param topic - The topic of the research
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
- * @param debugLog - The debug log
  * @param latestReasoning - The latest reasoning
  * @param latestResearchPlan - The latest research plan
  * @param queries - The queries used to get the search results
@@ -268,8 +269,8 @@ export async function generateFinalReport({
     phase = response.object.phase;
     draft += response.object.text;
 
-    logger.log("MODEL OUTPUT:\n" + response.object.text);
     logger.log("PHASE==============================:\n" + response.object.phase);
+    logger.log("MODEL OUTPUT:\n" + response.object.text);
 
 
     if (phase === "continuation") {
@@ -300,8 +301,7 @@ export async function generateFinalReport({
  * @param topic - The topic of the research
  * @param pastReasoning - The past reasoning
  * @param pastQueries - The past queries
- * @param config - The configuration for the DeepResearch instance
- * @param maxDepth - The maximum depth of the research
+ * @param pastSources - The past sources
  */
 export async function generateResearchPlan({
   aiProvider,
@@ -350,7 +350,13 @@ export async function generateResearchPlan({
   }
 }
 
-export function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+/**
+ * Deduplicate search results
+ * 
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The deduplicated search results
+ */
+function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, boolean>();
 
   return sources.map((result) => {
@@ -382,6 +388,13 @@ export function deduplicateSearchResults({ sources }: { sources: WebSearchResult
   });
 }
 
+
+/**
+ * Map search results to numbers
+ * 
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The search results with numbers
+ */
 function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
   const urlMap = new Map<string, number>();
   let currentNumber = 1;
@@ -434,6 +447,7 @@ export class DeepResearch {
   public latestResearchPlan: string = "";
   public latestReasoning: string = "";
   public latestDecisionMakingReason: string = "";
+  public logger = Logger.getInstance();
 
 
   public queries: string[] = [];
@@ -448,11 +462,9 @@ export class DeepResearch {
   constructor(config: Partial<typeof DEFAULT_CONFIG>) {
     this.config = this.validateConfig(config);
 
-    // Configure logger based on config
-    if (config.logging && config.logging.enabled !== undefined) {
-      logger.setEnabled(config.logging.enabled);
+    if (this.config.logging && this.config.logging.enabled !== undefined) {
+      this.logger.setEnabled(this.config.logging.enabled);
     }
-
 
     // Initialize AIProvider with API keys from config
     this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
@@ -547,6 +559,12 @@ export class DeepResearch {
     };
   }
 
+  /**
+   * Generate a research report
+   * 
+   * @param topic - The topic of the research
+   * @returns The research report
+   */
   public async generate(topic: string) {
     logger.log(`Running research with topic: ${topic}`);
     this.topic = topic;
@@ -658,7 +676,7 @@ export class DeepResearch {
     return {
       status: "success",
       data: {
-        text: report,
+        text: report + "\n\n" + bibliography,
         metadata: {
           topic: this.topic,
           iterationCount: this.iterationCount,
@@ -670,29 +688,6 @@ export class DeepResearch {
         },
       },
     };
-  }
-
-  public async testFinalReportGeneration({topic}: {topic: string}) {
-    // Load data from logs folder
-    const sources = JSON.parse(fs.readFileSync("logs/sources.json", "utf-8"));
-    const targetOutputTokens = this.config.report.targetOutputTokens;
-    const latestResearchPlan = JSON.parse(fs.readFileSync("logs/researchPlan.json", "utf-8"));
-    const latestReasoning = JSON.parse(fs.readFileSync("logs/reasoning.json", "utf-8"));
-    const queries = JSON.parse(fs.readFileSync("logs/queries.json", "utf-8"));
-
-    // Generate the final report using the loaded data
-    const { report } = await generateFinalReport({
-      sources,
-      topic,
-      targetOutputTokens,
-      aiProvider: this.aiProvider,
-      latestResearchPlan,
-      latestReasoning,
-      queries,
-    });
-
-
-    return report;
   }
 }
 
