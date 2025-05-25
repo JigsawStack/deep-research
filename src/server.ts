@@ -11,7 +11,7 @@ interface ResearchResult {
   data: {
     text: string;
     metadata: {
-      topic: string;
+      prompt: string;
       iterationCount: number;
       completionStatus: boolean;
       reasoning: string;
@@ -73,15 +73,15 @@ app.post('/api/research', async (req, res) => {
 // 2. Run the research for a given session
 app.post('/api/research/run', async (req, res) => {
   console.log('POST /api/research/run - Request received:', { 
-    topic: req.body.topic,
+    prompt: req.body.prompt,
     sessionId: req.body.sessionId
   });
 
   try {
-    const {topic, sessionId} = req.body;
+    const {prompt, sessionId} = req.body;
     
-    if (!topic) {
-      return res.status(400).json({ error: 'Topic is required' });
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
     }
 
     const session = activeResearch.get(sessionId);
@@ -94,7 +94,7 @@ app.post('/api/research/run', async (req, res) => {
     session.status = 'running';
     
     // Run the research asynchronously
-    const runPromise = session.deepResearch.generate(topic)
+    const runPromise = session.deepResearch.generate(prompt)
       .then((result: ResearchResult) => {
         session.result = result.data;
         session.status = 'completed';
@@ -111,7 +111,7 @@ app.post('/api/research/run', async (req, res) => {
       status: 'success', 
       message: 'Research started',
       sessionId,
-      topic
+      prompt
     });
   } catch (error: any) {
     console.error('Failed to run research:', error);

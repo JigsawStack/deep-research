@@ -25,7 +25,7 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  public async context_generator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
+  public async contextGenerator({queries, sources, prompt, aiProvider}: {queries: string[]; sources: WebSearchResult[]; prompt: string; aiProvider: AIProvider}) {
     try {
       // Generate context for each query's search results
       const contextResults = await Promise.all(
@@ -53,7 +53,7 @@ export class JigsawProvider {
           const response = await generateObject({
             model: aiProvider.getModel("default"),
             prompt: PROMPTS.contextGeneration({
-              topic: topic,
+              prompt: prompt,
               queries: [query],
               research_sources: processedSources,
             }),
@@ -73,7 +73,7 @@ export class JigsawProvider {
     }
   }
   
-  public async searchAndGenerateContext(queries: string[], topic: string, aiProvider: AIProvider): Promise<WebSearchResult[]> {
+  public async searchAndGenerateContext(queries: string[], prompt: string, aiProvider: AIProvider): Promise<WebSearchResult[]> {
     // Step 1: Fire web searches for all queries
     const searchResults = await this.fireWebSearches(queries);
     
@@ -88,10 +88,10 @@ export class JigsawProvider {
     }
     
     // Step 2: Generate context for the search results with non-empty results
-    const contextResults = await this.context_generator({
+    const contextResults = await this.contextGenerator({
       queries: nonEmptySearchResults.map(result => result.query),
       sources: nonEmptySearchResults,
-      topic,
+      prompt,
       aiProvider
     });
     

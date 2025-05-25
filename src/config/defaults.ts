@@ -26,20 +26,20 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
 
 export interface DeepResearchConfig {
   models: ModelConfig;
-  depth?: {
+  depth: {
     maxDepth: number;
   };
-  breadth?: {
+  breadth: {
     maxBreadth: number;
   };
-  report?: ReportConfig;
-  logging?: {
-    enabled?: boolean;
+  report: ReportConfig;
+  logging: {
+    enabled: boolean;
   };
-  JIGSAW_API_KEY?: string;
-  OPENAI_API_KEY?: string;
-  GEMINI_API_KEY?: string;
-  DEEPINFRA_API_KEY?: string;
+  JIGSAW_API_KEY: string;
+  OPENAI_API_KEY: string;
+  GEMINI_API_KEY: string;
+  DEEPINFRA_API_KEY: string;
 }
 
 export const DEFAULT_CONFIG = {

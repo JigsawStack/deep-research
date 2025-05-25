@@ -1,16 +1,16 @@
 import { ResearchSource, WebSearchResult } from "@/types/types";
 
 const CONTEXT_GENERATION_PROMPT = ({
-  topic,
+  prompt,
   queries,
   research_sources,
-}: { topic: string; queries: string[]; research_sources: ResearchSource[] }) => `
+}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) => `
 You are a world-class context generator.\n
-Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
-Extract all the information from the sources that is relevant to the main topic.\n
+Your task is to generate a context overview for the following queries and sources that relates to the main prompt:\n
+Extract all the information from the sources that is relevant to the main prompt.\n
 
-Main Topic:\n
-${topic}\n
+Main Prompt:\n
+${prompt}\n
 
 Sub-Queries and Sources:\n
 ${queries?.map((q) => {
@@ -25,17 +25,17 @@ ${queries?.map((q) => {
 `.trim();
 
 const RESEARCH_PROMPT_TEMPLATE = ({
-  topic,
+  prompt,
   reasoning,
   queries,
   sources,
-}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
-  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.
+}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
+  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
   INSTRUCTIONS:
   1. A Detailed Research Plan:
       - Clearly outline the overall research strategy and methodology you propose.
-      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.
+      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the prompt.
       - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.
       - The plan should be logical, actionable, and designed for efficient information gathering.
   2. A List of Focused Search Queries:
@@ -44,9 +44,9 @@ const RESEARCH_PROMPT_TEMPLATE = ({
       - The set of queries should collectively aim to cover the main aspects identified in your research plan.
       - Ensure queries are distinct and avoid redundancy.
   3. Generate how deep the research should be:
-      - Generate a number to determine how deep the research should be to fully explore this topic
+      - Generate a number to determine how deep the research should be to fully explore this prompt
   4. Generate how broad the research should be:
-      - Generate a number to determine how broad the research should be to fully explore this topic
+      - Generate a number to determine how broad the research should be to fully explore this prompt
 
       Output in the given JSON schema.
   `.trim();
@@ -66,7 +66,7 @@ ${queries.map((q) => {
   return `**${q}** (No sources found)`;
 }).join('\n')}` : ''}
   
-User Prompt: ${topic}
+User Prompt: ${prompt}
 `.trim();
 
   return {
@@ -76,11 +76,17 @@ User Prompt: ${topic}
 };
 
 const DECISION_MAKING_PROMPT = ({
-  topic,
+  prompt,
   reasoning,
+  queries,
+  sources,
+  researchPlan,
 }: {
   reasoning: string;
-  topic: string;
+  prompt: string;
+  queries: string[];
+  sources: WebSearchResult[];
+  researchPlan: string;
 }) => {
   const systemPrompt = `
 You are a world-class analyst. Your primary purpose is to help decide if the data provided is sufficient to complete the given prompt.
@@ -88,16 +94,30 @@ You are a world-class analyst. Your primary purpose is to help decide if the dat
 Current datetime is: ${new Date().toISOString()}
 
 INSTRUCTIONS:
-- If the reasoning is sufficient to answer the main topic set "isComplete" to true.
+- If the reasoning is sufficient to answer the prompt set "isComplete" to true.
 - In either case, provide a brief explanation in "reason" describing your judgement.
 
 Response in the given JSON schema.
 `.trim();
 
   const userPrompt = `
-Context: "${reasoning}"
+Research Plan:
+"${researchPlan}"
 
-Prompt: "${topic}"
+Sub-Queries and Sources previously generated:
+${queries.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
+  }
+  return `**${q}** (No sources found)`;
+}).join('\n')}
+
+Reasoning generated previously: "${reasoning}"
+
+Prompt: "${prompt}"
 `.trim();
 
   return {
@@ -107,12 +127,12 @@ Prompt: "${topic}"
 };
 
 const REASONING_SEARCH_RESULTS_PROMPT = ({
-  topic,
+  prompt,
   researchPlan,
   queries,
   sources,
 }: {
-  topic: string;
+  prompt: string;
   researchPlan: string;
   queries: string[];
   sources: WebSearchResult[];
@@ -135,7 +155,7 @@ ${queries?.map((q) => {
   }
 }).join('\n')}
 
-Prompt: "${topic}"
+Prompt: "${prompt}"
 `.trim();
 
   return {
@@ -145,7 +165,7 @@ Prompt: "${topic}"
 }
 
 const FINAL_REPORT_PROMPT = ({
-  topic,
+  prompt,
   sources,
   targetOutputTokens,
   latestResearchPlan,
@@ -154,7 +174,7 @@ const FINAL_REPORT_PROMPT = ({
   phase,
   currentReport,
 }: {
-  topic: string;
+  prompt: string;
   sources: WebSearchResult[];
   targetOutputTokens?: number;
   latestResearchPlan: string;
@@ -168,22 +188,22 @@ const FINAL_REPORT_PROMPT = ({
   const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
 
   const systemPrompt = `
-  You are a world-class analyst.\n 
-  Your primary purpose is to help users answer their topic/queries.\n
+  You are a world-class analyst.
+  Your primary purpose is to help users answer their prompt. 
 
-  GENERAL GUIDELINES:\n
-    - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.\n
-    - Only use the sources provided in the context.\n
-    - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").\n
-    - **Never repeat a heading that is already present in the Existing Draft.**\n
+  GENERAL GUIDELINES:
+    - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.
+    - Only use the sources provided in the context.
+    - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").
+    - **Never repeat a heading that is already present in the Existing Draft.**
 
-  INSTRUCTIONS:\n
+  INSTRUCTIONS:
     - generate in the
-    - Make sure your report is addressing the topic/queries.\n
-    - Make sure your report is comprehensive and covers all the sub-topics.\n
-    - Make sure your report is well-researched and well-cited.\n
-    - Make sure your report is well-written and well-structured.\n
-    - Make sure your report is well-organized and well-formatted.\n
+    - Make sure your report is addressing the prompt.
+    - Make sure your report is comprehensive and covers all the sub-topics.
+    - Make sure your report is well-researched and well-cited.
+    - Make sure your report is well-written and well-structured.
+    - Make sure your report is well-organized and well-formatted.
   `;
 
   // Determine instructions based on phase
@@ -191,23 +211,23 @@ const FINAL_REPORT_PROMPT = ({
   switch (phase) {
     case "initial":
       phaseInstructions = `
-        Do not generate a reference or conclusion section. Return phase as "continuation"\n
+        Do not generate a reference or conclusion section. Return phase as "continuation"
       `;
       break;
     case "continuation":
       if (atTarget === false) {
         phaseInstructions = `
-          Generate a continuation of the report. No need to include the initial report.\n
-          ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}\n
-          Do not generate a reference or conclusion section. Return phase as "continuation"\n
+          Generate a continuation of the report. No need to include the initial report.
+          ${remaining ? `You still need ≈${remaining.toLocaleString()} characters.` : ""}
+          Do not generate a reference or conclusion section. Return phase as "continuation"
         `;
       } else {
         phaseInstructions = `
-          - This is your FINAL response for this question.\n
-          - If the provided sources are insufficient, give your best definitive answer.\n
-          - YOU MUST conclude your answer now, regardless of whether you feel it's complete.\n
+          - This is your FINAL response for this question.
+          - If the provided sources are insufficient, give your best definitive answer.
+          - YOU MUST conclude your answer now, regardless of whether you feel it's complete.
 
-          Return phase as "done"\n
+          Return phase as "done"
         `;
       }
       break;
@@ -215,16 +235,17 @@ const FINAL_REPORT_PROMPT = ({
 
   const userPrompt = `
   ${targetOutputTokens ? `Target length:
-    ≈ ${(targetOutputTokens * 4).toLocaleString()} characters (${targetOutputTokens} tokens ×4)` : ""}
+    ≈ ${(targetOutputTokens * 3).toLocaleString()} characters (${targetOutputTokens} tokens ×3)` : ""}
 
-  CONTEXT:\n
-    Latest Research Plan:\n
-    ${latestResearchPlan}\n
+  CONTEXT:
+    Latest Research Plan:
+    ${latestResearchPlan}
 
-    Latest Reasoning Snapshot:\n
-    ${latestReasoning}\n
 
-    Sub-Queries and Sources:\n
+    Latest Reasoning Snapshot:
+    ${latestReasoning}
+
+    Sub-Queries and Sources:
     ${queries?.map((q) => {
       const sourcesForQuery = sources?.find(s => s.query === q);
       if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
@@ -239,8 +260,8 @@ const FINAL_REPORT_PROMPT = ({
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     ${phaseInstructions}\n
 
-  Main Topic:\n
-  ${topic}\n
+  Prompt:
+  "${prompt}"
   `.trim();
 
   return {

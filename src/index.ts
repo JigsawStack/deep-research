@@ -13,24 +13,30 @@ import { Logger, logger } from "./utils/logger";
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
   reasoning,
-  topic,
+  prompt,
   aiProvider,
-}: { reasoning: string; topic: string; aiProvider: AIProvider }) {
+  queries,
+  sources,
+  researchPlan,
+}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
-    topic,
+    prompt,
+    queries,
+    sources,
+    researchPlan,
   });
 
   const decisionMakingResponse = await generateObject({
     model: aiProvider.getModel("default"),
     output: "object",
     schema: z.object({
-      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main topic set to true."),
+      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
       reason: z.string().describe("The reason for the decision"),
     }),
     system: decisionMakingPrompt.system,
@@ -44,7 +50,7 @@ export async function decisionMaking({
 /**
  * Reasoning about the search results
  * 
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param latestResearchPlan - The latest research plan
  * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
  * @param queries - The queries used to get the search results
@@ -52,15 +58,15 @@ export async function decisionMaking({
  * @returns The reasoning / thinking output evaluating the search results
 **/
 export async function reasoningSearchResults({
-  topic,
+  prompt,
   latestResearchPlan,
   sources,
   queries,
   aiProvider,
-}: { topic: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
+}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
   try {
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
-      topic,
+      prompt,
       researchPlan: latestResearchPlan,
       sources: sources,
       queries: queries,
@@ -197,7 +203,7 @@ export async function processReportForSources({
  * Generate the final report
  * 
  * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
  * @param latestReasoning - The latest reasoning
@@ -207,7 +213,7 @@ export async function processReportForSources({
  */
 export async function generateFinalReport({
   sources,
-  topic,
+  prompt,
   targetOutputTokens,
   aiProvider,
   latestReasoning,
@@ -215,7 +221,7 @@ export async function generateFinalReport({
   queries,
 }: {
   sources: WebSearchResult[];
-  topic: string;
+  prompt: string;
   targetOutputTokens?: number;
   aiProvider: AIProvider;
   latestReasoning: string;
@@ -232,7 +238,7 @@ export async function generateFinalReport({
 
     const finalReportPrompt = PROMPTS.finalReport({
       currentReport: draft,
-      topic,
+      prompt,
       sources,
       targetOutputTokens,
       latestResearchPlan,
@@ -296,21 +302,22 @@ export async function generateFinalReport({
  * Generate a research plan
  * 
  * @param aiProvider - The AI provider
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param pastReasoning - The past reasoning
  * @param pastQueries - The past queries
  * @param pastSources - The past sources
  */
 export async function generateResearchPlan({
   aiProvider,
-  topic,
+  prompt,
   pastReasoning,
   pastQueries,
   pastSources,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
+  config,
+}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) {
   try {
     const researchPlanPrompt = PROMPTS.research({
-      topic,
+      prompt,
       reasoning: pastReasoning,
       queries: pastQueries,
       sources: pastSources,
@@ -322,15 +329,15 @@ export async function generateResearchPlan({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: z.object({
-        subQueries: z.array(z.string()).min(1).max(3).describe("A list of search queries to thoroughly research the topic"),
+        subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().min(1).max(3).describe("A number representing the depth of the research"),
-        breadth: z.number().min(1).max(3).describe("A number representing the breadth of the research"),
+        depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
+        breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
       }),
     });
 
     logger.log("Research Prompts", PROMPTS.research({
-      topic,
+      prompt,
       reasoning: pastReasoning,
       queries: pastQueries,
       sources: pastSources,
@@ -428,7 +435,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
  * @param config - The configuration for the DeepResearch instance
  * @returns A new DeepResearch instance
  */
-export function createDeepResearch(config: DeepResearchConfig) {
+export function createDeepResearch(config: Partial<DeepResearchConfig>) {
   return new DeepResearch(config);
 }
 
@@ -437,7 +444,7 @@ export function createDeepResearch(config: DeepResearchConfig) {
  */
 export class DeepResearch {
   public config: DeepResearchConfig;
-  public topic: string = "";
+  public prompt: string = "";
   public finalReport: string = "";
 
   public latestResearchPlan: string = "";
@@ -453,7 +460,7 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
 
-  constructor(config: DeepResearchConfig) {
+  constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateConfig(config);
 
     if (this.config.logging && this.config.logging.enabled !== undefined) {
@@ -475,9 +482,9 @@ export class DeepResearch {
       OPENAI_API_KEY: openaiApiKey,
       GEMINI_API_KEY: geminiApiKey,
       DEEPINFRA_API_KEY: deepInfraApiKey,
-      defaultModel: this.config.models.default as LanguageModelV1,
-      reasoningModel: this.config.models.reasoning as LanguageModelV1,
-      outputModel: this.config.models.output as LanguageModelV1,
+      defaultModel: this.config.models.default,
+      reasoningModel: this.config.models.reasoning,
+      outputModel: this.config.models.output,
     });
 
     this.initModels();
@@ -488,11 +495,7 @@ export class DeepResearch {
     if (this.config.models) {
       Object.entries(this.config.models).forEach(([modelType, modelValue]) => {
         if (modelValue) {
-          if (typeof modelValue !== "string") {
-            // It's a LanguageModelV1 instance, add it as a direct model
-            this.aiProvider.setModel(modelType, modelValue);
-          }
-          // If it's a string, it will be handled by the generateText method
+          this.aiProvider.setModel(modelType, modelValue);
         }
       });
     }
@@ -504,7 +507,7 @@ export class DeepResearch {
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
-  public validateConfig(config: DeepResearchConfig) {
+  public validateConfig(config: Partial<DeepResearchConfig>) {
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -565,12 +568,12 @@ export class DeepResearch {
   /**
    * Generate a research report
    * 
-   * @param topic - The topic of the research
+   * @param prompt - The prompt of the research
    * @returns The research report
    */
-  public async generate(topic: string) {
-    logger.log(`Running research with topic: ${topic}`);
-    this.topic = topic;
+  public async generate(prompt: string) {
+    logger.log(`Running research with prompt: ${prompt}`);
+    this.prompt = prompt;
     let iteration = 0;
 
     do {
@@ -585,37 +588,24 @@ export class DeepResearch {
         suggestedBreadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
-        topic: this.topic,
+        prompt: this.prompt,
         pastReasoning: this.latestReasoning,
         pastQueries: this.queries,
         pastSources: this.sources,
         config: this.config,
-        maxDepth: this.config.depth?.maxDepth,
-        maxBreadth: this.config.breadth?.maxBreadth,
       });
-
-      if ( suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config?.breadth?.maxBreadth) {
-        this.config.breadth.maxBreadth = suggestedBreadth;
-      }
   
-      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth?.maxDepth) {
-        this.config.depth.maxDepth = suggestedDepth;
-      }
-  
-      // // limit the subqueries to the breadth
-      const limitedQueries = subQueries.slice(0, this.config.breadth?.maxBreadth);
-      
-      this.queries = [...(this.queries || []), ...limitedQueries];
+      this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
 
       logger.log(`Research plan: ${this.latestResearchPlan}`);
       logger.log(`Research queries: ${this.queries.join("\n")}`);
-      logger.log(`Research depth and breadth: ${this.config.depth?.maxDepth} ${this.config.breadth?.maxBreadth}`);
+      logger.log(`Research depth and breadth: ${this.config.depth.maxDepth} ${this.config.breadth.maxBreadth}`);
 
       // step 2: fire web searches
-      logger.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
+      logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(limitedQueries, this.topic, this.aiProvider);
+      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.prompt, this.aiProvider);
       
       // step 2.5: deduplicate results
       logger.log(`Received ${initialSearchResults.length} initial search results`);
@@ -632,7 +622,7 @@ export class DeepResearch {
       // step 3: reasoning about the search results
       logger.log(`[Step 3] Reasoning about the search results...`);
       const reasoning = await reasoningSearchResults({
-        topic: this.topic,
+        prompt: this.prompt,
         latestResearchPlan: this.latestResearchPlan,
         sources: this.sources,
         queries: this.queries,
@@ -646,7 +636,10 @@ export class DeepResearch {
       logger.log(`[Step 4] Decision making...`);
       const deciding = await decisionMaking({
         reasoning,
-        topic: this.topic,
+        prompt: this.prompt,
+        queries: this.queries,
+        sources: this.sources,
+        researchPlan: this.latestResearchPlan,
         aiProvider: this.aiProvider,
       });
 
@@ -657,7 +650,7 @@ export class DeepResearch {
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && iteration < this.config.depth?.maxDepth);
+    } while (!this.isComplete && iteration < this.config.depth.maxDepth);
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
@@ -667,7 +660,7 @@ export class DeepResearch {
 
     const { report, bibliography } = await generateFinalReport({
       sources: this.sources,
-      topic: this.topic,
+      prompt: this.prompt,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
       latestReasoning: this.latestReasoning,
@@ -681,7 +674,7 @@ export class DeepResearch {
       data: {
         text: report + "\n\n" + bibliography,
         metadata: {
-          topic: this.topic,
+          prompt: this.prompt,
           iterationCount: this.iterationCount,
           completionStatus: this.isComplete,
           reasoning: this.latestReasoning,
