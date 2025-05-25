@@ -307,7 +307,8 @@ export async function generateResearchPlan({
   pastReasoning,
   pastQueries,
   pastSources,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig; maxDepth: number; maxBreadth: number; targetOutputTokens?: number }) {
+  config,
+}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) {
   try {
     const researchPlanPrompt = PROMPTS.research({
       topic,
@@ -324,8 +325,8 @@ export async function generateResearchPlan({
       schema: z.object({
         subQueries: z.array(z.string()).min(1).max(3).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().min(1).max(3).describe("A number representing the depth of the research"),
-        breadth: z.number().min(1).max(3).describe("A number representing the breadth of the research"),
+        depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
+        breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
       }),
     });
 
@@ -509,7 +510,6 @@ export class DeepResearch {
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
 
-    
     if (config.models) {
       Object.entries(config.models).forEach(([key, value]) => {
         if (value !== undefined) {
@@ -587,27 +587,25 @@ export class DeepResearch {
         pastQueries: this.queries,
         pastSources: this.sources,
         config: this.config,
-        maxDepth: this.config.depth?.maxDepth,
-        maxBreadth: this.config.breadth?.maxBreadth,
       });
 
-      if ( suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config?.breadth?.maxBreadth) {
+      if ( suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config.breadth.maxBreadth) {
         this.config.breadth.maxBreadth = suggestedBreadth;
       }
   
-      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth?.maxDepth) {
+      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth.maxDepth) {
         this.config.depth.maxDepth = suggestedDepth;
       }
   
       // // limit the subqueries to the breadth
-      const limitedQueries = subQueries.slice(0, this.config.breadth?.maxBreadth);
+      const limitedQueries = subQueries.slice(0, this.config.breadth.maxBreadth);
       
       this.queries = [...(this.queries || []), ...limitedQueries];
       this.latestResearchPlan = plan;
 
       logger.log(`Research plan: ${this.latestResearchPlan}`);
       logger.log(`Research queries: ${this.queries.join("\n")}`);
-      logger.log(`Research depth and breadth: ${this.config.depth?.maxDepth} ${this.config.breadth?.maxBreadth}`);
+      logger.log(`Research depth and breadth: ${this.config.depth.maxDepth} ${this.config.breadth.maxBreadth}`);
 
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
@@ -654,7 +652,7 @@ export class DeepResearch {
       const { isComplete, reason } = deciding;
       this.isComplete = isComplete;
       this.latestReasoning = reason;
-    } while (!this.isComplete && iteration < this.config.depth?.maxDepth);
+    } while (!this.isComplete && iteration < this.config.depth.maxDepth);
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });

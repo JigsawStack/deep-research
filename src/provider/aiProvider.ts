@@ -73,7 +73,7 @@ export class AIProvider {
     return this.models[key];
   }
   
-  setModel(key:ModelType, model:LanguageModelV1){
+  setModel(key:ModelType,model:LanguageModelV1){
     this.models[key] = model;
   }
 
