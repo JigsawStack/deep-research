@@ -13,20 +13,20 @@ import { Logger, logger } from "./utils/logger";
  * 
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export async function decisionMaking({
   reasoning,
-  topic,
+  prompt,
   aiProvider,
   queries,
   sources,
   researchPlan,
-}: { reasoning: string; topic: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) {
+}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
-    topic,
+    prompt,
     queries,
     sources,
     researchPlan,
@@ -36,7 +36,7 @@ export async function decisionMaking({
     model: aiProvider.getModel("default"),
     output: "object",
     schema: z.object({
-      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main topic set to true."),
+      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
       reason: z.string().describe("The reason for the decision"),
     }),
     system: decisionMakingPrompt.system,
@@ -50,7 +50,7 @@ export async function decisionMaking({
 /**
  * Reasoning about the search results
  * 
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param latestResearchPlan - The latest research plan
  * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
  * @param queries - The queries used to get the search results
@@ -58,15 +58,15 @@ export async function decisionMaking({
  * @returns The reasoning / thinking output evaluating the search results
 **/
 export async function reasoningSearchResults({
-  topic,
+  prompt,
   latestResearchPlan,
   sources,
   queries,
   aiProvider,
-}: { topic: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
+}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
   try {
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
-      topic,
+      prompt,
       researchPlan: latestResearchPlan,
       sources: sources,
       queries: queries,
@@ -203,7 +203,7 @@ export async function processReportForSources({
  * Generate the final report
  * 
  * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
  * @param latestReasoning - The latest reasoning
@@ -213,7 +213,7 @@ export async function processReportForSources({
  */
 export async function generateFinalReport({
   sources,
-  topic,
+  prompt,
   targetOutputTokens,
   aiProvider,
   latestReasoning,
@@ -221,7 +221,7 @@ export async function generateFinalReport({
   queries,
 }: {
   sources: WebSearchResult[];
-  topic: string;
+  prompt: string;
   targetOutputTokens?: number;
   aiProvider: AIProvider;
   latestReasoning: string;
@@ -238,7 +238,7 @@ export async function generateFinalReport({
 
     const finalReportPrompt = PROMPTS.finalReport({
       currentReport: draft,
-      topic,
+      prompt,
       sources,
       targetOutputTokens,
       latestResearchPlan,
@@ -302,22 +302,22 @@ export async function generateFinalReport({
  * Generate a research plan
  * 
  * @param aiProvider - The AI provider
- * @param topic - The topic of the research
+ * @param prompt - The prompt to research 
  * @param pastReasoning - The past reasoning
  * @param pastQueries - The past queries
  * @param pastSources - The past sources
  */
 export async function generateResearchPlan({
   aiProvider,
-  topic,
+  prompt,
   pastReasoning,
   pastQueries,
   pastSources,
   config,
-}: { aiProvider: AIProvider; topic: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) {
+}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) {
   try {
     const researchPlanPrompt = PROMPTS.research({
-      topic,
+      prompt,
       reasoning: pastReasoning,
       queries: pastQueries,
       sources: pastSources,
@@ -329,7 +329,7 @@ export async function generateResearchPlan({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: z.object({
-        subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the topic"),
+        subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
         breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
@@ -337,7 +337,7 @@ export async function generateResearchPlan({
     });
 
     logger.log("Research Prompts", PROMPTS.research({
-      topic,
+      prompt,
       reasoning: pastReasoning,
       queries: pastQueries,
       sources: pastSources,
@@ -444,7 +444,7 @@ export function createDeepResearch(config: Partial<DeepResearchConfig>) {
  */
 export class DeepResearch {
   public config: DeepResearchConfig;
-  public topic: string = "";
+  public prompt: string = "";
   public finalReport: string = "";
 
   public latestResearchPlan: string = "";
@@ -568,12 +568,12 @@ export class DeepResearch {
   /**
    * Generate a research report
    * 
-   * @param topic - The topic of the research
+   * @param prompt - The prompt of the research
    * @returns The research report
    */
-  public async generate(topic: string) {
-    logger.log(`Running research with topic: ${topic}`);
-    this.topic = topic;
+  public async generate(prompt: string) {
+    logger.log(`Running research with prompt: ${prompt}`);
+    this.prompt = prompt;
     let iteration = 0;
 
     do {
@@ -588,7 +588,7 @@ export class DeepResearch {
         suggestedBreadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
-        topic: this.topic,
+        prompt: this.prompt,
         pastReasoning: this.latestReasoning,
         pastQueries: this.queries,
         pastSources: this.sources,
@@ -605,7 +605,7 @@ export class DeepResearch {
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.topic, this.aiProvider);
+      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.prompt, this.aiProvider);
       
       // step 2.5: deduplicate results
       logger.log(`Received ${initialSearchResults.length} initial search results`);
@@ -622,7 +622,7 @@ export class DeepResearch {
       // step 3: reasoning about the search results
       logger.log(`[Step 3] Reasoning about the search results...`);
       const reasoning = await reasoningSearchResults({
-        topic: this.topic,
+        prompt: this.prompt,
         latestResearchPlan: this.latestResearchPlan,
         sources: this.sources,
         queries: this.queries,
@@ -636,7 +636,7 @@ export class DeepResearch {
       logger.log(`[Step 4] Decision making...`);
       const deciding = await decisionMaking({
         reasoning,
-        topic: this.topic,
+        prompt: this.prompt,
         queries: this.queries,
         sources: this.sources,
         researchPlan: this.latestResearchPlan,
@@ -660,7 +660,7 @@ export class DeepResearch {
 
     const { report, bibliography } = await generateFinalReport({
       sources: this.sources,
-      topic: this.topic,
+      prompt: this.prompt,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
       latestReasoning: this.latestReasoning,
@@ -674,7 +674,7 @@ export class DeepResearch {
       data: {
         text: report + "\n\n" + bibliography,
         metadata: {
-          topic: this.topic,
+          prompt: this.prompt,
           iterationCount: this.iterationCount,
           completionStatus: this.isComplete,
           reasoning: this.latestReasoning,

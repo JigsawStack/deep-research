@@ -1,16 +1,16 @@
 import { ResearchSource, WebSearchResult } from "@/types/types";
 
 const CONTEXT_GENERATION_PROMPT = ({
-  topic,
+  prompt,
   queries,
   research_sources,
-}: { topic: string; queries: string[]; research_sources: ResearchSource[] }) => `
+}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) => `
 You are a world-class context generator.\n
-Your task is to generate a context overview for the following queries and sources that relates to the main topic:\n
-Extract all the information from the sources that is relevant to the main topic.\n
+Your task is to generate a context overview for the following queries and sources that relates to the main prompt:\n
+Extract all the information from the sources that is relevant to the main prompt.\n
 
-Main Topic:\n
-${topic}\n
+Main Prompt:\n
+${prompt}\n
 
 Sub-Queries and Sources:\n
 ${queries?.map((q) => {
@@ -25,17 +25,17 @@ ${queries?.map((q) => {
 `.trim();
 
 const RESEARCH_PROMPT_TEMPLATE = ({
-  topic,
+  prompt,
   reasoning,
   queries,
   sources,
-}: { topic: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
-  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given topic.
+}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
+  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
   INSTRUCTIONS:
   1. A Detailed Research Plan:
       - Clearly outline the overall research strategy and methodology you propose.
-      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the topic.
+      - Identify key areas, themes, or sub-topics that need to be investigated to ensure comprehensive coverage of the prompt.
       - Suggest the types of information, data, or sources (e.g., academic papers, official reports, news articles, expert opinions) that would be most valuable for this research.
       - The plan should be logical, actionable, and designed for efficient information gathering.
   2. A List of Focused Search Queries:
@@ -44,9 +44,9 @@ const RESEARCH_PROMPT_TEMPLATE = ({
       - The set of queries should collectively aim to cover the main aspects identified in your research plan.
       - Ensure queries are distinct and avoid redundancy.
   3. Generate how deep the research should be:
-      - Generate a number to determine how deep the research should be to fully explore this topic
+      - Generate a number to determine how deep the research should be to fully explore this prompt
   4. Generate how broad the research should be:
-      - Generate a number to determine how broad the research should be to fully explore this topic
+      - Generate a number to determine how broad the research should be to fully explore this prompt
 
       Output in the given JSON schema.
   `.trim();
@@ -66,7 +66,7 @@ ${queries.map((q) => {
   return `**${q}** (No sources found)`;
 }).join('\n')}` : ''}
   
-User Prompt: ${topic}
+User Prompt: ${prompt}
 `.trim();
 
   return {
@@ -76,14 +76,14 @@ User Prompt: ${topic}
 };
 
 const DECISION_MAKING_PROMPT = ({
-  topic,
+  prompt,
   reasoning,
   queries,
   sources,
   researchPlan,
 }: {
   reasoning: string;
-  topic: string;
+  prompt: string;
   queries: string[];
   sources: WebSearchResult[];
   researchPlan: string;
@@ -94,7 +94,7 @@ You are a world-class analyst. Your primary purpose is to help decide if the dat
 Current datetime is: ${new Date().toISOString()}
 
 INSTRUCTIONS:
-- If the reasoning is sufficient to answer the main topic set "isComplete" to true.
+- If the reasoning is sufficient to answer the prompt set "isComplete" to true.
 - In either case, provide a brief explanation in "reason" describing your judgement.
 
 Response in the given JSON schema.
@@ -117,7 +117,7 @@ ${queries.map((q) => {
 
 Reasoning generated previously: "${reasoning}"
 
-Prompt: "${topic}"
+Prompt: "${prompt}"
 `.trim();
 
   return {
@@ -127,12 +127,12 @@ Prompt: "${topic}"
 };
 
 const REASONING_SEARCH_RESULTS_PROMPT = ({
-  topic,
+  prompt,
   researchPlan,
   queries,
   sources,
 }: {
-  topic: string;
+  prompt: string;
   researchPlan: string;
   queries: string[];
   sources: WebSearchResult[];
@@ -155,7 +155,7 @@ ${queries?.map((q) => {
   }
 }).join('\n')}
 
-Prompt: "${topic}"
+Prompt: "${prompt}"
 `.trim();
 
   return {
@@ -165,7 +165,7 @@ Prompt: "${topic}"
 }
 
 const FINAL_REPORT_PROMPT = ({
-  topic,
+  prompt,
   sources,
   targetOutputTokens,
   latestResearchPlan,
@@ -174,7 +174,7 @@ const FINAL_REPORT_PROMPT = ({
   phase,
   currentReport,
 }: {
-  topic: string;
+  prompt: string;
   sources: WebSearchResult[];
   targetOutputTokens?: number;
   latestResearchPlan: string;
@@ -189,7 +189,7 @@ const FINAL_REPORT_PROMPT = ({
 
   const systemPrompt = `
   You are a world-class analyst.
-  Your primary purpose is to help users answer their topic/queries. 
+  Your primary purpose is to help users answer their prompt. 
 
   GENERAL GUIDELINES:
     - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.
@@ -199,7 +199,7 @@ const FINAL_REPORT_PROMPT = ({
 
   INSTRUCTIONS:
     - generate in the
-    - Make sure your report is addressing the topic/queries.
+    - Make sure your report is addressing the prompt.
     - Make sure your report is comprehensive and covers all the sub-topics.
     - Make sure your report is well-researched and well-cited.
     - Make sure your report is well-written and well-structured.
@@ -260,8 +260,8 @@ const FINAL_REPORT_PROMPT = ({
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
     ${phaseInstructions}\n
 
-  Main Topic:
-  ${topic}
+  Prompt:
+  "${prompt}"
   `.trim();
 
   return {

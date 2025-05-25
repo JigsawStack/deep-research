@@ -12,11 +12,11 @@ async function simpleResearch() {
   });
 
 
-  // the topic to research
-  const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
+  // the prompt to research
+  const prompt = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
 
   try {
-    const simpleResult = await simpleResearch.generate(topic); // generate runs the research pipeline
+    const simpleResult = await simpleResearch.generate(prompt); // generate runs the research pipeline
 
     console.log("simpleResult", simpleResult.data.text);
 

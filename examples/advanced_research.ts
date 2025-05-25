@@ -50,11 +50,11 @@ async function advancedResearch() {
     JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
-  // the topic to research
-  const topic = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
+  // the prompt to research
+  const prompt = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
 
   try {
-    const advancedResult = await advancedResearch.generate(topic); // generate runs the research pipeline
+    const advancedResult = await advancedResearch.generate(prompt); // generate runs the research pipeline
     console.log("advancedResult", advancedResult.data.text);
 
   } catch (error) {
