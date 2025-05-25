@@ -6,9 +6,9 @@ export interface ReportConfig {
 }
 
 export interface ModelConfig {
-  default: string | LanguageModelV1;
-  reasoning: string | LanguageModelV1;
-  output: string | LanguageModelV1;
+  default: LanguageModelV1;
+  reasoning: LanguageModelV1;
+  output: LanguageModelV1;
 }
 
 export interface ResearchSource {

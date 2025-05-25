@@ -428,7 +428,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
  * @param config - The configuration for the DeepResearch instance
  * @returns A new DeepResearch instance
  */
-export function createDeepResearch(config: DeepResearchConfig) {
+export function createDeepResearch(config: Partial<DeepResearchConfig>) {
   return new DeepResearch(config);
 }
 
@@ -453,7 +453,7 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
 
-  constructor(config: DeepResearchConfig) {
+  constructor(config: Partial<DeepResearchConfig>) {
     this.config = this.validateConfig(config);
 
     if (this.config.logging && this.config.logging.enabled !== undefined) {
@@ -475,9 +475,9 @@ export class DeepResearch {
       OPENAI_API_KEY: openaiApiKey,
       GEMINI_API_KEY: geminiApiKey,
       DEEPINFRA_API_KEY: deepInfraApiKey,
-      defaultModel: this.config.models.default as LanguageModelV1,
-      reasoningModel: this.config.models.reasoning as LanguageModelV1,
-      outputModel: this.config.models.output as LanguageModelV1,
+      defaultModel: this.config.models.default,
+      reasoningModel: this.config.models.reasoning,
+      outputModel: this.config.models.output,
     });
 
     this.initModels();
@@ -488,11 +488,7 @@ export class DeepResearch {
     if (this.config.models) {
       Object.entries(this.config.models).forEach(([modelType, modelValue]) => {
         if (modelValue) {
-          if (typeof modelValue !== "string") {
-            // It's a LanguageModelV1 instance, add it as a direct model
-            this.aiProvider.setModel(modelType, modelValue);
-          }
-          // If it's a string, it will be handled by the generateText method
+          this.aiProvider.setModel(modelType, modelValue);
         }
       });
     }
@@ -504,7 +500,7 @@ export class DeepResearch {
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
-  public validateConfig(config: DeepResearchConfig) {
+  public validateConfig(config: Partial<DeepResearchConfig>) {
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -513,6 +509,7 @@ export class DeepResearch {
     // Merge models carefully to handle both string and LanguageModelV1 instances
     const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
 
+    
     if (config.models) {
       Object.entries(config.models).forEach(([key, value]) => {
         if (value !== undefined) {
