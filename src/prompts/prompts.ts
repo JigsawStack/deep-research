@@ -78,9 +78,15 @@ User Prompt: ${topic}
 const DECISION_MAKING_PROMPT = ({
   topic,
   reasoning,
+  queries,
+  sources,
+  researchPlan,
 }: {
   reasoning: string;
   topic: string;
+  queries: string[];
+  sources: WebSearchResult[];
+  researchPlan: string;
 }) => {
   const systemPrompt = `
 You are a world-class analyst. Your primary purpose is to help decide if the data provided is sufficient to complete the given prompt.
@@ -95,7 +101,21 @@ Response in the given JSON schema.
 `.trim();
 
   const userPrompt = `
-Context: "${reasoning}"
+Research Plan:
+"${researchPlan}"
+
+Sub-Queries and Sources previously generated:
+${queries.map((q) => {
+  const sourcesForQuery = sources?.find(s => s.query === q);
+  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
+    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
+  }
+  return `**${q}** (No sources found)`;
+}).join('\n')}
+
+Reasoning generated previously: "${reasoning}"
 
 Prompt: "${topic}"
 `.trim();
@@ -215,7 +235,7 @@ const FINAL_REPORT_PROMPT = ({
 
   const userPrompt = `
   ${targetOutputTokens ? `Target length:
-    ≈ ${(targetOutputTokens * 4).toLocaleString()} characters (${targetOutputTokens} tokens ×4)` : ""}
+    ≈ ${(targetOutputTokens * 3).toLocaleString()} characters (${targetOutputTokens} tokens ×3)` : ""}
 
   CONTEXT:
     Latest Research Plan:

@@ -20,10 +20,16 @@ export async function decisionMaking({
   reasoning,
   topic,
   aiProvider,
-}: { reasoning: string; topic: string; aiProvider: AIProvider }) {
+  queries,
+  sources,
+  researchPlan,
+}: { reasoning: string; topic: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
     topic,
+    queries,
+    sources,
+    researchPlan,
   });
 
   const decisionMakingResponse = await generateObject({
@@ -631,6 +637,9 @@ export class DeepResearch {
       const deciding = await decisionMaking({
         reasoning,
         topic: this.topic,
+        queries: this.queries,
+        sources: this.sources,
+        researchPlan: this.latestResearchPlan,
         aiProvider: this.aiProvider,
       });
 
