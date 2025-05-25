@@ -323,7 +323,7 @@ export async function generateResearchPlan({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: z.object({
-        subQueries: z.array(z.string()).min(1).max(3).describe("A list of search queries to thoroughly research the topic"),
+        subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the topic"),
         plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
         depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
         breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
@@ -588,19 +588,8 @@ export class DeepResearch {
         pastSources: this.sources,
         config: this.config,
       });
-
-      if ( suggestedBreadth && suggestedBreadth > 0 && suggestedBreadth < this.config.breadth.maxBreadth) {
-        this.config.breadth.maxBreadth = suggestedBreadth;
-      }
   
-      if (suggestedDepth && suggestedDepth > 0 && suggestedDepth < this.config.depth.maxDepth) {
-        this.config.depth.maxDepth = suggestedDepth;
-      }
-  
-      // // limit the subqueries to the breadth
-      const limitedQueries = subQueries.slice(0, this.config.breadth.maxBreadth);
-      
-      this.queries = [...(this.queries || []), ...limitedQueries];
+      this.queries = [...(this.queries || []), ...subQueries];
       this.latestResearchPlan = plan;
 
       logger.log(`Research plan: ${this.latestResearchPlan}`);
@@ -608,9 +597,9 @@ export class DeepResearch {
       logger.log(`Research depth and breadth: ${this.config.depth.maxDepth} ${this.config.breadth.maxBreadth}`);
 
       // step 2: fire web searches
-      logger.log(`[Step 2] Running initial web searches with ${limitedQueries.length} queries...`);
+      logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(limitedQueries, this.topic, this.aiProvider);
+      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.topic, this.aiProvider);
       
       // step 2.5: deduplicate results
       logger.log(`Received ${initialSearchResults.length} initial search results`);

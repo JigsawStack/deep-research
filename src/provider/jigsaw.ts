@@ -25,7 +25,7 @@ export class JigsawProvider {
     return JigsawProvider.instance;
   }
 
-  public async context_generator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
+  public async contextGenerator({queries, sources, topic, aiProvider}: {queries: string[]; sources: WebSearchResult[]; topic: string; aiProvider: AIProvider}) {
     try {
       // Generate context for each query's search results
       const contextResults = await Promise.all(
@@ -88,7 +88,7 @@ export class JigsawProvider {
     }
     
     // Step 2: Generate context for the search results with non-empty results
-    const contextResults = await this.context_generator({
+    const contextResults = await this.contextGenerator({
       queries: nonEmptySearchResults.map(result => result.query),
       sources: nonEmptySearchResults,
       topic,
