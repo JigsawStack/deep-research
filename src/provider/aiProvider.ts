@@ -1,8 +1,8 @@
-import { generateText } from "ai";
-import { ProviderV1, LanguageModelV1 } from "@ai-sdk/provider";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { LanguageModelV1, ProviderV1 } from "@ai-sdk/provider";
+import { generateText } from "ai";
 
 /**
  * AIProvider acts as an abstract factory for different AI model providers
@@ -10,7 +10,6 @@ import { createDeepInfra } from "@ai-sdk/deepinfra";
  */
 
 export type ModelType = "default" | "reasoning" | "output" | string;
-
 
 export class AIProvider {
   private providers: Map<string, ProviderV1> = new Map();
@@ -69,11 +68,11 @@ export class AIProvider {
     };
   }
 
-  getModel(key:ModelType){
+  getModel(key: ModelType) {
     return this.models[key];
   }
-  
-  setModel(key:ModelType,model:LanguageModelV1){
+
+  setModel(key: ModelType, model: LanguageModelV1) {
     this.models[key] = model;
   }
 
@@ -114,7 +113,6 @@ export class AIProvider {
       throw new Error(`Error generating text: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
 }
 
 export default AIProvider;

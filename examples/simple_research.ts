@@ -11,7 +11,6 @@ async function simpleResearch() {
     JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
-
   // the prompt to research
   const prompt = "What is the largest order of a non-cyclic torsion subgroup of an elliptic curve over $\\mathbb{Q}(\\sqrt{-3})$";
 
@@ -20,7 +19,6 @@ async function simpleResearch() {
 
     console.log("simpleResult", simpleResult.data.text);
     console.log("simpleBibliography", simpleResult.data.bibliography);
-
   } catch (error) {
     console.error("Research failed with error:", error);
     process.exit(1);

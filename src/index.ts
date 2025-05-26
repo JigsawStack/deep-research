@@ -1,14 +1,17 @@
+import { DeepResearchConfig, DeepResearchParams, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult, DeepResearchConfig, DeepResearchParams } from "@/types/types";
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG} from "./config/defaults";
-import "dotenv/config";
+import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
+import {
+  decisionMaking,
+  deduplicateSearchResults,
+  generateFinalReport,
+  generateResearchPlan,
+  mapSearchResultsToNumbers,
+  reasoningSearchResults,
+} from "./process";
 import { JigsawProvider } from "./provider/jigsaw";
 import { Logger, logger } from "./utils/logger";
-import { decisionMaking, deduplicateSearchResults, generateFinalReport, generateResearchPlan, mapSearchResultsToNumbers, reasoningSearchResults } from "./process";
 
-/**
- * The DeepResearch class
- */
 export class DeepResearch {
   public config: DeepResearchConfig;
   public prompt: string = "";
@@ -19,12 +22,10 @@ export class DeepResearch {
   public decision: { isComplete: boolean; reason: string } = { isComplete: false, reason: "" };
   public logger = Logger.getInstance();
 
-
   public queries: string[] = [];
   public sources: WebSearchResult[] = [];
   public aiProvider: AIProvider;
   private jigsaw: JigsawProvider;
-  private isComplete: boolean = false;
   private iterationCount: number = 0;
 
   constructor(config: DeepResearchParams) {
@@ -61,14 +62,18 @@ export class DeepResearch {
 
   /**
    * Validate the configuration
-   * 
+   *
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
   public validateConfig(config: DeepResearchParams) {
-
     // maxOutputTokens must be greater than targetOutputLength
-    if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
+    if (
+      config.report &&
+      config.report.maxOutputTokens &&
+      config.report.targetOutputTokens &&
+      config.report.maxOutputTokens < config.report.targetOutputTokens
+    ) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
@@ -98,22 +103,26 @@ export class DeepResearch {
       },
       models: mergedModels,
       JIGSAW_API_KEY:
-        config.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY ||
+        config.JIGSAW_API_KEY ||
+        process.env.JIGSAW_API_KEY ||
         (() => {
           throw new Error("JIGSAW_API_KEY must be provided in config");
         })(),
       OPENAI_API_KEY:
-        config.OPENAI_API_KEY || process.env.OPENAI_API_KEY ||
+        config.OPENAI_API_KEY ||
+        process.env.OPENAI_API_KEY ||
         (() => {
           throw new Error("OpenAI API key must be provided in config");
         })(),
       GEMINI_API_KEY:
-        config.GEMINI_API_KEY || process.env.GEMINI_API_KEY ||
+        config.GEMINI_API_KEY ||
+        process.env.GEMINI_API_KEY ||
         (() => {
           throw new Error("Gemini API key must be provided in config");
         })(),
       DEEPINFRA_API_KEY:
-        config.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY ||
+        config.DEEPINFRA_API_KEY ||
+        process.env.DEEPINFRA_API_KEY ||
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),
@@ -126,7 +135,7 @@ export class DeepResearch {
 
   /**
    * Generate a research report
-   * 
+   *
    * @param prompt - The prompt of the research
    * @returns The research report
    */
@@ -140,12 +149,7 @@ export class DeepResearch {
 
       logger.log(`[Step 1] Generating research plan... at ${iteration}`);
 
-      const {
-        subQueries,
-        researchPlan,
-        depth,
-        breadth,
-      } = await generateResearchPlan({
+      const { subQueries, researchPlan, depth, breadth } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
         reasoning: this.reasoning,
@@ -153,7 +157,7 @@ export class DeepResearch {
         sources: this.sources,
         config: this.config,
       });
-  
+
       this.queries = [...(this.queries || []), ...subQueries];
       this.researchPlan = researchPlan;
       this.config.depth.maxDepth = depth;
@@ -167,7 +171,7 @@ export class DeepResearch {
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
       const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.prompt, this.aiProvider);
-      
+
       // step 2.5: deduplicate results
       logger.log(`Received ${initialSearchResults.length} initial search results`);
       logger.log(`[Step 2.5] Deduplicating search results...`);
@@ -206,7 +210,6 @@ export class DeepResearch {
 
       this.decision = deciding;
       logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
-
     } while (!this.decision.isComplete && iteration < this.config.depth.maxDepth);
 
     // map the sources to numbers for sources
@@ -224,7 +227,6 @@ export class DeepResearch {
       researchPlan: this.researchPlan,
       queries: this.queries,
     });
-
 
     return {
       status: "success",
@@ -247,13 +249,10 @@ export class DeepResearch {
 
 /**
  * Create a new DeepResearch instance
- * 
+ *
  * @param config - The configuration for the DeepResearch instance
  * @returns A new DeepResearch instance
  */
 export const createDeepResearch = (config: Partial<DeepResearchConfig>) => {
   return new DeepResearch(config);
 };
-
-// Default export
-export default createDeepResearch;

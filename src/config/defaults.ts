@@ -2,7 +2,6 @@ import { ModelConfig, ReportConfig } from "@/types/types";
 import { deepinfra } from "@ai-sdk/deepinfra";
 import { openai } from "@ai-sdk/openai";
 
-
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   default: openai.languageModel("gpt-4.1"),
   output: openai.languageModel("gpt-4.1"),
@@ -17,11 +16,9 @@ export const DEFAULT_BREADTH_CONFIG = {
   maxBreadth: 3,
 };
 
-
 export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   maxOutputTokens: 32000,
 };
-
 
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,

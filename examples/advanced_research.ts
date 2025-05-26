@@ -1,12 +1,11 @@
 import "dotenv/config";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
-import { createDeepResearch } from "../src/index";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createDeepResearch } from "../src/index";
 
 // Advanced usage example
 async function advancedResearch() {
-
   // initialize your own AiProviders
   const gemini = createGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -30,16 +29,16 @@ async function advancedResearch() {
       maxOutputTokens: 30000, // Hard upper limit of tokens
       targetOutputTokens: 10000,
     },
-    depth:{
-      maxDepth: 4 // specify how many iterations of research to perform (how deep the research should be)
+    depth: {
+      maxDepth: 4, // specify how many iterations of research to perform (how deep the research should be)
     },
     breadth: {
-      maxBreadth: 3 // specify how many subqueries to generate (how broad the research should be)
+      maxBreadth: 3, // specify how many subqueries to generate (how broad the research should be)
     },
     models: {
       output: geminiModel, // pass in specific models
       reasoning: deepseekModel,
-      default: openaiModel, 
+      default: openaiModel,
     },
     logging: {
       enabled: true, // enabled to true for console logging
@@ -58,7 +57,6 @@ async function advancedResearch() {
 
     console.log("advancedResult", advancedResult.data.text);
     console.log("advancedBibliography", advancedResult.data.bibliography);
-
   } catch (error) {
     console.error("Research failed with error:", error);
     process.exit(1);

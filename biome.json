@@ -7,8 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["node_modules", "dist", "coverage"],
-    "include": ["src/**/*.{ts,tsx,js,jsx}"]
+    "ignore": []
   },
   "formatter": {
     "enabled": true,
@@ -25,10 +24,7 @@
     "enabled": true
   },
   "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
+    "enabled": false
   },
   "javascript": {
     "formatter": {

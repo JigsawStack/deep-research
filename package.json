@@ -1,17 +1,16 @@
 {
-  "name": "open-deep-research",
-  "version": "1.0.0",
-  "description": "An OpenSource Deep Research library with reasoning",
+  "name": "deep-research",
+  "version": "0.0.1",
+  "description": "Open source deep research TS/JS library with built in web search, reasoning, and bibliography generation",
   "engines": {
     "node": ">=18"
   },
+  "packageManager": "yarn@1.22.22",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
-  "files": [
-    "dist/**"
-  ],
+  "files": ["dist/**"],
   "exports": {
     "require": {
       "types": "./dist/index.d.cts",
@@ -23,13 +22,8 @@
     }
   },
   "scripts": {
-    "build": "pkgroll --minify --sourcemap=inline --src=./src",
-    "test": "jest",
-    "test:report": "tsx examples/basic/testFinalReport.ts",
-    "dev:server": "tsx src/server.ts",
+    "build": "pkgroll --minify --src=./src",
     "lint": "biome lint .",
-    "prepare": "npm run build",
-    "start": "node dist/index.js",
     "format": "biome check --write .",
     "dev": "tsx examples/simple_research.ts"
   },
@@ -40,29 +34,22 @@
     "@ai-sdk/groq": "^1.1.2",
     "@ai-sdk/openai": "^1.1.9",
     "@types/uuid": "^10.0.0",
-    "ai": "4.3.15",
-    "body-parser": "^2.2.0",
-    "express": "^5.1.0",
+    "ai": "^4.3.16",
     "jigsawstack": "^0.2.2",
-    "json-schema": "0.4.0",
+    "json-schema": "^0.4.0",
     "ts-retry": "^6.0.0",
-    "uuid": "^11.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.10.10",
+    "body-parser": "^2.2.0",
     "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "pkgroll": "^2.6.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   },
-  "keywords": [
-    "ai",
-    "research",
-    "openai",
-    "google-ai"
-  ],
-  "author": "",
-  "license": "ISC"
+  "keywords": ["ai", "framework", "deep-research", "web-search", "reasoning"],
+  "license": "Apache-2.0"
 }

@@ -5,7 +5,8 @@ const CONTEXT_GENERATION_PROMPT = ({
   prompt,
   queries,
   research_sources,
-}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) => `
+}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) =>
+  `
 You are a world-class context generator.
 Your task is to generate a context overview for the following queries and sources that relates to the main prompt:
 Extract all the information from the sources that is relevant to the main prompt.
@@ -14,15 +15,21 @@ Main Prompt:
 ${prompt}
 
 Sub-Queries and Sources:
-${queries?.map((q) => {
-  const sourcesForQuery = research_sources?.filter(s => s.url && s.url.length > 0);
-  if (sourcesForQuery && sourcesForQuery.length > 0) {
-    return `**${q}**\n${sourcesForQuery.map(r => `   
-    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
-  }
-  return `**${q}** (No sources found)`;
-}).join('\n\n')}
+${queries
+  ?.map((q) => {
+    const sourcesForQuery = research_sources?.filter((s) => s.url && s.url.length > 0);
+    if (sourcesForQuery && sourcesForQuery.length > 0) {
+      return `**${q}**\n${sourcesForQuery
+        .map(
+          (r) => `   
+    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+        )
+        .join("\n")}`;
+    }
+    return `**${q}** (No sources found)`;
+  })
+  .join("\n\n")}
 `.trim();
 
 const RESEARCH_PROMPT_TEMPLATE = ({
@@ -32,7 +39,8 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   sources,
   config,
 }: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[]; config: DeepResearchConfig }) => {
-  const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
+  const systemPrompt =
+    `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
   INSTRUCTIONS:
   1. A Detailed Research Plan:
@@ -56,27 +64,37 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   const userPrompt = `
 ${reasoning ? `Past reasoning: ${reasoning}` : ""}
 
-${queries ? `
+${
+  queries
+    ? `
 Sub-Queries and Sources previously generated:
-${queries.map((q) => {
-  const sourcesForQuery = sources?.find(s => s.query === q);
-  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
-    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
-  }
-  return `**${q}** (No sources found)`;
-}).join('\n')}` : ''}
+${queries
+  .map((q) => {
+    const sourcesForQuery = sources?.find((s) => s.query === q);
+    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+      return `**${q}**\n${sourcesForQuery.searchResults.results
+        .map(
+          (r) => `   
+    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+        )
+        .join("\n")}`;
+    }
+    return `**${q}** (No sources found)`;
+  })
+  .join("\n")}`
+    : ""
+}
   
 User Prompt: ${prompt}
 `.trim();
 
-const schema = z.object({
-  subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
-  researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-  depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
-  breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
-});
+  const schema = z.object({
+    subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
+    researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
+    depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
+    breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
+  });
 
   return {
     system: systemPrompt,
@@ -115,25 +133,31 @@ Research Plan:
 "${researchPlan}"
 
 Sub-Queries and Sources previously generated:
-${queries.map((q) => {
-  const sourcesForQuery = sources?.find(s => s.query === q);
-  if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-    return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
-    [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
-  }
-  return `**${q}** (No sources found)`;
-}).join('\n')}
+${queries
+  .map((q) => {
+    const sourcesForQuery = sources?.find((s) => s.query === q);
+    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+      return `**${q}**\n${sourcesForQuery.searchResults.results
+        .map(
+          (r) => `   
+    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+        )
+        .join("\n")}`;
+    }
+    return `**${q}** (No sources found)`;
+  })
+  .join("\n")}
 
 Reasoning generated previously: "${reasoning}"
 
 Prompt: "${prompt}"
 `.trim();
 
-const schema = z.object({
-  isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
-  reason: z.string().describe("The reason for the decision"),
-});
+  const schema = z.object({
+    isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
+    reason: z.string().describe("The reason for the decision"),
+  });
 
   return {
     system: systemPrompt,
@@ -160,15 +184,17 @@ Proposed research plan:
 "${researchPlan}"
 
 Context for each query:
-${queries?.map((q) => {
-  const sourcesForQuery = sources?.find(s => s.query === q);
-  if (sourcesForQuery) {
-    return `**Query: ${q}**\n
+${queries
+  ?.map((q) => {
+    const sourcesForQuery = sources?.find((s) => s.query === q);
+    if (sourcesForQuery) {
+      return `**Query: ${q}**\n
     Context: ${sourcesForQuery.context}`;
-  } else {
-    throw new Error(`No sources found for query: ${q}`);
-  }
-}).join('\n')}
+    } else {
+      throw new Error(`No sources found for query: ${q}`);
+    }
+  })
+  .join("\n")}
 
 Prompt: "${prompt}"
 `.trim();
@@ -177,7 +203,7 @@ Prompt: "${prompt}"
     system: systemPrompt,
     user: userPrompt,
   };
-}
+};
 
 const FINAL_REPORT_PROMPT = ({
   prompt,
@@ -196,7 +222,7 @@ const FINAL_REPORT_PROMPT = ({
   reasoning: string;
   queries: string[];
   currentReport: string;
-  phase: "initial" | "continuation" ;
+  phase: "initial" | "continuation";
 }) => {
   const targetChars = targetOutputTokens ? targetOutputTokens * 3 : undefined;
   const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
@@ -222,7 +248,7 @@ const FINAL_REPORT_PROMPT = ({
   `;
 
   // Determine instructions based on phase
-  let phaseInstructions = '';
+  let phaseInstructions = "";
   switch (phase) {
     case "initial":
       phaseInstructions = `
@@ -249,8 +275,12 @@ const FINAL_REPORT_PROMPT = ({
   }
 
   const userPrompt = `
-  ${targetOutputTokens ? `Target length:
-    ≈ ${(targetOutputTokens * 3).toLocaleString()} characters (${targetOutputTokens} tokens ×3)` : ""}
+  ${
+    targetOutputTokens
+      ? `Target length:
+    ≈ ${(targetOutputTokens * 3).toLocaleString()} characters (${targetOutputTokens} tokens ×3)`
+      : ""
+  }
 
   CONTEXT:
     Latest Research Plan:
@@ -260,15 +290,21 @@ const FINAL_REPORT_PROMPT = ({
     ${reasoning}
 
     Sub-Queries and Sources:
-    ${queries?.map((q) => {
-      const sourcesForQuery = sources?.find(s => s.query === q);
-      if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-        return `**${q}**\n${sourcesForQuery.searchResults.results.map(r => `   
-        [${r.referenceNumber}] ${r.title || 'No title'} (${r.url})\n      
-        Content and Snippets: ${r.content ? r.content : r.snippets?.join('\n')}`).join('\n')}`;
-      }
-      return `**${q}** (No sources found)`;
-    }).join('\n\n')}
+    ${queries
+      ?.map((q) => {
+        const sourcesForQuery = sources?.find((s) => s.query === q);
+        if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
+          return `**${q}**\n${sourcesForQuery.searchResults.results
+            .map(
+              (r) => `   
+        [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+        Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+            )
+            .join("\n")}`;
+        }
+        return `**${q}** (No sources found)`;
+      })
+      .join("\n\n")}
 
 
     ${currentReport ? `Current Draft:\n${currentReport}` : ""}
@@ -289,7 +325,6 @@ const FINAL_REPORT_PROMPT = ({
     schema,
   };
 };
-
 
 // Export all prompts together with date context
 export const PROMPTS = {

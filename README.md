@@ -4,8 +4,6 @@ Open Deep Research is an open source library for conducting deep, multi-hop rese
 
 ![Open Deep Research Architecture](./public/open_deep_research_diagram.png)
 
-
-
 ## 🧱 Core Concepts
 
 | Concept           | Description                                                                                                          |
@@ -16,12 +14,17 @@ Open Deep Research is an open source library for conducting deep, multi-hop rese
 ## 🚀 Installation
 
 ```bash
-npm install open-deep-research
+npm i open-deep-research
+# or
+yarn add open-deep-research
+# or
+bun i open-deep-research
 ```
 
-## 🚀 Quick Start 
+## 🚀 Quick Start
 
 ### Basic Usage
+
 ```typescript
 import { createDeepResearch } from "open-deep-research";
 
@@ -44,6 +47,7 @@ console.log(result.data.bibliography);
 ```
 
 ### Advanced Usage
+
 ```typescript
 import { createDeepResearch } from "open-deep-research";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -71,22 +75,22 @@ const openaiModel = openaiProvider("gpt-4o");
 // Create instance with custom configuration
 const deepResearch = createDeepResearch({
   report: {
-    maxOutputTokens: 30000,     // Hard limit on report length
-    targetOutputTokens: 10000,  // Target report length
+    maxOutputTokens: 30000, // Hard limit on report length
+    targetOutputTokens: 10000, // Target report length
   },
   depth: {
-    maxDepth: 4                 // How many iterations of research to perform
+    maxDepth: 4, // How many iterations of research to perform
   },
   breadth: {
-    maxBreadth: 3               // How many subqueries to generate
+    maxBreadth: 3, // How many subqueries to generate
   },
   models: {
-    default: openaiModel,       // Custom models from AI SDK
+    default: openaiModel, // Custom models from AI SDK
     reasoning: deepseekModel,
     output: geminiModel,
   },
   logging: {
-    enabled: true               // Enable console logging
+    enabled: true, // Enable console logging
   },
   // Required API keys
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -106,19 +110,23 @@ console.log(result.data.bibliography);
 ```
 
 ## Configurations Options for Open Deep Research
+
 **depth** Configuration
+
 - maxDepth: Number (default: 3)
   - Controls how many iterations of research the system will perform
   - Higher values allow for more thorough, multi-hop research
   - The system will continue researching until it has a complete answer or reaches this limit
 
 **breadth** Configuration
+
 - maxBreadth: Number (default: 3)
   - Controls how many subqueries are generated for each research iteration
   - Higher values enable wider exploration of the topic
   - Determines how many parallel search paths are pursued
 
 **report** Configuration
+
 - maxOutputTokens: Number (default: 32000)
   - Hard upper limit on the length of the final report
   - Must be greater than targetOutputTokens
@@ -127,6 +135,7 @@ console.log(result.data.bibliography);
   - The system will try to produce a report of approximately this length
 
 **models** Configuration
+
 - default: LanguageModelV1
   - The primary model used for most operations
   - Default: OpenAI's GPT-4.1
@@ -138,34 +147,40 @@ console.log(result.data.bibliography);
   - Default: OpenAI's GPT-4.1
 
 **logging** Configuration
+
 - enabled: Boolean (default: false)
   - When set to true, enables detailed console logging
   - Helpful for debugging and understanding the research process
 
 **API Keys** (Required)
+
 - JIGSAW_API_KEY: String (required)
   - For accessing the JigsawStack API for web searches
 - OPENAI_API_KEY: String (required)
-  - For OpenAI model access  
+  - For OpenAI model access
 - GEMINI_API_KEY: String (required)
   - For Google Gemini model access
 - DEEPINFRA_API_KEY: String (required)
   - For DeepInfra model access
 
 ## 🧩 How It Works
+
 1️⃣ **Research Planning & Analysis**
+
 - Creates a DeepResearch instance with user-provided configuration
 - Analyzes the input prompt to understand requirements
 - Generates a comprehensive research plan
 - Breaks down into focused sub-queries using LLMs
 
-2️⃣ **Data Collection & Processing** 
+2️⃣ **Data Collection & Processing**
+
 - Executes AI-powered web searches for each sub-query via JigsawStack API
 - Gathers and validates relevant sources
 - Generates context from search results
 - Deduplicates URLs to ensure unique sources
 
 3️⃣ **Analysis & Synthesis**
+
 - Processes gathered information through reasoning models
 - Analyzes and synthesizes the findings
 - Evaluates information sufficiency
@@ -173,13 +188,13 @@ console.log(result.data.bibliography);
 - Performs iterative research within configured depth limits if needed
 
 4️⃣ **Report Generation & Citations**
+
 - Creates comprehensive final report
 - Iteratively generates content until complete
 - Maps sources to reference numbers
 - Generates bibliography with citations
 - Formats output according to target length requirements
 
-
 ## 🛠️ Contributing
-Contributions are welcome! Please feel free to submit a PR :)
 
+Contributions are welcome! Please feel free to submit a PR :)

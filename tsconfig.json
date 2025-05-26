@@ -18,7 +18,6 @@
     "paths": {
       "@/*": ["./src/*"],
       "@/index": ["./src/index.ts"],
-      "@config/*": ["./src/config/*"],
       "@prompts/*": ["./src/prompts/*"],
       "@provider/*": ["./src/provider/*"],
       "@utils/*": ["./src/utils/*"],

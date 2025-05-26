@@ -1,15 +1,15 @@
+import { DeepResearchConfig, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult, DeepResearchConfig } from "@/types/types";
 import { generateObject, generateText } from "ai";
 import { PROMPTS } from "./prompts/prompts";
 import { logger } from "./utils/logger";
 
 /**
  * Decision making
- * 
+ *
  * @param reasoning - The reasoning for the decision
  * @param aiProvider - The AI provider
- * @param prompt - The prompt to research 
+ * @param prompt - The prompt to research
  * @returns The decision whether to continue with more research or to start generating the final report
  */
 export const decisionMaking = async ({
@@ -42,15 +42,15 @@ export const decisionMaking = async ({
 
 /**
  * Reasoning about the search results
- * 
- * @param prompt - The prompt to research 
+ *
+ * @param prompt - The prompt to research
  * @param latestResearchPlan - The latest research plan
  * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
  * @param queries - The queries used to get the search results
  * @param aiProvider - The AI provider
  * @returns The reasoning / thinking output evaluating the search results
-**/
-export const reasoningSearchResults= async ({
+ **/
+export const reasoningSearchResults = async ({
   prompt,
   researchPlan,
   sources,
@@ -72,7 +72,7 @@ export const reasoningSearchResults= async ({
       // system: reasoningPrompt.system,
       prompt: reasoningPrompt.user,
     });
-    
+
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
       return reasoningResponse.reasoning;
@@ -93,11 +93,11 @@ export const reasoningSearchResults= async ({
     // Throw the error to terminate program execution
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
-}
+};
 
 /**
  * Process the report for sources
- * 
+ *
  * @param report - The report to process
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The report with sources
@@ -111,92 +111,90 @@ export const processReportForSources = async ({
 }) => {
   // Create a lookup map for reference numbers to source info
   const referenceMap = new Map<number, any>();
-  
+
   // Populate the map with reference numbers and their corresponding source info
-  
-  sources.forEach(source => {
+
+  sources.forEach((source) => {
     if (source.searchResults && Array.isArray(source.searchResults.results)) {
-      source.searchResults.results.forEach(result => {
-        
+      source.searchResults.results.forEach((result) => {
         if (result.referenceNumber) {
           referenceMap.set(result.referenceNumber, result);
         }
       });
     }
   });
-  
+
   logger.log(`Reference map size: ${referenceMap.size}`);
-  
+
   // Enhanced regex to find both single sources [1] and multiple sources [1, 2, 3]
   // This matches either:
   // 1. [number] - A single source
   // 2. [number, number, ...] - Multiple comma-separated sources
   const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
-  
+
   // Replace each citation with markdown links
   const reportWithSources = report.replace(sourceRegex, (match, referenceString) => {
     // Split the reference string by commas if it contains multiple references
-    const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
-    
+    const referenceNumbers = referenceString.split(",").map((ref) => parseInt(ref.trim(), 10));
+
     // If it's a single reference number
     if (referenceNumbers.length === 1) {
       const refNum = referenceNumbers[0];
       const source = referenceMap.get(refNum);
-      
+
       if (source) {
         // Create markdown link with the citation number pointing to the source URL
         return `[[${refNum}](${source.url})]`;
       }
-      
+
       // If no matching source found, keep the original citation
       logger.log(`No source found for citation [${refNum}]`);
       return match;
-    } 
+    }
     // If it's multiple reference numbers
     else {
       // Create an array to hold the links
-      const links = referenceNumbers.map(refNum => {
+      const links = referenceNumbers.map((refNum) => {
         const source = referenceMap.get(refNum);
-        
+
         if (source) {
           // Create markdown link with the citation number pointing to the source URL
           return `[${refNum}](${source.url})`;
         }
-        
+
         // If no matching source found, just return the number
         logger.log(`No source found for citation part ${refNum}`);
         return `${refNum}`;
       });
-      
+
       // Join the links with commas
-      return `[${links.join(', ')}]`;
+      return `[${links.join(", ")}]`;
     }
   });
-  
+
   // Generate bibliography section
   let bibliography = "\n\n## References\n\n";
-  
+
   // Sort by reference number for a well-ordered bibliography
-  const sortedReferences = Array.from(referenceMap.entries())
-    .sort((a, b) => a[0] - b[0]);
-  
+  const sortedReferences = Array.from(referenceMap.entries()).sort((a, b) => a[0] - b[0]);
+
   logger.log(`Generating bibliography with ${sortedReferences.length} entries`);
-  
+
   // Create bibliography entries
   sortedReferences.forEach(([number, source]) => {
     const title = source.title || "No title";
-    
+
     bibliography += `${number}. [${title}](${source.url})\n`;
   });
 
-  return {reportWithSources, bibliography};
-}
+  return { reportWithSources, bibliography };
+};
 
 /**
  * Generate the final report
- * 
+ *
  * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @param prompt - The prompt to research 
+ * @param prompt - The prompt to research
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
  * @param latestReasoning - The latest reasoning
@@ -240,7 +238,6 @@ export const generateFinalReport = async ({
       phase,
     });
 
-
     logger.log(`\n[Iteration ${iter}] phase=${phase}`);
     logger.log("SYSTEM PROMPT:\n" + reportPrompt.system);
     logger.log("USER PROMPT:\n" + reportPrompt.user);
@@ -253,7 +250,7 @@ export const generateFinalReport = async ({
       schema: reportPrompt.schema,
       experimental_repairText: async ({ text, error }) => {
         // Simple repair attempt for unclosed JSON strings
-        if (error && error.message && error.message.includes('Unterminated string')) {
+        if (error && error.message && error.message.includes("Unterminated string")) {
           return text + '"}';
         }
         return text;
@@ -266,7 +263,6 @@ export const generateFinalReport = async ({
     logger.log("PHASE==============================:\n" + response.object.phase);
     logger.log("MODEL OUTPUT:\n" + response.object.text);
 
-
     if (phase === "continuation") {
       const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
       if (targetChars && draft.length >= targetChars) {
@@ -277,8 +273,8 @@ export const generateFinalReport = async ({
     iter++;
   } while (phase !== "done");
 
-  // process the report for sources 
-  const {reportWithSources, bibliography} = await processReportForSources({
+  // process the report for sources
+  const { reportWithSources, bibliography } = await processReportForSources({
     report: draft,
     sources,
   });
@@ -286,13 +282,13 @@ export const generateFinalReport = async ({
   logger.log("Done processing report for sources");
 
   return { report: reportWithSources, bibliography };
-}
+};
 
 /**
  * Generate a research plan
- * 
+ *
  * @param aiProvider - The AI provider
- * @param prompt - The prompt to research 
+ * @param prompt - The prompt to research
  * @param pastReasoning - The past reasoning
  * @param pastQueries - The past queries
  * @param pastSources - The past sources
@@ -304,7 +300,7 @@ export const generateResearchPlan = async ({
   queries,
   sources,
   config,
-}: { aiProvider: AIProvider; prompt: string; reasoning: string; queries: string[]; sources: WebSearchResult[]; config: DeepResearchConfig;}) => {
+}: { aiProvider: AIProvider; prompt: string; reasoning: string; queries: string[]; sources: WebSearchResult[]; config: DeepResearchConfig }) => {
   try {
     const researchPlanPrompt = PROMPTS.research({
       prompt,
@@ -313,7 +309,7 @@ export const generateResearchPlan = async ({
       sources: sources,
       config,
     });
-    
+
     // Generate the research plan using the AI provider
     const result = await generateObject({
       model: aiProvider.getModel("default"),
@@ -322,13 +318,16 @@ export const generateResearchPlan = async ({
       schema: researchPlanPrompt.schema,
     });
 
-    logger.log("Research Prompts", PROMPTS.research({
-      prompt,
-      reasoning: reasoning,
-      queries: queries,
-      sources: sources,
-      config,
-    }));
+    logger.log(
+      "Research Prompts",
+      PROMPTS.research({
+        prompt,
+        reasoning: reasoning,
+        queries: queries,
+        sources: sources,
+        config,
+      })
+    );
 
     return {
       subQueries: result.object.subQueries,
@@ -340,11 +339,11 @@ export const generateResearchPlan = async ({
     logger.error(`Error generating research plan: ${error.message || error}`);
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
-}
+};
 
 /**
  * Deduplicate search results
- * 
+ *
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The deduplicated search results
  */
@@ -378,11 +377,11 @@ export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult
       },
     };
   });
-}
+};
 
 /**
  * Map search results to numbers
- * 
+ *
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The search results with numbers
  */
@@ -401,7 +400,7 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
           if (!urlMap.has(item.url)) {
             urlMap.set(item.url, currentNumber++);
           }
-          
+
           return {
             url: item.url,
             title: item.title,
