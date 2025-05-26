@@ -37,7 +37,7 @@ export const decisionMaking = async ({
     temperature: 0,
   });
 
-  return decisionMakingResponse.object;
+  return { decision: decisionMakingResponse, usage: decisionMakingResponse.usage };
 };
 
 /**
@@ -75,17 +75,17 @@ export const reasoningSearchResults = async ({
 
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
-      return reasoningResponse.reasoning;
+      return { reasoning: reasoningResponse.reasoning, usage: reasoningResponse.usage };
     }
 
     // Option 2: Extract content between <think> or <thinking> tags (deepseek-r1 uses this)
     const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
     if (thinkingMatch) {
-      return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
+      return { reasoning: thinkingMatch[1] || thinkingMatch[2], usage: reasoningResponse.usage }; // Return the content of whichever group matched
     }
 
     // Option 3: If no structured reasoning available, return the full text
-    return reasoningResponse.text;
+    return { reasoning: reasoningResponse.text, usage: reasoningResponse.usage };
   } catch (error: any) {
     logger.error("Fatal error in reasoningSearchResults:", error.message || error);
     logger.error(`  Error details:`, error);
@@ -334,6 +334,7 @@ export const generateResearchPlan = async ({
       researchPlan: result.object.researchPlan,
       depth: result.object.depth,
       breadth: result.object.breadth,
+      tokenUsage: result.usage,
     };
   } catch (error: any) {
     logger.error(`Error generating research plan: ${error.message || error}`);
