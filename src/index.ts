@@ -1,3 +1,12 @@
+// **TODO**
+// researchPlanPrompt has the schema as well and then do ...researchPlanPrompt
+
+// **TODO**
+// move functions outside into another file
+
+// **TODO**
+// remove suggestedDepth and suggestedBreadth as inputs
+
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
 import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig } from "./config/defaults";
@@ -467,6 +476,8 @@ export class DeepResearch {
       this.logger.setEnabled(this.config.logging.enabled);
     }
 
+    //**TODO */
+    // move this into validateConfig
     const openaiApiKey = this.config?.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
     const geminiApiKey = this.config?.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     const deepInfraApiKey = this.config?.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY;

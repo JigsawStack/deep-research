@@ -23,7 +23,10 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   maxOutputTokens: 32000,
 };
 
-
+// **TODO** 
+// separate types
+  // parameter types 
+  // config types 
 export interface DeepResearchConfig {
   models: ModelConfig;
   depth: {
