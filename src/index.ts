@@ -16,14 +16,14 @@ import { Logger, logger } from "./utils/logger";
  * @param prompt - The prompt to research 
  * @returns The decision whether to continue with more research or to start generating the final report
  */
-export async function decisionMaking({
+export const decisionMaking = async ({
   reasoning,
   prompt,
   aiProvider,
   queries,
   sources,
   researchPlan,
-}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) {
+}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) => {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning,
     prompt,
@@ -45,7 +45,7 @@ export async function decisionMaking({
   });
 
   return decisionMakingResponse.object;
-}
+};
 
 /**
  * Reasoning about the search results
@@ -57,13 +57,13 @@ export async function decisionMaking({
  * @param aiProvider - The AI provider
  * @returns The reasoning / thinking output evaluating the search results
 **/
-export async function reasoningSearchResults({
+export const reasoningSearchResults= async ({
   prompt,
   latestResearchPlan,
   sources,
   queries,
   aiProvider,
-}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) {
+}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) => {
   try {
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
       prompt,
@@ -109,13 +109,13 @@ export async function reasoningSearchResults({
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The report with sources
  */
-export async function processReportForSources({
+export const processReportForSources = async ({
   report,
   sources,
 }: {
   report: string;
   sources: WebSearchResult[];
-}) {
+}) => {
   // Create a lookup map for reference numbers to source info
   const referenceMap = new Map<number, any>();
   
@@ -211,7 +211,7 @@ export async function processReportForSources({
  * @param queries - The queries used to get the search results
  * @returns The final report
  */
-export async function generateFinalReport({
+export const generateFinalReport = async ({
   sources,
   prompt,
   targetOutputTokens,
@@ -227,7 +227,7 @@ export async function generateFinalReport({
   latestReasoning: string;
   latestResearchPlan: string;
   queries: string[];
-}) {
+}) => {
   let draft = "";
   let iter = 0;
   // track which prompt we're on
@@ -307,14 +307,14 @@ export async function generateFinalReport({
  * @param pastQueries - The past queries
  * @param pastSources - The past sources
  */
-export async function generateResearchPlan({
+export const generateResearchPlan = async ({
   aiProvider,
   prompt,
   pastReasoning,
   pastQueries,
   pastSources,
   config,
-}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) {
+}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) => {
   try {
     const researchPlanPrompt = PROMPTS.research({
       prompt,
@@ -361,7 +361,7 @@ export async function generateResearchPlan({
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The deduplicated search results
  */
-function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
   const urlMap = new Map<string, boolean>();
 
   return sources.map((result) => {
@@ -399,7 +399,7 @@ function deduplicateSearchResults({ sources }: { sources: WebSearchResult[] }): 
  * @param sources - The search results (url, query, context, etc) from JigsawStack
  * @returns The search results with numbers
  */
-function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] {
+const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
   const urlMap = new Map<string, number>();
   let currentNumber = 1;
 
@@ -415,7 +415,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
             urlMap.set(item.url, currentNumber++);
           }
           
-        return {
+          return {
             url: item.url,
             title: item.title,
             domain: item.domain,
@@ -427,7 +427,7 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
       },
     };
   });
-}
+};
 
 /**
  * Create a new DeepResearch instance
@@ -435,9 +435,9 @@ function mapSearchResultsToNumbers({ sources }: { sources: WebSearchResult[] }):
  * @param config - The configuration for the DeepResearch instance
  * @returns A new DeepResearch instance
  */
-export function createDeepResearch(config: Partial<DeepResearchConfig>) {
+export const createDeepResearch = (config: Partial<DeepResearchConfig>) => {
   return new DeepResearch(config);
-}
+};
 
 /**
  * The DeepResearch class
