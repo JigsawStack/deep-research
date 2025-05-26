@@ -5,14 +5,14 @@ const CONTEXT_GENERATION_PROMPT = ({
   queries,
   research_sources,
 }: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) => `
-You are a world-class context generator.\n
-Your task is to generate a context overview for the following queries and sources that relates to the main prompt:\n
-Extract all the information from the sources that is relevant to the main prompt.\n
+You are a world-class context generator.
+Your task is to generate a context overview for the following queries and sources that relates to the main prompt:
+Extract all the information from the sources that is relevant to the main prompt.
 
-Main Prompt:\n
-${prompt}\n
+Main Prompt:
+${prompt}
 
-Sub-Queries and Sources:\n
+Sub-Queries and Sources:
 ${queries?.map((q) => {
   const sourcesForQuery = research_sources?.filter(s => s.url && s.url.length > 0);
   if (sourcesForQuery && sourcesForQuery.length > 0) {
@@ -148,8 +148,7 @@ ${queries?.map((q) => {
   const sourcesForQuery = sources?.find(s => s.query === q);
   if (sourcesForQuery) {
     return `**Query: ${q}**\n
-    Context: ${sourcesForQuery.context}\n
-    URLs: ${sourcesForQuery.searchResults.results.map(r => r.url).join(', ')}`;
+    Context: ${sourcesForQuery.context}`;
   } else {
     throw new Error(`No sources found for query: ${q}`);
   }
