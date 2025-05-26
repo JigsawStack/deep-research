@@ -5,6 +5,14 @@
   "engines": {
     "node": ">=18"
   },
+  "homepage": "https://github.com/JigsawStack/deep-research",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JigsawStack/deep-research.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JigsawStack/deep-research/issues"
+  },
   "packageManager": "yarn@1.22.22",
   "type": "module",
   "main": "./dist/index.cjs",
