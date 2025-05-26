@@ -14,9 +14,9 @@ export class DeepResearch {
   public prompt: string = "";
   public finalReport: string = "";
 
-  public latestResearchPlan: string = "";
-  public latestReasoning: string = "";
-  public latestDecisionMakingReason: string = "";
+  public researchPlan: string = "";
+  public reasoning: string = "";
+  public decision: { isComplete: boolean; reason: string } = { isComplete: false, reason: "" };
   public logger = Logger.getInstance();
 
 
@@ -142,20 +142,24 @@ export class DeepResearch {
 
       const {
         subQueries,
-        plan,
+        researchPlan,
+        depth,
+        breadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
-        pastReasoning: this.latestReasoning,
-        pastQueries: this.queries,
-        pastSources: this.sources,
+        reasoning: this.reasoning,
+        queries: this.queries,
+        sources: this.sources,
         config: this.config,
       });
   
       this.queries = [...(this.queries || []), ...subQueries];
-      this.latestResearchPlan = plan;
+      this.researchPlan = researchPlan;
+      this.config.depth.maxDepth = depth;
+      this.config.breadth.maxBreadth = breadth;
 
-      logger.log(`Research plan: ${this.latestResearchPlan}`);
+      logger.log(`Research plan: ${this.researchPlan}`);
       logger.log(`Research queries: ${this.queries.join("\n")}`);
       logger.log(`Research depth and breadth: ${this.config.depth.maxDepth} ${this.config.breadth.maxBreadth}`);
 
@@ -180,12 +184,12 @@ export class DeepResearch {
       logger.log(`[Step 3] Reasoning about the search results...`);
       const reasoning = await reasoningSearchResults({
         prompt: this.prompt,
-        latestResearchPlan: this.latestResearchPlan,
+        researchPlan: this.researchPlan,
         sources: this.sources,
         queries: this.queries,
         aiProvider: this.aiProvider,
       });
-      this.latestReasoning = reasoning;
+      this.reasoning = reasoning;
 
       logger.log(`Reasoning: ${reasoning}`);
 
@@ -196,18 +200,14 @@ export class DeepResearch {
         prompt: this.prompt,
         queries: this.queries,
         sources: this.sources,
-        researchPlan: this.latestResearchPlan,
+        researchPlan: this.researchPlan,
         aiProvider: this.aiProvider,
       });
 
-      this.latestDecisionMakingReason = deciding.reason;
-      logger.log(`Decision making: ${deciding.isComplete} ${deciding.reason}`);
+      this.decision = deciding;
+      logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
 
-
-      const { isComplete, reason } = deciding;
-      this.isComplete = isComplete;
-      this.latestReasoning = reason;
-    } while (!this.isComplete && iteration < this.config.depth.maxDepth);
+    } while (!this.decision.isComplete && iteration < this.config.depth.maxDepth);
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
@@ -220,8 +220,8 @@ export class DeepResearch {
       prompt: this.prompt,
       targetOutputTokens: this.config.report.targetOutputTokens,
       aiProvider: this.aiProvider,
-      latestReasoning: this.latestReasoning,
-      latestResearchPlan: this.latestResearchPlan,
+      reasoning: this.reasoning,
+      researchPlan: this.researchPlan,
       queries: this.queries,
     });
 
@@ -234,9 +234,9 @@ export class DeepResearch {
         metadata: {
           prompt: this.prompt,
           iterationCount: this.iterationCount,
-          completionStatus: this.isComplete,
-          reasoning: this.latestReasoning,
-          researchPlan: this.latestResearchPlan,
+          completionStatus: this.decision.isComplete,
+          reasoning: this.reasoning,
+          researchPlan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
         },

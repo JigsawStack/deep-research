@@ -55,7 +55,9 @@ async function advancedResearch() {
 
   try {
     const advancedResult = await advancedResearch.generate(prompt); // generate runs the research pipeline
+
     console.log("advancedResult", advancedResult.data.text);
+    console.log("advancedBibliography", advancedResult.data.bibliography);
 
   } catch (error) {
     console.error("Research failed with error:", error);

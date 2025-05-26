@@ -21,11 +21,11 @@ export const decisionMaking = async ({
   researchPlan,
 }: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) => {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
-    reasoning,
-    prompt,
-    queries,
-    sources,
-    researchPlan,
+    reasoning: reasoning,
+    prompt: prompt,
+    queries: queries,
+    sources: sources,
+    researchPlan: researchPlan,
   });
 
   const decisionMakingResponse = await generateObject({
@@ -52,15 +52,15 @@ export const decisionMaking = async ({
 **/
 export const reasoningSearchResults= async ({
   prompt,
-  latestResearchPlan,
+  researchPlan,
   sources,
   queries,
   aiProvider,
-}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) => {
+}: { prompt: string; researchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) => {
   try {
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
-      prompt,
-      researchPlan: latestResearchPlan,
+      prompt: prompt,
+      researchPlan: researchPlan,
       sources: sources,
       queries: queries,
     });
@@ -209,16 +209,16 @@ export const generateFinalReport = async ({
   prompt,
   targetOutputTokens,
   aiProvider,
-  latestReasoning,
-  latestResearchPlan,
+  reasoning,
+  researchPlan,
   queries,
 }: {
   sources: WebSearchResult[];
   prompt: string;
   targetOutputTokens?: number;
   aiProvider: AIProvider;
-  latestReasoning: string;
-  latestResearchPlan: string;
+  reasoning: string;
+  researchPlan: string;
   queries: string[];
 }) => {
   let draft = "";
@@ -234,8 +234,8 @@ export const generateFinalReport = async ({
       prompt,
       sources,
       targetOutputTokens,
-      latestResearchPlan,
-      latestReasoning,
+      researchPlan,
+      reasoning,
       queries,
       phase,
     });
@@ -300,17 +300,17 @@ export const generateFinalReport = async ({
 export const generateResearchPlan = async ({
   aiProvider,
   prompt,
-  pastReasoning,
-  pastQueries,
-  pastSources,
+  reasoning,
+  queries,
+  sources,
   config,
-}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) => {
+}: { aiProvider: AIProvider; prompt: string; reasoning: string; queries: string[]; sources: WebSearchResult[]; config: DeepResearchConfig;}) => {
   try {
     const researchPlanPrompt = PROMPTS.research({
       prompt,
-      reasoning: pastReasoning,
-      queries: pastQueries,
-      sources: pastSources,
+      reasoning: reasoning,
+      queries: queries,
+      sources: sources,
       config,
     });
     
@@ -324,15 +324,17 @@ export const generateResearchPlan = async ({
 
     logger.log("Research Prompts", PROMPTS.research({
       prompt,
-      reasoning: pastReasoning,
-      queries: pastQueries,
-      sources: pastSources,
+      reasoning: reasoning,
+      queries: queries,
+      sources: sources,
       config,
     }));
 
     return {
       subQueries: result.object.subQueries,
-      plan: result.object.plan,
+      researchPlan: result.object.researchPlan,
+      depth: result.object.depth,
+      breadth: result.object.breadth,
     };
   } catch (error: any) {
     logger.error(`Error generating research plan: ${error.message || error}`);
