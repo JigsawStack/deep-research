@@ -6,6 +6,8 @@
     "node": ">=18"
   },
   "homepage": "https://github.com/JigsawStack/deep-research",
+  "keywords": ["ai", "framework", "deep-research", "web-search", "reasoning"],
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JigsawStack/deep-research.git"
@@ -55,7 +57,5 @@
     "pkgroll": "^2.6.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
-  },
-  "keywords": ["ai", "framework", "deep-research", "web-search", "reasoning"],
-  "license": "Apache-2.0"
+  }
 }
