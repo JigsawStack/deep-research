@@ -16,6 +16,13 @@ export class DeepResearch {
   public config: DeepResearchConfig;
   public prompt: string = "";
   public finalReport: string = "";
+  public tokenUsage: {
+    research_tokens: number;
+    reasoning_tokens: number;
+    report_tokens: number;
+    decision_tokens: number;
+    total_tokens: number;
+  } = { research_tokens: 0, reasoning_tokens: 0, report_tokens: 0, decision_tokens: 0, total_tokens: 0 };
 
   public researchPlan: string = "";
   public reasoning: string = "";
@@ -149,7 +156,7 @@ export class DeepResearch {
 
       logger.log(`[Step 1] Generating research plan... at ${iteration}`);
 
-      const { subQueries, researchPlan, depth, breadth } = await generateResearchPlan({
+      const { subQueries, researchPlan, depth, breadth, tokenUsage } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
         reasoning: this.reasoning,
@@ -162,6 +169,7 @@ export class DeepResearch {
       this.researchPlan = researchPlan;
       this.config.depth.maxDepth = depth;
       this.config.breadth.maxBreadth = breadth;
+      this.tokenUsage.research_tokens = tokenUsage.totalTokens;
 
       logger.log(`Research plan: ${this.researchPlan}`);
       logger.log(`Research queries: ${this.queries.join("\n")}`);
@@ -193,14 +201,15 @@ export class DeepResearch {
         queries: this.queries,
         aiProvider: this.aiProvider,
       });
-      this.reasoning = reasoning;
+      this.reasoning = reasoning.reasoning;
+      this.tokenUsage.reasoning_tokens = reasoning.usage.totalTokens;
 
       logger.log(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
       logger.log(`[Step 4] Decision making...`);
-      const deciding = await decisionMaking({
-        reasoning,
+      const { decision, usage } = await decisionMaking({
+        reasoning: this.reasoning,
         prompt: this.prompt,
         queries: this.queries,
         sources: this.sources,
@@ -208,7 +217,9 @@ export class DeepResearch {
         aiProvider: this.aiProvider,
       });
 
-      this.decision = deciding;
+      this.decision = decision.object;
+      this.tokenUsage.decision_tokens = usage.totalTokens;
+
       logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
     } while (!this.decision.isComplete && iteration < this.config.depth.maxDepth);
 
@@ -218,7 +229,7 @@ export class DeepResearch {
     // step 5: generating report
     logger.log(`[Step 5] Generating report...`);
 
-    const { report, bibliography } = await generateFinalReport({
+    const { report, bibliography, tokenUsage: reportTokenUsage } = await generateFinalReport({
       sources: this.sources,
       prompt: this.prompt,
       targetOutputTokens: this.config.report.targetOutputTokens,
@@ -227,6 +238,9 @@ export class DeepResearch {
       researchPlan: this.researchPlan,
       queries: this.queries,
     });
+
+    this.tokenUsage.report_tokens = reportTokenUsage;
+    this.tokenUsage.total_tokens = this.tokenUsage.research_tokens + this.tokenUsage.reasoning_tokens + this.tokenUsage.decision_tokens + this.tokenUsage.report_tokens;
 
     return {
       status: "success",
@@ -243,6 +257,7 @@ export class DeepResearch {
           sources: this.sources,
         },
       },
+      _usage: this.tokenUsage,
     };
   }
 }
