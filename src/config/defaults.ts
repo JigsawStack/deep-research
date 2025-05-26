@@ -24,7 +24,7 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
 };
 
 
-export interface DeepResearchConfig {
+export interface DeepResearchConfig  {
   models: ModelConfig;
   depth: {
     maxDepth: number;
@@ -41,6 +41,8 @@ export interface DeepResearchConfig {
   GEMINI_API_KEY: string;
   DEEPINFRA_API_KEY: string;
 }
+
+export type DeepResearchParams = Partial<DeepResearchConfig>;
 
 export const DEFAULT_CONFIG = {
   models: DEFAULT_MODEL_CONFIG,

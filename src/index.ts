@@ -1,6 +1,6 @@
 import AIProvider from "@provider/aiProvider";
 import { WebSearchResult } from "@/types/types";
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig } from "./config/defaults";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig, DeepResearchParams } from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
 import { generateObject, generateText, LanguageModelV1 } from "ai";
@@ -460,8 +460,8 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
 
-  constructor(config: Partial<DeepResearchConfig>) {
-    this.config = this.validateConfig(config);
+  constructor(config: DeepResearchParams) {
+    this.config = this.validateConfig(config) as DeepResearchConfig;
 
     if (this.config.logging && this.config.logging.enabled !== undefined) {
       this.logger.setEnabled(this.config.logging.enabled);
@@ -507,7 +507,7 @@ export class DeepResearch {
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
-  public validateConfig(config: Partial<DeepResearchConfig>) {
+  public validateConfig(config: DeepResearchParams) {
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -562,7 +562,7 @@ export class DeepResearch {
         ...DEFAULT_CONFIG.logging,
         ...(config.logging || {}),
       },
-    };
+    } as DeepResearchConfig;
   }
 
   /**
@@ -672,7 +672,8 @@ export class DeepResearch {
     return {
       status: "success",
       data: {
-        text: report + "\n\n" + bibliography,
+        text: report,
+        bibliography,
         metadata: {
           prompt: this.prompt,
           iterationCount: this.iterationCount,
