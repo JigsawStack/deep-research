@@ -71,23 +71,24 @@ const openaiModel = openaiProvider("gpt-4o");
 // Create instance with custom configuration
 const deepResearch = createDeepResearch({
   report: {
-    maxOutputTokens: 30000,
-    targetOutputTokens: 10000,
+    maxOutputTokens: 30000,     // Hard limit on report length
+    targetOutputTokens: 10000,  // Target report length
   },
   depth: {
-    maxDepth: 4, // How many iterations of research to perform
+    maxDepth: 4                 // How many iterations of research to perform
   },
   breadth: {
-    maxBreadth: 3, // How many subqueries to generate
+    maxBreadth: 3               // How many subqueries to generate
   },
   models: {
-    default: openaiModel,
+    default: openaiModel,       // Custom models from AI SDK
     reasoning: deepseekModel,
     output: geminiModel,
   },
   logging: {
-    enabled: true, // Enable console logging
+    enabled: true               // Enable console logging
   },
+  // Required API keys
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
@@ -103,6 +104,53 @@ const result = await deepResearch.generate(prompt);
 console.log(result.data.text);
 console.log(result.data.bibliography);
 ```
+
+## Configurations Options for Open Deep Research
+**depth** Configuration
+- maxDepth: Number (default: 3)
+  - Controls how many iterations of research the system will perform
+  - Higher values allow for more thorough, multi-hop research
+  - The system will continue researching until it has a complete answer or reaches this limit
+
+**breadth** Configuration
+- maxBreadth: Number (default: 3)
+  - Controls how many subqueries are generated for each research iteration
+  - Higher values enable wider exploration of the topic
+  - Determines how many parallel search paths are pursued
+
+**report** Configuration
+- maxOutputTokens: Number (default: 32000)
+  - Hard upper limit on the length of the final report
+  - Must be greater than targetOutputTokens
+- targetOutputTokens: Number (optional)
+  - The ideal length for the generated report
+  - The system will try to produce a report of approximately this length
+
+**models** Configuration
+- default: LanguageModelV1
+  - The primary model used for most operations
+  - Default: OpenAI's GPT-4.1
+- reasoning: LanguageModelV1
+  - Model used for reasoning about search results
+  - Default: DeepSeek-AI's DeepSeek-R1
+- output: LanguageModelV1
+  - Model used for generating the final report
+  - Default: OpenAI's GPT-4.1
+
+**logging** Configuration
+- enabled: Boolean (default: false)
+  - When set to true, enables detailed console logging
+  - Helpful for debugging and understanding the research process
+
+**API Keys** (Required)
+- JIGSAW_API_KEY: String (required)
+  - For accessing the JigsawStack API for web searches
+- OPENAI_API_KEY: String (required)
+  - For OpenAI model access  
+- GEMINI_API_KEY: String (required)
+  - For Google Gemini model access
+- DEEPINFRA_API_KEY: String (required)
+  - For DeepInfra model access
 
 ## 🧩 How It Works
 1️⃣ **Research Planning & Analysis**
