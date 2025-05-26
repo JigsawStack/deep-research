@@ -1,3 +1,22 @@
+// **TODOS**
+// remove unused variables
+
+// **TODOS**
+// add everything into the meta data
+// token usage
+
+// **TODOS**
+// add the ability to use a custom prompt
+
+// **TODOS**
+// Feature list in readme
+
+// **TODOS**
+// README, overwriting models with no env
+
+// **TODOS**
+// configs do table instead of list
+
 import { DeepResearchConfig, DeepResearchParams, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
 import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";

@@ -1,8 +1,8 @@
-# Open Deep Research
+# Deep Research
 
-Open Deep Research is an open source library for conducting deep, multi-hop research with reasoning capabilities. It performs focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
+Deep Research is an open source library for conducting deep, multi-hop research with reasoning capabilities. It performs focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
 
-![Open Deep Research Architecture](./public/open_deep_research_diagram.png)
+![Deep Research Architecture](/public/open_deep_research_diagram.png)
 
 ## 🧱 Core Concepts
 
@@ -14,11 +14,11 @@ Open Deep Research is an open source library for conducting deep, multi-hop rese
 ## 🚀 Installation
 
 ```bash
-npm i open-deep-research
+npm i deep-research
 # or
-yarn add open-deep-research
+yarn add deep-research
 # or
-bun i open-deep-research
+bun i deep-research
 ```
 
 ## 🚀 Quick Start
@@ -26,7 +26,7 @@ bun i open-deep-research
 ### Basic Usage
 
 ```typescript
-import { createDeepResearch } from "open-deep-research";
+import { createDeepResearch } from "deep-research";
 
 // Create instance using the factory function with default settings
 const deepResearch = createDeepResearch({
@@ -92,11 +92,6 @@ const deepResearch = createDeepResearch({
   logging: {
     enabled: true, // Enable console logging
   },
-  // Required API keys
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
-  JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
 });
 
 // Research prompt
@@ -109,7 +104,7 @@ console.log(result.data.text);
 console.log(result.data.bibliography);
 ```
 
-## Configurations Options for Open Deep Research
+## Configurations Options for Deep Research
 
 **depth** Configuration
 

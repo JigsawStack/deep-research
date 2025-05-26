@@ -43,10 +43,6 @@ async function advancedResearch() {
     logging: {
       enabled: true, // enabled to true for console logging
     },
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-    DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
-    JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
   });
 
   // the prompt to research

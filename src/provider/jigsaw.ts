@@ -1,5 +1,4 @@
 import { JigsawStack } from "jigsawstack";
-import "dotenv/config";
 import { PROMPTS } from "@/prompts/prompts";
 import { ResearchSource, WebSearchResult } from "@/types/types";
 import { ContentCleaner } from "@utils/utils";
