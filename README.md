@@ -2,7 +2,7 @@
 
 Open Deep Research is an open source library for conducting deep, multi-hop research with reasoning capabilities. It performs focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
 
-![Open Deep Research Architecture](./public/open_deep_research_diagram.png)
+![Open Deep Research Architecture](/public/open_deep_research_diagram.png)
 
 ## 🧱 Core Concepts
 
