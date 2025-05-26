@@ -73,7 +73,7 @@ User Prompt: ${prompt}
 
 const schema = z.object({
   subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
-  plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
+  researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
   depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
   breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
 });
@@ -183,8 +183,8 @@ const FINAL_REPORT_PROMPT = ({
   prompt,
   sources,
   targetOutputTokens,
-  latestResearchPlan,
-  latestReasoning,
+  researchPlan,
+  reasoning,
   queries,
   phase,
   currentReport,
@@ -192,8 +192,8 @@ const FINAL_REPORT_PROMPT = ({
   prompt: string;
   sources: WebSearchResult[];
   targetOutputTokens?: number;
-  latestResearchPlan: string;
-  latestReasoning: string;
+  researchPlan: string;
+  reasoning: string;
   queries: string[];
   currentReport: string;
   phase: "initial" | "continuation" ;
@@ -254,11 +254,10 @@ const FINAL_REPORT_PROMPT = ({
 
   CONTEXT:
     Latest Research Plan:
-    ${latestResearchPlan}
-
+    ${researchPlan}
 
     Latest Reasoning Snapshot:
-    ${latestReasoning}
+    ${reasoning}
 
     Sub-Queries and Sources:
     ${queries?.map((q) => {

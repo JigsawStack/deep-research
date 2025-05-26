@@ -19,6 +19,7 @@ async function simpleResearch() {
     const simpleResult = await simpleResearch.generate(prompt); // generate runs the research pipeline
 
     console.log("simpleResult", simpleResult.data.text);
+    console.log("simpleBibliography", simpleResult.data.bibliography);
 
   } catch (error) {
     console.error("Research failed with error:", error);

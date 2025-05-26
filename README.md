@@ -1,6 +1,10 @@
 # Open Deep Research
 
-An OpenSource Deep Research library with reasoning capabilities, inspired by ChatGPT's deep research feature. This library enables multi-hop, focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
+Open Deep Research is an open source library for conducting deep, multi-hop research with reasoning capabilities. It performs focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
+
+![Open Deep Research Architecture](./public/open_deep_research_diagram.png)
+
+
 
 ## 🧱 Core Concepts
 
@@ -15,258 +19,119 @@ An OpenSource Deep Research library with reasoning capabilities, inspired by Cha
 npm install open-deep-research
 ```
 
-## 📝 Usage
+## 🚀 Quick Start 
 
+### Basic Usage
 ```typescript
-import createDeepResearch from 'open-deep-research';
+import { createDeepResearch } from "open-deep-research";
 
-// Create instance using the factory function
-const deepResearch = await createDeepResearch({
-  depth: {
-    level: 3, // Detailed analysis
-    includeReferences: true,
-  },
-  breadth: {
-    level: 2, // Main topic + direct relationships
-    maxParallelTopics: 3,
-  },
-  synthesis: {
-    maxOutputTokens: 8000, // Hard upper limit of tokens
-    targetOutputLength: 5000,
-    formatAsMarkdown: true,
-  },
-  models: {
-    default: 'gpt-4o', // Default model
-    reasoning: 'gemini-1.5-pro', // Reasoning model
-  },
-  jigsawApiKey: 'your-jigsaw-api-key',
+// Create instance using the factory function with default settings
+const deepResearch = createDeepResearch({
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+  JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
 });
 
-// Need to provide prompts array as required by generate method
-const prompts = [
-  'What are the recent developments in quantum computing?',
-  // Add more related prompts if needed
-];
+// Research prompt
+const prompt = "What are the recent developments in quantum computing?";
 
-const result = await deepResearch.generate(prompts, 'markdown');
+// Generate research report
+const result = await deepResearch.generate(prompt);
+
+console.log(result.data.text);
+console.log(result.data.bibliography);
 ```
 
-### Using String Model Names
-
+### Advanced Usage
 ```typescript
-import createDeepResearch from 'open-deep-research';
+import { createDeepResearch } from "open-deep-research";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { createOpenAI } from "@ai-sdk/openai";
 
-// Create instance using the factory function with string model names
-const deepResearch = await createDeepResearch({
-  depth: {
-    level: 3, // Detailed analysis
-    includeReferences: true,
-  },
-  breadth: {
-    level: 2, // Main topic + direct relationships
-    maxParallelTopics: 3,
-  },
-  synthesis: {
-    maxOutputTokens: 8000, // Hard upper limit of tokens
-    targetOutputLength: 5000,
-    formatAsMarkdown: true,
-  },
-  models: {
-    default: 'gpt-4o', // Default model
-    reasoning: 'gemini-1.5-pro', // Reasoning model
-  },
-  jigsawApiKey: 'your-jigsaw-api-key',
-});
-
-// Need to provide prompts array as required by generate method
-const prompts = [
-  'What are the recent developments in quantum computing?',
-  // Add more related prompts if needed
-];
-
-const result = await deepResearch.generate(prompts, 'markdown');
-```
-
-### Using Direct Model Instances
-
-You can also pass model instances directly, which gives you more control over model configuration:
-
-```typescript
-import createDeepResearch from 'open-deep-research';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-
-// Create model instances directly
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  // Add custom settings as needed
-  compatibility: 'strict',
-});
-
+// Initialize AI providers
 const gemini = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-// Get model instances
-const openaiModel = openai.languageModel('gpt-4o');
-const geminiModel = gemini.languageModel('gemini-1.5-pro');
-
-// Create instance using the factory function with direct model instances
-const deepResearch = await createDeepResearch({
-  depth: {
-    level: 3,
-    includeReferences: true,
-  },
-  breadth: {
-    level: 2,
-    maxParallelTopics: 3,
-  },
-  synthesis: {
-    maxOutputTokens: 8000,
-    targetOutputLength: 5000,
-    formatAsMarkdown: true,
-  },
-  models: {
-    default: openaiModel, // Pass the model instance directly
-    reasoning: geminiModel, // Pass the model instance directly
-  },
-  jigsawApiKey: 'your-jigsaw-api-key',
+const deepinfra = createDeepInfra({
+  apiKey: process.env.DEEPINFRA_API_KEY,
 });
 
-const prompts = ['What are the recent developments in quantum computing?'];
+const openaiProvider = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-const result = await deepResearch.generate(prompts, 'markdown');
+// Get model instances
+const geminiModel = gemini("gemini-2.0-flash");
+const deepseekModel = deepinfra("deepseek-ai/DeepSeek-R1");
+const openaiModel = openaiProvider("gpt-4o");
+
+// Create instance with custom configuration
+const deepResearch = createDeepResearch({
+  report: {
+    maxOutputTokens: 30000,
+    targetOutputTokens: 10000,
+  },
+  depth: {
+    maxDepth: 4, // How many iterations of research to perform
+  },
+  breadth: {
+    maxBreadth: 3, // How many subqueries to generate
+  },
+  models: {
+    default: openaiModel,
+    reasoning: deepseekModel,
+    output: geminiModel,
+  },
+  logging: {
+    enabled: true, // Enable console logging
+  },
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+  JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
+});
+
+// Research prompt
+const prompt = "What are the recent developments in quantum computing?";
+
+// Generate research report
+const result = await deepResearch.generate(prompt);
+
+console.log(result.data.text);
+console.log(result.data.bibliography);
 ```
 
 ## 🧩 How It Works
+1️⃣ **Research Planning & Analysis**
+- Creates a DeepResearch instance with user-provided configuration
+- Analyzes the input prompt to understand requirements
+- Generates a comprehensive research plan
+- Breaks down into focused sub-queries using LLMs
 
-```mermaid
-graph
+2️⃣ **Data Collection & Processing** 
+- Executes AI-powered web searches for each sub-query via JigsawStack API
+- Gathers and validates relevant sources
+- Generates context from search results
+- Deduplicates URLs to ensure unique sources
 
-A[User Question] --> B[🔍 Analyze Intent & Context]
-B --> C[🧩 Break into Sub-questions]
-C --> D[🌐 Targeted Search for Each Sub-question]
-D --> E[📚 Retrieve Relevant Sources]
-E --> F[🧠 Summarize & Extract Key Points]
-F --> G[⚖️ Compare & Evaluate Answers]
-G --> H[🧠 Synthesize Final Answer]
-H --> I[📝 Output Answer + Citations + Follow-ups]
-```
+3️⃣ **Analysis & Synthesis**
+- Processes gathered information through reasoning models
+- Analyzes and synthesizes the findings
+- Evaluates information sufficiency
+- Determines if additional research is needed
+- Performs iterative research within configured depth limits if needed
 
-## 🔬 Technical Implementation
+4️⃣ **Report Generation & Citations**
+- Creates comprehensive final report
+- Iteratively generates content until complete
+- Maps sources to reference numbers
+- Generates bibliography with citations
+- Formats output according to target length requirements
 
-The deep research process works as follows:
 
-1. **Query Analysis**: The main query is analyzed to understand its intent and scope.
-2. **Subquery Decomposition**: The main query is broken down into focused sub-questions using LLMs.
-3. **Web Search Execution**: Each sub-question triggers a web search using the JigsawStack API.
-4. **Content Processing**: Search results are cleaned, summarized, and key information is extracted.
-5. **Recursive Exploration**: Based on the initial findings, new sub-questions may be generated.
-6. **Depth Control**: The recursion continues until the configured maximum depth is reached.
-7. **Synthesis**: All gathered information is synthesized into a comprehensive answer.
-8. **Citation**: Claims are linked to their source material with proper citations.
+## 🛠️ Contributing
+Contributions are welcome! Please feel free to submit a PR :)
 
-## 📏 Recursion and Context Management
-
-The system implements the following controls to manage recursive sub-searches and memory:
-
-| Control                | Purpose                                | Implementation                                                  |
-| ---------------------- | -------------------------------------- | --------------------------------------------------------------- |
-| **Max Depth**          | Prevent infinite recursion             | Tracking a depth variable (0=main, 1=sub, 2=sub-sub)            |
-| **Relevance Check**    | Keep sub-queries on topic              | Using LLM to verify relevance to the main question              |
-| **Context Retention**  | Maintain focus on main question        | Including main question context in all sub-searches             |
-| **Deduplication**      | Avoid redundant searches               | Tracking previously searched queries                            |
-| **Token Management**   | Prevent context bloat                  | Tracking token usage and applying pruning strategies            |
-| **Context Hierarchy**  | Organize research data                 | Storing research context in a tree structure that mirrors depth |
-| **Memory Pruning**     | Manage memory constraints              | Automatically remove least relevant information when needed     |
-| **Persistent Context** | Save context for long-running research | Option to save context to disk for later resumption (optional)  |
-
-## 📚 Architecture
-
-The library is built with a modular architecture:
-
-- **Generators**: Create sub-questions from the main prompt
-- **Providers**: Interface with different LLM and search APIs
-- **Preparation**: Clean and process web content
-- **Synthesis**: Combine multiple sources into coherent answers
-- **Memory**: Manage context and token usage throughout the research process
-- **Reasoning**: Handle multi-step thinking and decision-making
-
-## 🔧 Configuration Options
-
-| Option                            | Description                                     | Default          |
-| --------------------------------- | ----------------------------------------------- | ---------------- |
-| `depth.level`                     | Recursion depth (1-5)                           | 3                |
-| `breadth.maxParallelTopics`       | Number of sub-questions to explore              | 3                |
-| `breadth.minRelevanceScore`       | Minimum relevance score (0-1) for sub-questions | 0.7              |
-| `models.default`                  | Default LLM for general tasks                   | gpt-4.1          |
-| `models.quick`                    | Faster LLM for simpler tasks                    | gemini-2-flash   |
-| `models.reasoning`                | LLM optimized for complex reasoning             | deepseek-r1      |
-| `memory.maxContextTokens`         | Maximum tokens to store in context              | 16000            |
-| `memory.pruningStrategy`          | How to manage context when limit reached        | 'least-relevant' |
-| `memory.persistToFile`            | Save context to disk for later use              | false            |
-| `response.maxTokens`              | Maximum tokens in the final response            | 4000             |
-| `response.includeThinkingProcess` | Show reasoning steps in the output              | false            |
-| `response.streamResults`          | Stream intermediate results during research     | false            |
-
-## 🧠 Reasoning Process
-
-The library uses DeepSeek R1 with thinking capabilities to provide transparent reasoning:
-
-1. **Initial Analysis**: Break down complex questions and identify key components
-2. **Step-by-Step Reasoning**: Show the thought process for evaluating information
-3. **Source Evaluation**: Analyze the credibility and relevance of different sources
-4. **Conflict Resolution**: Identify and resolve contradictions between sources
-5. **Conclusion Formation**: Show the reasoning path to the final answer
-
-**Example thinking process output:**
-
-1. The question asks about quantum computing advancements.
-2. From source A, we know about quantum supremacy demonstrations.
-3. Source B mentions error correction improvements.
-4. Source C discusses topological qubits.
-5. Sources A and B are academic papers while C is a news article.
-6. The academic sources provide more technical depth, suggesting...
-7. Therefore, the most significant recent advancements appear to be...
-
-## 🛠️ Implementation Guide (For Contributors)
-
-To implement the deep research functionality:
-
-1. **Set up the recursion system**:
-
-   - Implement a depth tracker that counts recursion levels
-   - Create a context chain that passes information between recursion levels
-   - Implement logic to stop at max depth
-
-2. **Enhance the sub-question generation**:
-
-   - Make sub-questions aware of previous search results
-   - Implement relevance scoring against the main question
-   - Filter out irrelevant or redundant questions
-
-3. **Implement result aggregation**:
-
-   - Create a system to merge findings from different search paths
-   - Resolve contradictions between sources
-   - Weight information by source credibility and relevance
-
-4. **Add citation tracking**:
-
-   - Track the source of each piece of information
-   - Generate properly formatted citations
-   - Link assertions in the final answer to specific sources
-
-5. **Implement memory management**:
-
-   - Track token usage throughout the research process
-   - Apply pruning strategies to manage context size
-   - Implement hierarchical storage for context data
-
-   - 1. Keep context in memory during a single run (tree structure)
-   - 2. Persist to disk at regular intervals or per depth (for crash recovery + debugging)
-   - 3. Pass context around functions to keep it functional and testable
-
-## 📄 License
-
-Will have to add something here. (TODO)
