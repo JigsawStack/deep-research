@@ -1,443 +1,10 @@
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult } from "@/types/types";
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig, DeepResearchParams } from "./config/defaults";
+import { WebSearchResult, DeepResearchConfig, DeepResearchParams } from "@/types/types";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG} from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
-import { generateObject, generateText, LanguageModelV1 } from "ai";
-import { z } from "zod";
-import { PROMPTS } from "./prompts/prompts";
 import { Logger, logger } from "./utils/logger";
-
-/**
- * Decision making
- * 
- * @param reasoning - The reasoning for the decision
- * @param aiProvider - The AI provider
- * @param prompt - The prompt to research 
- * @returns The decision whether to continue with more research or to start generating the final report
- */
-export const decisionMaking = async ({
-  reasoning,
-  prompt,
-  aiProvider,
-  queries,
-  sources,
-  researchPlan,
-}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) => {
-  const decisionMakingPrompt = PROMPTS.decisionMaking({
-    reasoning,
-    prompt,
-    queries,
-    sources,
-    researchPlan,
-  });
-
-  const decisionMakingResponse = await generateObject({
-    model: aiProvider.getModel("default"),
-    output: "object",
-    schema: z.object({
-      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
-      reason: z.string().describe("The reason for the decision"),
-    }),
-    system: decisionMakingPrompt.system,
-    prompt: decisionMakingPrompt.user,
-    temperature: 0,
-  });
-
-  return decisionMakingResponse.object;
-};
-
-/**
- * Reasoning about the search results
- * 
- * @param prompt - The prompt to research 
- * @param latestResearchPlan - The latest research plan
- * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
- * @param queries - The queries used to get the search results
- * @param aiProvider - The AI provider
- * @returns The reasoning / thinking output evaluating the search results
-**/
-export const reasoningSearchResults= async ({
-  prompt,
-  latestResearchPlan,
-  sources,
-  queries,
-  aiProvider,
-}: { prompt: string; latestResearchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) => {
-  try {
-    const reasoningPrompt = PROMPTS.reasoningSearchResults({
-      prompt,
-      researchPlan: latestResearchPlan,
-      sources: sources,
-      queries: queries,
-    });
-
-    logger.log("REASONING WITH", reasoningPrompt);
-
-    const reasoningResponse = await generateText({
-      model: aiProvider.getModel("reasoning"),
-      // system: reasoningPrompt.system,
-      prompt: reasoningPrompt.user,
-    });
-    
-    // Option 1: Return reasoning property if available
-    if (reasoningResponse.reasoning) {
-      return reasoningResponse.reasoning;
-    }
-
-    // Option 2: Extract content between <think> or <thinking> tags (deepseek-r1 uses this)
-    const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
-    if (thinkingMatch) {
-      return thinkingMatch[1] || thinkingMatch[2]; // Return the content of whichever group matched
-    }
-
-    // Option 3: If no structured reasoning available, return the full text
-    return reasoningResponse.text;
-  } catch (error: any) {
-    logger.error("Fatal error in reasoningSearchResults:", error.message || error);
-    logger.error(`  Error details:`, error);
-
-    // Throw the error to terminate program execution
-    throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
-  }
-}
-
-/**
- * Process the report for sources
- * 
- * @param report - The report to process
- * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @returns The report with sources
- */
-export const processReportForSources = async ({
-  report,
-  sources,
-}: {
-  report: string;
-  sources: WebSearchResult[];
-}) => {
-  // Create a lookup map for reference numbers to source info
-  const referenceMap = new Map<number, any>();
-  
-  // Populate the map with reference numbers and their corresponding source info
-  
-  sources.forEach(source => {
-    if (source.searchResults && Array.isArray(source.searchResults.results)) {
-      source.searchResults.results.forEach(result => {
-        
-        if (result.referenceNumber) {
-          referenceMap.set(result.referenceNumber, result);
-        }
-      });
-    }
-  });
-  
-  logger.log(`Reference map size: ${referenceMap.size}`);
-  
-  // Enhanced regex to find both single sources [1] and multiple sources [1, 2, 3]
-  // This matches either:
-  // 1. [number] - A single source
-  // 2. [number, number, ...] - Multiple comma-separated sources
-  const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
-  
-  // Replace each citation with markdown links
-  const reportWithSources = report.replace(sourceRegex, (match, referenceString) => {
-    // Split the reference string by commas if it contains multiple references
-    const referenceNumbers = referenceString.split(',').map(ref => parseInt(ref.trim(), 10));
-    
-    // If it's a single reference number
-    if (referenceNumbers.length === 1) {
-      const refNum = referenceNumbers[0];
-      const source = referenceMap.get(refNum);
-      
-      if (source) {
-        // Create markdown link with the citation number pointing to the source URL
-        return `[[${refNum}](${source.url})]`;
-      }
-      
-      // If no matching source found, keep the original citation
-      logger.log(`No source found for citation [${refNum}]`);
-      return match;
-    } 
-    // If it's multiple reference numbers
-    else {
-      // Create an array to hold the links
-      const links = referenceNumbers.map(refNum => {
-        const source = referenceMap.get(refNum);
-        
-        if (source) {
-          // Create markdown link with the citation number pointing to the source URL
-          return `[${refNum}](${source.url})`;
-        }
-        
-        // If no matching source found, just return the number
-        logger.log(`No source found for citation part ${refNum}`);
-        return `${refNum}`;
-      });
-      
-      // Join the links with commas
-      return `[${links.join(', ')}]`;
-    }
-  });
-  
-  // Generate bibliography section
-  let bibliography = "\n\n## References\n\n";
-  
-  // Sort by reference number for a well-ordered bibliography
-  const sortedReferences = Array.from(referenceMap.entries())
-    .sort((a, b) => a[0] - b[0]);
-  
-  logger.log(`Generating bibliography with ${sortedReferences.length} entries`);
-  
-  // Create bibliography entries
-  sortedReferences.forEach(([number, source]) => {
-    const title = source.title || "No title";
-    
-    bibliography += `${number}. [${title}](${source.url})\n`;
-  });
-
-  return {reportWithSources, bibliography};
-}
-
-/**
- * Generate the final report
- * 
- * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @param prompt - The prompt to research 
- * @param targetOutputTokens - The target output tokens
- * @param aiProvider - The AI provider
- * @param latestReasoning - The latest reasoning
- * @param latestResearchPlan - The latest research plan
- * @param queries - The queries used to get the search results
- * @returns The final report
- */
-export const generateFinalReport = async ({
-  sources,
-  prompt,
-  targetOutputTokens,
-  aiProvider,
-  latestReasoning,
-  latestResearchPlan,
-  queries,
-}: {
-  sources: WebSearchResult[];
-  prompt: string;
-  targetOutputTokens?: number;
-  aiProvider: AIProvider;
-  latestReasoning: string;
-  latestResearchPlan: string;
-  queries: string[];
-}) => {
-  let draft = "";
-  let iter = 0;
-  // track which prompt we're on
-  let phase: "initial" | "continuation" | "done" = "initial";
-
-  do {
-    logger.log(`[Iteration ${iter}] phase=${phase}`);
-
-    const finalReportPrompt = PROMPTS.finalReport({
-      currentReport: draft,
-      prompt,
-      sources,
-      targetOutputTokens,
-      latestResearchPlan,
-      latestReasoning,
-      queries,
-      phase,
-    });
-
-
-    logger.log(`\n[Iteration ${iter}] phase=${phase}`);
-    logger.log("SYSTEM PROMPT:\n" + finalReportPrompt.system);
-    logger.log("USER PROMPT:\n" + finalReportPrompt.user);
-
-    // call the model
-    const response = await generateObject({
-      model: aiProvider.getModel("output"),
-      system: finalReportPrompt.system,
-      prompt: finalReportPrompt.user,
-      schema: z.object({
-        text: z.string().describe("The final report"),
-        phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
-      }),
-      experimental_repairText: async ({ text, error }) => {
-        // Simple repair attempt for unclosed JSON strings
-        if (error && error.message && error.message.includes('Unterminated string')) {
-          return text + '"}';
-        }
-        return text;
-      },
-    });
-
-    phase = response.object.phase;
-    draft += response.object.text;
-
-    logger.log("PHASE==============================:\n" + response.object.phase);
-    logger.log("MODEL OUTPUT:\n" + response.object.text);
-
-
-    if (phase === "continuation") {
-      const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
-      if (targetChars && draft.length >= targetChars) {
-        phase = "done";
-      }
-    }
-
-    iter++;
-  } while (phase !== "done");
-
-  // process the report for sources 
-  const {reportWithSources, bibliography} = await processReportForSources({
-    report: draft,
-    sources,
-  });
-
-  logger.log("Done processing report for sources");
-
-  return { report: reportWithSources, bibliography };
-}
-
-/**
- * Generate a research plan
- * 
- * @param aiProvider - The AI provider
- * @param prompt - The prompt to research 
- * @param pastReasoning - The past reasoning
- * @param pastQueries - The past queries
- * @param pastSources - The past sources
- */
-export const generateResearchPlan = async ({
-  aiProvider,
-  prompt,
-  pastReasoning,
-  pastQueries,
-  pastSources,
-  config,
-}: { aiProvider: AIProvider; prompt: string; pastReasoning: string; pastQueries: string[]; pastSources: WebSearchResult[]; config: DeepResearchConfig;}) => {
-  try {
-    const researchPlanPrompt = PROMPTS.research({
-      prompt,
-      reasoning: pastReasoning,
-      queries: pastQueries,
-      sources: pastSources,
-    });
-    
-    // Generate the research plan using the AI provider
-    const result = await generateObject({
-      model: aiProvider.getModel("default"),
-      system: researchPlanPrompt.system,
-      prompt: researchPlanPrompt.user,
-      schema: z.object({
-        subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
-        plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-        depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
-        breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
-      }),
-    });
-
-    logger.log("Research Prompts", PROMPTS.research({
-      prompt,
-      reasoning: pastReasoning,
-      queries: pastQueries,
-      sources: pastSources,
-    }));
-
-    return {
-      subQueries: result.object.subQueries,
-      plan: result.object.plan,
-      suggestedDepth: result.object.depth,
-      suggestedBreadth: result.object.breadth,
-    };
-  } catch (error: any) {
-    logger.error(`Error generating research plan: ${error.message || error}`);
-    throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
-  }
-}
-
-/**
- * Deduplicate search results
- * 
- * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @returns The deduplicated search results
- */
-const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
-  const urlMap = new Map<string, boolean>();
-
-  return sources.map((result) => {
-    return {
-      query: result.query,
-      context: result.context,
-      searchResults: {
-        results: result.searchResults.results
-          .filter((item) => {
-            // Skip if we've seen this URL before
-            if (urlMap.has(item.url)) {
-              return false;
-            }
-            // Mark this URL as seen
-            urlMap.set(item.url, true);
-            return true;
-          })
-          .map((item) => {
-            return {
-              url: item.url,
-              title: item.title,
-              domain: item.domain,
-              content: item.content,
-              snippets: item.snippets,
-            };
-          }),
-      },
-    };
-  });
-}
-
-/**
- * Map search results to numbers
- * 
- * @param sources - The search results (url, query, context, etc) from JigsawStack
- * @returns The search results with numbers
- */
-const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
-  const urlMap = new Map<string, number>();
-  let currentNumber = 1;
-
-  return sources.map((result) => {
-    return {
-      query: result.query,
-      context: result.context || "",
-      searchResults: {
-        // ai_overview: result.searchResults.ai_overview,
-        results: result.searchResults.results.map((item) => {
-          // If URL hasn't been seen before, assign it a new number
-          if (!urlMap.has(item.url)) {
-            urlMap.set(item.url, currentNumber++);
-          }
-          
-          return {
-            url: item.url,
-            title: item.title,
-            domain: item.domain,
-            referenceNumber: urlMap.get(item.url) || 0,
-            content: item.content,
-            snippets: item.snippets,
-          };
-        }),
-      },
-    };
-  });
-};
-
-/**
- * Create a new DeepResearch instance
- * 
- * @param config - The configuration for the DeepResearch instance
- * @returns A new DeepResearch instance
- */
-export const createDeepResearch = (config: Partial<DeepResearchConfig>) => {
-  return new DeepResearch(config);
-};
+import { decisionMaking, deduplicateSearchResults, generateFinalReport, generateResearchPlan, mapSearchResultsToNumbers, reasoningSearchResults } from "./process";
 
 /**
  * The DeepResearch class
@@ -467,21 +34,12 @@ export class DeepResearch {
       this.logger.setEnabled(this.config.logging.enabled);
     }
 
-    const openaiApiKey = this.config?.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-    const geminiApiKey = this.config?.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    const deepInfraApiKey = this.config?.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY;
-    const jigsawApiKey = this.config?.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY;
-
-    if (!openaiApiKey || !geminiApiKey || !deepInfraApiKey || !jigsawApiKey) {
-      throw new Error("API keys are not set");
-    }
-
     // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(jigsawApiKey);
+    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
     this.aiProvider = new AIProvider({
-      OPENAI_API_KEY: openaiApiKey,
-      GEMINI_API_KEY: geminiApiKey,
-      DEEPINFRA_API_KEY: deepInfraApiKey,
+      OPENAI_API_KEY: this.config.OPENAI_API_KEY,
+      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
+      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
       defaultModel: this.config.models.default,
       reasoningModel: this.config.models.reasoning,
       outputModel: this.config.models.output,
@@ -508,6 +66,7 @@ export class DeepResearch {
    * @returns The validated configuration (merged with defaults)
    */
   public validateConfig(config: DeepResearchParams) {
+
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -539,22 +98,22 @@ export class DeepResearch {
       },
       models: mergedModels,
       JIGSAW_API_KEY:
-        config.JIGSAW_API_KEY ||
+        config.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY ||
         (() => {
           throw new Error("JIGSAW_API_KEY must be provided in config");
         })(),
       OPENAI_API_KEY:
-        config.OPENAI_API_KEY ||
+        config.OPENAI_API_KEY || process.env.OPENAI_API_KEY ||
         (() => {
           throw new Error("OpenAI API key must be provided in config");
         })(),
       GEMINI_API_KEY:
-        config.GEMINI_API_KEY ||
+        config.GEMINI_API_KEY || process.env.GEMINI_API_KEY ||
         (() => {
           throw new Error("Gemini API key must be provided in config");
         })(),
       DEEPINFRA_API_KEY:
-        config.DEEPINFRA_API_KEY ||
+        config.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY ||
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),
@@ -584,8 +143,6 @@ export class DeepResearch {
       const {
         subQueries,
         plan,
-        suggestedDepth,
-        suggestedBreadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
@@ -687,6 +244,16 @@ export class DeepResearch {
     };
   }
 }
+
+/**
+ * Create a new DeepResearch instance
+ * 
+ * @param config - The configuration for the DeepResearch instance
+ * @returns A new DeepResearch instance
+ */
+export const createDeepResearch = (config: Partial<DeepResearchConfig>) => {
+  return new DeepResearch(config);
+};
 
 // Default export
 export default createDeepResearch;

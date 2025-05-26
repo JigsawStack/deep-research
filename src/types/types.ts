@@ -28,3 +28,23 @@ export interface WebSearchResult {
   };
   context?: string;
 }
+
+export interface DeepResearchConfig {
+  models: ModelConfig;
+  depth: {
+    maxDepth: number;
+  };
+  breadth: {
+    maxBreadth: number;
+  };
+  report: ReportConfig;
+  logging: {
+    enabled: boolean;
+  };
+  JIGSAW_API_KEY: string;
+  OPENAI_API_KEY: string;
+  GEMINI_API_KEY: string;
+  DEEPINFRA_API_KEY: string;
+}
+
+export type DeepResearchParams = Partial<DeepResearchConfig>;

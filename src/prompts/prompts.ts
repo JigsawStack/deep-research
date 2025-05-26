@@ -1,4 +1,5 @@
-import { ResearchSource, WebSearchResult } from "@/types/types";
+import { DeepResearchConfig, ResearchSource, WebSearchResult } from "@/types/types";
+import { z } from "zod";
 
 const CONTEXT_GENERATION_PROMPT = ({
   prompt,
@@ -29,7 +30,8 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   reasoning,
   queries,
   sources,
-}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[] }) => {
+  config,
+}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[]; config: DeepResearchConfig }) => {
   const systemPrompt = `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
   INSTRUCTIONS:
@@ -69,9 +71,17 @@ ${queries.map((q) => {
 User Prompt: ${prompt}
 `.trim();
 
+const schema = z.object({
+  subQueries: z.array(z.string()).min(1).max(config.breadth.maxBreadth).describe("A list of search queries to thoroughly research the prompt"),
+  plan: z.string().describe("A detailed plan explaining the research approach and methodology"),
+  depth: z.number().min(1).max(config.depth.maxDepth).describe("A number representing the depth of the research"),
+  breadth: z.number().min(1).max(config.breadth.maxBreadth).describe("A number representing the breadth of the research"),
+});
+
   return {
     system: systemPrompt,
     user: userPrompt,
+    schema,
   };
 };
 
@@ -120,9 +130,15 @@ Reasoning generated previously: "${reasoning}"
 Prompt: "${prompt}"
 `.trim();
 
+const schema = z.object({
+  isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
+  reason: z.string().describe("The reason for the decision"),
+});
+
   return {
     system: systemPrompt,
     user: userPrompt,
+    schema,
   };
 };
 
@@ -263,9 +279,15 @@ const FINAL_REPORT_PROMPT = ({
   "${prompt}"
   `.trim();
 
+  const schema = z.object({
+    text: z.string().describe("The final report"),
+    phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
+  });
+
   return {
     system: systemPrompt,
     user: userPrompt,
+    schema,
   };
 };
 
