@@ -24,7 +24,7 @@
     "enabled": true
   },
   "linter": {
-    "enabled": false
+    "enabled": false 
   },
   "javascript": {
     "formatter": {

@@ -1,6 +1,6 @@
 {
   "name": "deep-research",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Open source deep research TS/JS library with built in web search, reasoning, and bibliography generation",
   "engines": {
     "node": ">=18"
@@ -52,7 +52,6 @@
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.10.10",
     "body-parser": "^2.2.0",
-    "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "pkgroll": "^2.6.1",
     "tsx": "^4.19.4",
