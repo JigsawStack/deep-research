@@ -1,4 +1,5 @@
 import { ResearchSource, WebSearchResult } from "@/types/types";
+import { z } from "zod";
 
 const CONTEXT_GENERATION_PROMPT = ({
   prompt,
@@ -120,9 +121,15 @@ Reasoning generated previously: "${reasoning}"
 Prompt: "${prompt}"
 `.trim();
 
+const schema = z.object({
+  isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
+  reason: z.string().describe("The reason for the decision"),
+});
+
   return {
     system: systemPrompt,
     user: userPrompt,
+    schema,
   };
 };
 

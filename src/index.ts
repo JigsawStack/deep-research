@@ -4,15 +4,12 @@
 // **TODO**
 // move functions outside into another file
 
-// **TODO**
-// remove suggestedDepth and suggestedBreadth as inputs
-
 import AIProvider from "@provider/aiProvider";
-import { WebSearchResult } from "@/types/types";
-import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG, DeepResearchConfig } from "./config/defaults";
+import { WebSearchResult, DeepResearchConfig, DeepResearchParams } from "@/types/types";
+import { DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_BREADTH_CONFIG, DEFAULT_REPORT_CONFIG} from "./config/defaults";
 import "dotenv/config";
 import { JigsawProvider } from "./provider/jigsaw";
-import { generateObject, generateText, LanguageModelV1 } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { PROMPTS } from "./prompts/prompts";
 import { Logger, logger } from "./utils/logger";
@@ -44,12 +41,9 @@ export const decisionMaking = async ({
   const decisionMakingResponse = await generateObject({
     model: aiProvider.getModel("default"),
     output: "object",
-    schema: z.object({
-      isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
-      reason: z.string().describe("The reason for the decision"),
-    }),
     system: decisionMakingPrompt.system,
     prompt: decisionMakingPrompt.user,
+    schema: decisionMakingPrompt.schema,
     temperature: 0,
   });
 
@@ -355,8 +349,6 @@ export const generateResearchPlan = async ({
     return {
       subQueries: result.object.subQueries,
       plan: result.object.plan,
-      suggestedDepth: result.object.depth,
-      suggestedBreadth: result.object.breadth,
     };
   } catch (error: any) {
     logger.error(`Error generating research plan: ${error.message || error}`);
@@ -469,30 +461,19 @@ export class DeepResearch {
   private isComplete: boolean = false;
   private iterationCount: number = 0;
 
-  constructor(config: Partial<DeepResearchConfig>) {
-    this.config = this.validateConfig(config);
+  constructor(config: DeepResearchParams) {
+    this.config = this.validateConfig(config) as DeepResearchConfig;
 
     if (this.config.logging && this.config.logging.enabled !== undefined) {
       this.logger.setEnabled(this.config.logging.enabled);
     }
 
-    //**TODO */
-    // move this into validateConfig
-    const openaiApiKey = this.config?.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-    const geminiApiKey = this.config?.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    const deepInfraApiKey = this.config?.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY;
-    const jigsawApiKey = this.config?.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY;
-
-    if (!openaiApiKey || !geminiApiKey || !deepInfraApiKey || !jigsawApiKey) {
-      throw new Error("API keys are not set");
-    }
-
     // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(jigsawApiKey);
+    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
     this.aiProvider = new AIProvider({
-      OPENAI_API_KEY: openaiApiKey,
-      GEMINI_API_KEY: geminiApiKey,
-      DEEPINFRA_API_KEY: deepInfraApiKey,
+      OPENAI_API_KEY: this.config.OPENAI_API_KEY,
+      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
+      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
       defaultModel: this.config.models.default,
       reasoningModel: this.config.models.reasoning,
       outputModel: this.config.models.output,
@@ -518,7 +499,8 @@ export class DeepResearch {
    * @param config - The configuration for the DeepResearch instance
    * @returns The validated configuration (merged with defaults)
    */
-  public validateConfig(config: Partial<DeepResearchConfig>) {
+  public validateConfig(config: DeepResearchParams) {
+
     // maxOutputTokens must be greater than targetOutputLength
     if (config.report && config.report.maxOutputTokens && config.report.targetOutputTokens && config.report.maxOutputTokens < config.report.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
@@ -550,22 +532,22 @@ export class DeepResearch {
       },
       models: mergedModels,
       JIGSAW_API_KEY:
-        config.JIGSAW_API_KEY ||
+        config.JIGSAW_API_KEY || process.env.JIGSAW_API_KEY ||
         (() => {
           throw new Error("JIGSAW_API_KEY must be provided in config");
         })(),
       OPENAI_API_KEY:
-        config.OPENAI_API_KEY ||
+        config.OPENAI_API_KEY || process.env.OPENAI_API_KEY ||
         (() => {
           throw new Error("OpenAI API key must be provided in config");
         })(),
       GEMINI_API_KEY:
-        config.GEMINI_API_KEY ||
+        config.GEMINI_API_KEY || process.env.GEMINI_API_KEY ||
         (() => {
           throw new Error("Gemini API key must be provided in config");
         })(),
       DEEPINFRA_API_KEY:
-        config.DEEPINFRA_API_KEY ||
+        config.DEEPINFRA_API_KEY || process.env.DEEPINFRA_API_KEY ||
         (() => {
           throw new Error("DeepInfra API key must be provided in config");
         })(),
@@ -573,7 +555,7 @@ export class DeepResearch {
         ...DEFAULT_CONFIG.logging,
         ...(config.logging || {}),
       },
-    };
+    } as DeepResearchConfig;
   }
 
   /**
@@ -595,8 +577,6 @@ export class DeepResearch {
       const {
         subQueries,
         plan,
-        suggestedDepth,
-        suggestedBreadth,
       } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
@@ -683,7 +663,8 @@ export class DeepResearch {
     return {
       status: "success",
       data: {
-        text: report + "\n\n" + bibliography,
+        text: report,
+        bibliography,
         metadata: {
           prompt: this.prompt,
           iterationCount: this.iterationCount,
