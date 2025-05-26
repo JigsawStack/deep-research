@@ -53,6 +53,7 @@ async function advancedResearch() {
 
     console.log("advancedResult", advancedResult.data.text);
     console.log("advancedBibliography", advancedResult.data.bibliography);
+    console.log("advancedTokenUsage", advancedResult._usage);
   } catch (error) {
     console.error("Research failed with error:", error);
     process.exit(1);

@@ -223,6 +223,7 @@ export const generateFinalReport = async ({
   let iter = 0;
   // track which prompt we're on
   let phase: "initial" | "continuation" | "done" = "initial";
+  let tokenUsage = 0;
 
   do {
     logger.log(`[Iteration ${iter}] phase=${phase}`);
@@ -271,6 +272,7 @@ export const generateFinalReport = async ({
     }
 
     iter++;
+    tokenUsage += response.usage.totalTokens;
   } while (phase !== "done");
 
   // process the report for sources
@@ -281,7 +283,7 @@ export const generateFinalReport = async ({
 
   logger.log("Done processing report for sources");
 
-  return { report: reportWithSources, bibliography };
+  return { report: reportWithSources, bibliography, tokenUsage };
 };
 
 /**

@@ -1,18 +1,3 @@
-// **TODOS**
-// remove unused variables
-
-// **TODOS**
-// add the ability to use a custom prompt
-
-// **TODOS**
-// Feature list in readme
-
-// **TODOS**
-// README, overwriting models with no env
-
-// **TODOS**
-// configs do table instead of list
-
 import { DeepResearchConfig, DeepResearchParams, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
 import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
@@ -244,7 +229,7 @@ export class DeepResearch {
     // step 5: generating report
     logger.log(`[Step 5] Generating report...`);
 
-    const { report, bibliography} = await generateFinalReport({
+    const { report, bibliography, tokenUsage: reportTokenUsage } = await generateFinalReport({
       sources: this.sources,
       prompt: this.prompt,
       targetOutputTokens: this.config.report.targetOutputTokens,
@@ -254,6 +239,7 @@ export class DeepResearch {
       queries: this.queries,
     });
 
+    this.tokenUsage.report_tokens = reportTokenUsage;
     this.tokenUsage.total_tokens = this.tokenUsage.research_tokens + this.tokenUsage.reasoning_tokens + this.tokenUsage.decision_tokens + this.tokenUsage.report_tokens;
 
     return {
