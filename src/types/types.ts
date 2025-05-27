@@ -1,8 +1,8 @@
 import { LanguageModelV1 } from "@ai-sdk/provider";
 
 export interface ReportConfig {
-  maxOutputTokens?: number;
-  targetOutputTokens?: number;
+  maxOutputTokens: number;
+  targetOutputTokens: number;
 }
 
 export interface ModelConfig {
@@ -48,3 +48,4 @@ export interface DeepResearchConfig {
 }
 
 export type DeepResearchParams = Partial<DeepResearchConfig>;
+export type ReportParams = Partial<ReportConfig>;
