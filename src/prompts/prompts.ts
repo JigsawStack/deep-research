@@ -62,7 +62,7 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   `.trim();
 
   const userPrompt = `
-${reasoning ? `Past reasoning: ${reasoning}` : ""}
+${reasoning ? `Reasoning: ${reasoning}` : ""}
 
 ${
   queries
@@ -237,6 +237,8 @@ const FINAL_REPORT_PROMPT = ({
     - Only use the sources provided in the context.
     - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").
     - **Never repeat a heading that is already present in the Existing Draft.**
+    - When writing mathematical equations, always use single dollar sign syntax ($...$) for inline equations 
+      and double dollar signs ($$...$$) for block equations. Do not use \(...\) or \[...\] delimiters.
 
   INSTRUCTIONS:
     - generate in the

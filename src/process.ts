@@ -44,7 +44,7 @@ export const decisionMaking = async ({
  * Reasoning about the search results
  *
  * @param prompt - The prompt to research
- * @param latestResearchPlan - The latest research plan
+ * @param researchPlan - The research plan
  * @param sources - The search results (url, title, domain, ai_overview.) from JigsawStack
  * @param queries - The queries used to get the search results
  * @param aiProvider - The AI provider
@@ -69,7 +69,6 @@ export const reasoningSearchResults = async ({
 
     const reasoningResponse = await generateText({
       model: aiProvider.getModel("reasoning"),
-      // system: reasoningPrompt.system,
       prompt: reasoningPrompt.user,
     });
 
@@ -197,8 +196,8 @@ export const processReportForSources = async ({
  * @param prompt - The prompt to research
  * @param targetOutputTokens - The target output tokens
  * @param aiProvider - The AI provider
- * @param latestReasoning - The latest reasoning
- * @param latestResearchPlan - The latest research plan
+ * @param reasoning - The reasoning
+ * @param researchPlan - The research plan
  * @param queries - The queries used to get the search results
  * @returns The final report
  */
@@ -291,9 +290,9 @@ export const generateFinalReport = async ({
  *
  * @param aiProvider - The AI provider
  * @param prompt - The prompt to research
- * @param pastReasoning - The past reasoning
- * @param pastQueries - The past queries
- * @param pastSources - The past sources
+ * @param reasoning - The reasoning
+ * @param queries - The queries
+ * @param sources - The sources
  */
 export const generateResearchPlan = async ({
   aiProvider,
@@ -318,6 +317,7 @@ export const generateResearchPlan = async ({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: researchPlanPrompt.schema,
+      mode: "json",
     });
 
     logger.log(

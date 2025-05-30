@@ -1,4 +1,4 @@
-import { ModelConfig, ReportConfig } from "@/types/types";
+import { ModelConfig } from "@/types/types";
 import { deepinfra } from "@ai-sdk/deepinfra";
 import { openai } from "@ai-sdk/openai";
 
@@ -16,7 +16,7 @@ export const DEFAULT_BREADTH_CONFIG = {
   maxBreadth: 3,
 };
 
-export const DEFAULT_REPORT_CONFIG: ReportConfig = {
+export const DEFAULT_REPORT_CONFIG = {
   maxOutputTokens: 32000,
 };
 
