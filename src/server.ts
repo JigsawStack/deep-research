@@ -10,6 +10,7 @@ interface ResearchResult {
   status: string;
   data: {
     text: string;
+    bibliography: string;
     metadata: {
       prompt: string;
       iterationCount: number;
@@ -20,8 +21,16 @@ interface ResearchResult {
       sources: any[]; // Using any for sources as the exact type depends on your implementation
     };
   };
+  _usage: {
+    targetOutputTokens: number;
+    maxOutputTokens: number;
+    research_tokens: number;
+    reasoning_tokens: number;
+    report_tokens: number;
+    decision_tokens: number;
+    total_tokens: number;
+  };
 }
-
 // Session interface
 interface ResearchSession {
   deepResearch: any; // Type could be more specific based on your DeepResearch implementation
