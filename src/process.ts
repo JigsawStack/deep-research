@@ -317,7 +317,7 @@ export const generateResearchPlan = async ({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: researchPlanPrompt.schema,
-      mode: 'json'
+      mode: "json",
     });
 
     logger.log(
