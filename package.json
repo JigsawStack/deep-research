@@ -1,6 +1,6 @@
 {
   "name": "deep-research",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Open source deep research TS/JS library with built in web search, reasoning, and bibliography generation",
   "engines": {
     "node": ">=18"
