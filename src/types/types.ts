@@ -45,6 +45,8 @@ export interface DeepResearchConfig {
   OPENAI_API_KEY: string;
   GEMINI_API_KEY: string;
   DEEPINFRA_API_KEY: string;
+
+  webSearch?: (query: string) => Promise<WebSearchResult>;
 }
 
 export type DeepResearchParams = Partial<DeepResearchConfig>;

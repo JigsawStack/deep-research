@@ -9,7 +9,7 @@ import {
   mapSearchResultsToNumbers,
   reasoningSearchResults,
 } from "./process";
-import { JigsawProvider } from "./provider/jigsaw";
+import { WebSearchProvider } from "./provider/webSearch";
 import { Logger, logger } from "./utils/logger";
 
 export class DeepResearch {
@@ -32,8 +32,8 @@ export class DeepResearch {
   public queries: string[] = [];
   public sources: WebSearchResult[] = [];
   public aiProvider: AIProvider;
-  private jigsaw: JigsawProvider;
   private iterationCount: number = 0;
+  private webSearchProvider: WebSearchProvider;
 
   constructor(config: DeepResearchParams) {
     this.config = this.validateConfig(config) as DeepResearchConfig;
@@ -42,8 +42,8 @@ export class DeepResearch {
       this.logger.setEnabled(this.config.logging.enabled);
     }
 
-    // Initialize AIProvider with API keys from config
-    this.jigsaw = JigsawProvider.getInstance(this.config.JIGSAW_API_KEY);
+    this.webSearchProvider = WebSearchProvider.getInstance(this.config);
+
     this.aiProvider = new AIProvider({
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
       GEMINI_API_KEY: this.config.GEMINI_API_KEY,
@@ -182,7 +182,11 @@ export class DeepResearch {
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
-      const initialSearchResults = await this.jigsaw.searchAndGenerateContext(this.queries, this.prompt, this.aiProvider);
+      const initialSearchResults = await this.webSearchProvider.searchAndGenerateContext({
+        queries: this.queries,
+        prompt: this.prompt,
+        aiProvider: this.aiProvider,
+      });
 
       // step 2.5: deduplicate results
       logger.log(`Received ${initialSearchResults.length} initial search results`);
