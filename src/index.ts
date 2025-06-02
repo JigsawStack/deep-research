@@ -46,11 +46,10 @@ export class DeepResearch {
 
     this.aiProvider = AIProvider.getInstance({
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
-      GEMINI_API_KEY: this.config.GEMINI_API_KEY,
       DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
-      defaultModel: this.config.models.default,
-      reasoningModel: this.config.models.reasoning,
-      outputModel: this.config.models.output,
+      defaultModel: this.config.models?.default,
+      reasoningModel: this.config.models?.reasoning,
+      outputModel: this.config.models?.output,
     });
   }
 
@@ -61,8 +60,6 @@ export class DeepResearch {
    * @returns The validated configuration (merged with defaults)
    */
   public validateConfig(config: DeepResearchParams) {
-    // **TODO** make api keys optional except for jigsaw if models is passed
-
     // maxOutputTokens must be greater than targetOutputLength
     if (
       config.report &&
@@ -71,17 +68,6 @@ export class DeepResearch {
       config.report.maxOutputTokens < config.report.targetOutputTokens
     ) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
-    }
-
-    // Merge models carefully to handle both string and LanguageModelV1 instances
-    const mergedModels = { ...DEFAULT_CONFIG.models, ...(config.models || {}) };
-
-    if (config.models) {
-      Object.entries(config.models).forEach(([key, value]) => {
-        if (value !== undefined) {
-          mergedModels[key] = value;
-        }
-      });
     }
 
     return {
@@ -101,35 +87,38 @@ export class DeepResearch {
         ...DEFAULT_REPORT_CONFIG,
         ...(config.report || {}),
       },
-      models: mergedModels,
       JIGSAW_API_KEY:
         config.JIGSAW_API_KEY ||
         process.env.JIGSAW_API_KEY ||
-        (() => {
-          throw new Error("JIGSAW_API_KEY must be provided in config");
-        })(),
+        (config.webSearch
+          ? null
+          : (() => {
+              throw new Error("JIGSAW_API_KEY must be provided in config");
+            })()),
       OPENAI_API_KEY:
         config.OPENAI_API_KEY ||
         process.env.OPENAI_API_KEY ||
-        (() => {
-          throw new Error("OpenAI API key must be provided in config");
-        })(),
-      GEMINI_API_KEY:
-        config.GEMINI_API_KEY ||
-        process.env.GEMINI_API_KEY ||
-        (() => {
-          throw new Error("Gemini API key must be provided in config");
-        })(),
+        (config.models?.default && config.models?.output
+          ? null
+          : (() => {
+              throw new Error("Either OPENAI_API_KEY or models.default and models.output must be provided in config");
+            })()),
       DEEPINFRA_API_KEY:
         config.DEEPINFRA_API_KEY ||
         process.env.DEEPINFRA_API_KEY ||
-        (() => {
-          throw new Error("DeepInfra API key must be provided in config");
-        })(),
+        (config.models?.reasoning
+          ? null
+          : (() => {
+              throw new Error("DeepInfra API key must be provided in config");
+            })()),
       logging: {
         ...DEFAULT_CONFIG.logging,
         ...(config.logging || {}),
       },
+      models: {
+        ...(config.models || {}),
+      },
+      webSearch: config.webSearch,
     } as DeepResearchConfig;
   }
 

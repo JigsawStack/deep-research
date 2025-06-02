@@ -90,7 +90,7 @@ export const reasoningSearchResults = async ({
     logger.error(`  Error details:`, error);
 
     // Throw the error to terminate program execution
-    throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
+    throw new Error(`reasoning evaluation failed: ${error.message || "Unknown error"}`);
   }
 };
 

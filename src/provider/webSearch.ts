@@ -13,6 +13,10 @@ export class WebSearchProvider {
   private customSearchFunction: ((query: string) => Promise<WebSearchResult>) | null = null;
 
   private constructor(config: DeepResearchConfig) {
+
+    console.log("WEBSEARCH CONFIG", config.webSearch);
+    console.log("JIGSAW API KEY", config.JIGSAW_API_KEY);
+
     // If user provided a custom search function, use it
     if (config.webSearch) {
       this.customSearchFunction = config.webSearch;
@@ -21,11 +25,6 @@ export class WebSearchProvider {
     // If a JIGSAW_API_KEY is provided, initialize JigsawProvider as fallback
     if (config.JIGSAW_API_KEY) {
       this.jigsaw = JigsawProvider.getInstance({ apiKey: config.JIGSAW_API_KEY });
-    }
-
-    // Validate that we have at least one search method available
-    if (!this.customSearchFunction && !this.jigsaw) {
-      throw new Error("No search method available. Please provide either a custom webSearch function or a JIGSAW_API_KEY.");
     }
   }
 
