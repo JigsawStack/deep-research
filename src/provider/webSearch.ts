@@ -34,7 +34,7 @@ export class WebSearchProvider {
   /**
    * Fire web searches for all queries
    */
-  public async fireWebSearches(queries: string[]): Promise<WebSearchResult[]> {
+  private async fireWebSearches(queries: string[]): Promise<WebSearchResult[]> {
     // Map each query to a promise that resolves to a search result
     const searchPromises = queries.map(async (query) => {
       try {
@@ -78,12 +78,11 @@ export class WebSearchProvider {
                 title: result.title,
                 content: result.content,
                 snippets: result.snippets,
+                is_safe: result.is_safe,
               };
               const cleaned = ContentCleaner.cleanContent(source);
               return {
                 ...cleaned,
-                domain: cleaned.domain,
-                isAcademic: cleaned.isAcademic,
               } as ResearchSource;
             })
             // Filter out sources with empty content and empty snippets early
@@ -160,6 +159,8 @@ export class WebSearchProvider {
             results: filteredResults,
           },
           context: contextResults[index] || "",
+          geo_results: searchResult.geo_results,
+          image_urls: searchResult.image_urls,
         };
       })
       .filter((result) => result !== null);
@@ -170,7 +171,7 @@ export class WebSearchProvider {
   /**
    * Generate context for the search results
    */
-  public async contextGenerator({
+  private async contextGenerator({
     queries,
     sources,
     prompt,

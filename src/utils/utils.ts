@@ -1,13 +1,10 @@
-import { ResearchSource } from "@/types/types";
+import { ResearchSource, WebSearchResult } from "@/types/types";
 
 export class ContentCleaner {
   /**
    * Clean and normalize content from a research source
    */
   public static cleanContent(source: ResearchSource): ResearchSource {
-    const domain = this.extractDomain(source.url);
-    const isAcademic = this.isAcademicSource(domain);
-
     // Clean the content if it exists
     const cleanedContent = source.content ? this.contentPipeline(source.content) : undefined;
 
@@ -16,45 +13,9 @@ export class ContentCleaner {
 
     return {
       ...source,
-      domain,
-      isAcademic,
       content: cleanedContent,
       snippets: cleanedSnippets,
     };
-  }
-
-  /**
-   * Extract domain from URL
-   */
-  private static extractDomain(url: string): string {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname;
-    } catch {
-      // If URL parsing fails, try basic extraction
-      const match = url.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n]+)/im);
-      return match ? match[1] : url;
-    }
-  }
-
-  /**
-   * Check if source is from an academic domain
-   */
-  private static isAcademicSource(domain: string): boolean {
-    const academicDomains = [
-      /\.edu$/,
-      /\.ac\.[a-z]{2}$/,
-      /scholar\.google\./,
-      /science(direct)?\.com$/,
-      /nature\.com$/,
-      /researchgate\.net$/,
-      /springer\.com$/,
-      /ieee\.org$/,
-      /jstor\.org$/,
-      /pubmed\.ncbi\.nlm\.nih\.gov$/,
-    ];
-
-    return academicDomains.some((pattern) => pattern.test(domain));
   }
 
   /**
@@ -62,13 +23,6 @@ export class ContentCleaner {
    */
   private static contentPipeline(content: string): string {
     return this.contentSteps.reduce((text, step) => step(text), content);
-  }
-
-  /**
-   * Run markdown content through the markdown-preserving pipeline
-   */
-  private static markdownPipeline(content: string): string {
-    return this.markdownSteps.reduce((text, step) => step(text), content);
   }
 
   /**
@@ -151,31 +105,70 @@ export class ContentCleaner {
       return text;
     },
   ];
-
-  /**
-   * Steps for cleaning markdown content while preserving formatting
-   */
-  private static markdownSteps: Array<(text: string) => string> = [
-    // Remove HTML tags but preserve markdown
-    (text: string) => text.replace(/<[^>]*>/g, " "),
-
-    // Remove CSS content
-    (text: string) => text.replace(/\.[A-Za-z][\w-]*\s*\{[^}]*\}/g, ""),
-    (text: string) => text.replace(/@font-face\s*\{[^}]*\}/g, ""),
-
-    // Normalize markdown list items
-    (text: string) => text.replace(/^\s*[-*+]\s+/gm, "* "),
-
-    // Preserve markdown bold/italic
-    (text: string) => text.replace(/\*\*|\*/g, (match) => match),
-
-    // Normalize whitespace while preserving line breaks
-    (text: string) => text.replace(/[ \t]+/g, " "),
-
-    // Fix markdown list spacing
-    (text: string) => text.replace(/\n\n\*/g, "\n*"),
-
-    // Trim extra whitespace while preserving markdown structure
-    (text: string) => text.trim(),
-  ];
 }
+
+/**
+ * Deduplicate search results
+ *
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The deduplicated search results
+ */
+export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
+  const urlMap = new Map<string, boolean>();
+
+  return sources.map((result) => {
+    return {
+      query: result.query,
+      context: result.context,
+      searchResults: {
+        results: result.searchResults.results
+          .filter((item) => {
+            // Skip if we've seen this URL before
+            if (urlMap.has(item.url)) {
+              return false;
+            }
+            // Mark this URL as seen
+            urlMap.set(item.url, true);
+            return true;
+          })
+          .map((item) => {
+            return {
+              ...item,
+            };
+          }),
+      },
+    };
+  });
+};
+
+/**
+ * Map search results to numbers
+ *
+ * @param sources - The search results (url, query, context, etc) from JigsawStack
+ * @returns The search results with numbers
+ */
+export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResult[] }): WebSearchResult[] => {
+  const urlMap = new Map<string, number>();
+  let currentNumber = 1;
+
+  return sources.map((result) => {
+    return {
+      query: result.query,
+      context: result.context || "",
+      searchResults: {
+        // ai_overview: result.searchResults.ai_overview,
+        results: result.searchResults.results.map((item) => {
+          // If URL hasn't been seen before, assign it a new number
+          if (!urlMap.has(item.url)) {
+            urlMap.set(item.url, currentNumber++);
+          }
+
+          return {
+            ...item,
+            referenceNumber: urlMap.get(item.url) || 0,
+          };
+        }),
+      },
+    };
+  });
+};

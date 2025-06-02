@@ -14,19 +14,20 @@ export interface ModelConfig {
 export interface ResearchSource {
   url: string;
   title?: string;
-  domain?: string;
   content?: string;
-  isAcademic?: boolean;
   referenceNumber?: number;
   snippets?: string[];
+  is_safe?: boolean;
 }
-
 export interface WebSearchResult {
   query: string;
   searchResults: {
     results: ResearchSource[];
   };
   context?: string;
+  image_urls?: string[];
+  links?: string[];
+  geo_results?: any;
 }
 
 export interface DeepResearchConfig {
