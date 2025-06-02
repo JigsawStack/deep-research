@@ -44,7 +44,7 @@ export class DeepResearch {
 
     this.webSearchProvider = WebSearchProvider.getInstance(this.config);
 
-    this.aiProvider = new AIProvider({
+    this.aiProvider = AIProvider.getInstance({
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
       GEMINI_API_KEY: this.config.GEMINI_API_KEY,
       DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,

@@ -2,7 +2,6 @@ import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { LanguageModelV1, ProviderV1 } from "@ai-sdk/provider";
-import { generateText } from "ai";
 
 /**
  * AIProvider acts as an abstract factory for different AI model providers
@@ -12,6 +11,7 @@ import { generateText } from "ai";
 export type ModelType = "default" | "reasoning" | "output" | string;
 
 export class AIProvider {
+  private static instance: AIProvider;
   private providers: Map<string, ProviderV1> = new Map();
   private models: {
     default: LanguageModelV1;
@@ -22,7 +22,7 @@ export class AIProvider {
   /**
    * Initialize the provider with API keys from config and optional custom models
    */
-  constructor({
+  private constructor({
     OPENAI_API_KEY,
     GEMINI_API_KEY,
     DEEPINFRA_API_KEY,
@@ -66,6 +66,37 @@ export class AIProvider {
       reasoning: reasoningModel,
       output: outputModel,
     };
+  }
+
+  /**
+   * Get singleton instance of AIProvider
+   */
+  public static getInstance({
+    OPENAI_API_KEY,
+    GEMINI_API_KEY,
+    DEEPINFRA_API_KEY,
+    defaultModel,
+    reasoningModel,
+    outputModel,
+  }: {
+    OPENAI_API_KEY: string;
+    GEMINI_API_KEY: string;
+    DEEPINFRA_API_KEY: string;
+    defaultModel: LanguageModelV1;
+    reasoningModel: LanguageModelV1;
+    outputModel: LanguageModelV1;
+  }): AIProvider {
+    if (!AIProvider.instance) {
+      AIProvider.instance = new AIProvider({
+        OPENAI_API_KEY,
+        GEMINI_API_KEY,
+        DEEPINFRA_API_KEY,
+        defaultModel,
+        reasoningModel,
+        outputModel,
+      });
+    }
+    return AIProvider.instance;
   }
 
   getModel(key: ModelType) {
