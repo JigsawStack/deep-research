@@ -42,29 +42,11 @@ export class AIProvider {
       throw new Error("Missing required API keys. Please provide OPENAI_API_KEY, GEMINI_API_KEY, and DEEPINFRA_API_KEY.");
     }
 
-    // Initialize providers
-    const openai = createOpenAI({
-      apiKey: OPENAI_API_KEY,
-    });
-
-    const gemini = createGoogleGenerativeAI({
-      apiKey: GEMINI_API_KEY,
-    });
-
-    const deepinfra = createDeepInfra({
-      apiKey: DEEPINFRA_API_KEY,
-    });
-
-    // Store providers
-    this.providers.set("openai", openai);
-    this.providers.set("gemini", gemini);
-    this.providers.set("deepinfra", deepinfra);
-
     // Set default models
     this.models = {
-      default: defaultModel,
-      reasoning: reasoningModel,
-      output: outputModel,
+      default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY }),
+      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY }),
+      output: outputModel || createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY }),
     };
   }
 
@@ -106,6 +88,17 @@ export class AIProvider {
   setModel(key: ModelType, model: LanguageModelV1) {
     this.models[key] = model;
   }
+
+  // private initModels() {
+  //   // Add models from config.models if available
+  //   if (this.config.models) {
+  //     Object.entries(this.config.models).forEach(([modelType, modelValue]) => {
+  //       if (modelValue) {
+  //         this.aiProvider.setModel(modelType, modelValue);
+  //       }
+  //     });
+  //   }
+  // }
 
   /**
    * Get a specific provider by name

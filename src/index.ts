@@ -52,19 +52,6 @@ export class DeepResearch {
       reasoningModel: this.config.models.reasoning,
       outputModel: this.config.models.output,
     });
-
-    this.initModels();
-  }
-
-  private initModels() {
-    // Add models from config.models if available
-    if (this.config.models) {
-      Object.entries(this.config.models).forEach(([modelType, modelValue]) => {
-        if (modelValue) {
-          this.aiProvider.setModel(modelType, modelValue);
-        }
-      });
-    }
   }
 
   /**
@@ -74,6 +61,8 @@ export class DeepResearch {
    * @returns The validated configuration (merged with defaults)
    */
   public validateConfig(config: DeepResearchParams) {
+    // **TODO** make api keys optional except for jigsaw if models is passed
+
     // maxOutputTokens must be greater than targetOutputLength
     if (
       config.report &&
