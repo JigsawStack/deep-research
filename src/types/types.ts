@@ -30,7 +30,7 @@ export interface WebSearchResult {
 }
 
 export interface DeepResearchConfig {
-  models: ModelConfig;
+  models?: ModelConfig;
   depth: {
     maxDepth: number;
   };
@@ -41,10 +41,9 @@ export interface DeepResearchConfig {
   logging: {
     enabled: boolean;
   };
-  JIGSAW_API_KEY: string;
-  OPENAI_API_KEY: string;
-  GEMINI_API_KEY: string;
-  DEEPINFRA_API_KEY: string;
+  JIGSAW_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  DEEPINFRA_API_KEY?: string;
 
   webSearch?: (query: string) => Promise<WebSearchResult>;
 }

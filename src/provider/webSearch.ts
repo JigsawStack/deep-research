@@ -22,11 +22,6 @@ export class WebSearchProvider {
     if (config.JIGSAW_API_KEY) {
       this.jigsaw = JigsawProvider.getInstance({ apiKey: config.JIGSAW_API_KEY });
     }
-
-    // Validate that we have at least one search method available
-    if (!this.customSearchFunction && !this.jigsaw) {
-      throw new Error("No search method available. Please provide either a custom webSearch function or a JIGSAW_API_KEY.");
-    }
   }
 
   public static getInstance(config: DeepResearchConfig): WebSearchProvider {
