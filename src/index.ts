@@ -1,16 +1,10 @@
 import { DeepResearchConfig, DeepResearchParams, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
 import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
-import {
-  decisionMaking,
-  deduplicateSearchResults,
-  generateFinalReport,
-  generateResearchPlan,
-  mapSearchResultsToNumbers,
-  reasoningSearchResults,
-} from "./process";
+import { decisionMaking, generateFinalReport, generateResearchPlan, reasoningSearchResults } from "./process";
 import { WebSearchProvider } from "./provider/webSearch";
 import { Logger, logger } from "./utils/logger";
+import { mapSearchResultsToNumbers, deduplicateSearchResults } from "./utils/utils";
 
 export class DeepResearch {
   public config: DeepResearchConfig;
@@ -246,6 +240,9 @@ export class DeepResearch {
           researchPlan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
+          image_urls: this.sources.map((source) => source.image_urls).flat(),
+          links: this.sources.map((source) => source.links).flat(),
+          geo_results: this.sources.map((source) => source.geo_results).flat(),
         },
       },
       _usage: this.tokenUsage,
