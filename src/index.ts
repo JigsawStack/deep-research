@@ -4,7 +4,7 @@ import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_R
 import { decisionMaking, generateFinalReport, generateResearchPlan, reasoningSearchResults } from "./process";
 import { WebSearchProvider } from "./provider/webSearch";
 import { Logger, logger } from "./utils/logger";
-import { mapSearchResultsToNumbers, deduplicateSearchResults } from "./utils/utils";
+import { deduplicateSearchResults, mapSearchResultsToNumbers } from "./utils/utils";
 
 export class DeepResearch {
   public config: DeepResearchConfig;
