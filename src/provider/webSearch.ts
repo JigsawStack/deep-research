@@ -13,10 +13,6 @@ export class WebSearchProvider {
   private customSearchFunction: ((query: string) => Promise<WebSearchResult>) | null = null;
 
   private constructor(config: DeepResearchConfig) {
-
-    console.log("WEBSEARCH CONFIG", config.webSearch);
-    console.log("JIGSAW API KEY", config.JIGSAW_API_KEY);
-
     // If user provided a custom search function, use it
     if (config.webSearch) {
       this.customSearchFunction = config.webSearch;
