@@ -120,21 +120,15 @@ export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult
     return {
       ...result,
       search_results: {
-        results: result.search_results.results
-          .filter((item) => {
-            // Skip if we've seen this URL before
-            if (urlMap.has(item.url)) {
-              return false;
-            }
-            // Mark this URL as seen
-            urlMap.set(item.url, true);
-            return true;
-          })
-          .map((item) => {
-            return {
-              ...item,
-            };
-          }),
+        results: result.search_results.results.filter((item) => {
+          // Skip if we've seen this URL before
+          if (urlMap.has(item.url)) {
+            return false;
+          }
+          // Mark this URL as seen
+          urlMap.set(item.url, true);
+          return true;
+        }),
       },
     };
   });
