@@ -139,12 +139,30 @@ export class WebSearchProvider {
     });
 
     // Step 3: Combine search results with generated contexts
-    const resultsWithContext = nonEmptySearchResults.map((searchResult, index) => {
-      return {
-        ...searchResult,
-        context: contextResults[index],
-      };
-    });
+    const resultsWithContext = nonEmptySearchResults
+      .map((searchResult, index) => {
+        // Filter out sources with empty content and empty snippets
+        const filteredResults = searchResult.search_results.results.filter(
+          (source) => (source.content && source.content.trim() !== "") || (source.snippets && source.snippets.length > 0)
+        );
+
+        // Skip queries that end up with empty results after filtering
+        if (filteredResults.length === 0) {
+          return null;
+        }
+
+        return {
+          query: searchResult.query,
+          search_results: {
+            results: filteredResults,
+          },
+          context: contextResults[index] || "",
+          geo_results: searchResult.geo_results,
+          image_urls: searchResult.image_urls,
+          links: searchResult.links,
+        };
+      })
+      .filter((result) => result !== null);
 
     // step 4: deduplicate results
     const deduplicatedResults = deduplicateSearchResults({
