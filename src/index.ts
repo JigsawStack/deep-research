@@ -54,12 +54,7 @@ export class DeepResearch {
    */
   public validateConfig(config: DeepResearchParams) {
     // maxOutputTokens must be greater than targetOutputLength
-    if (
-      config.report &&
-      config.report.maxOutputTokens &&
-      config.report.targetOutputTokens &&
-      config.report.maxOutputTokens < config.report.targetOutputTokens
-    ) {
+    if (config.maxOutputTokens && config.targetOutputTokens && config.maxOutputTokens < config.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
@@ -68,6 +63,8 @@ export class DeepResearch {
         ...DEFAULT_CONFIG,
         ...(config || {}),
       },
+      maxOutputTokens: config.maxOutputTokens,
+      targetOutputTokens: config.targetOutputTokens,
       depth: {
         ...DEFAULT_DEPTH_CONFIG,
         ...(config.depth || {}),
@@ -75,10 +72,6 @@ export class DeepResearch {
       breadth: {
         ...DEFAULT_BREADTH_CONFIG,
         ...(config.breadth || {}),
-      },
-      report: {
-        ...DEFAULT_REPORT_CONFIG,
-        ...(config.report || {}),
       },
       JIGSAW_API_KEY:
         config.JIGSAW_API_KEY ||
@@ -206,7 +199,8 @@ export class DeepResearch {
     } = await generateFinalReport({
       sources: this.sources,
       prompt: this.prompt,
-      targetOutputTokens: this.config.report.targetOutputTokens,
+      targetOutputTokens: this.config.targetOutputTokens,
+      maxOutputTokens: this.config.maxOutputTokens,
       aiProvider: this.aiProvider,
       reasoning: this.reasoning,
       researchPlan: this.researchPlan,

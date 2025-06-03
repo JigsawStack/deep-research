@@ -204,6 +204,7 @@ export const processReportForSources = async ({
 export const generateFinalReport = async ({
   sources,
   prompt,
+  maxOutputTokens,
   targetOutputTokens,
   aiProvider,
   reasoning,
@@ -212,6 +213,7 @@ export const generateFinalReport = async ({
 }: {
   sources: WebSearchResult[];
   prompt: string;
+  maxOutputTokens?: number;
   targetOutputTokens?: number;
   aiProvider: AIProvider;
   reasoning: string;
@@ -266,6 +268,9 @@ export const generateFinalReport = async ({
     if (phase === "continuation") {
       const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
       if (targetChars && draft.length >= targetChars) {
+        phase = "done";
+      }
+      if (maxOutputTokens && draft.length >= maxOutputTokens) {
         phase = "done";
       }
     }

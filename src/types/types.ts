@@ -1,10 +1,4 @@
 import { LanguageModelV1 } from "@ai-sdk/provider";
-
-export interface ReportConfig {
-  maxOutputTokens: number;
-  targetOutputTokens?: number;
-}
-
 export interface ModelConfig {
   default: LanguageModelV1;
   reasoning: LanguageModelV1;
@@ -38,7 +32,8 @@ export interface DeepResearchConfig {
   breadth: {
     maxBreadth: number;
   };
-  report: ReportConfig;
+  maxOutputTokens: number;
+  targetOutputTokens?: number;
   logging: {
     enabled: boolean;
   };
