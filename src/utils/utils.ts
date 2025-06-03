@@ -120,8 +120,8 @@ export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult
     return {
       query: result.query,
       context: result.context,
-      searchResults: {
-        results: result.searchResults.results
+      search_results: {
+        results: result.search_results.results
           .filter((item) => {
             // Skip if we've seen this URL before
             if (urlMap.has(item.url)) {
@@ -158,8 +158,8 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
     return {
       query: result.query,
       context: result.context || "",
-      searchResults: {
-        results: result.searchResults.results.map((item) => {
+      search_results: {
+        results: result.search_results.results.map((item) => {
           // If URL hasn't been seen before, assign it a new number
           if (!urlMap.has(item.url)) {
             urlMap.set(item.url, currentNumber++);

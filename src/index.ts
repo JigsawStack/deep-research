@@ -213,7 +213,7 @@ export class DeepResearch {
         metadata: {
           prompt: this.prompt,
           reasoning: this.reasoning,
-          researchPlan: this.researchPlan,
+          research_plan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
           image_urls: this.sources

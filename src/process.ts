@@ -114,8 +114,8 @@ export const processReportForSources = async ({
   // Populate the map with reference numbers and their corresponding source info
 
   sources.forEach((source) => {
-    if (source.searchResults && Array.isArray(source.searchResults.results)) {
-      source.searchResults.results.forEach((result) => {
+    if (source.search_results && Array.isArray(source.search_results.results)) {
+      source.search_results.results.forEach((result) => {
         if (result.reference_number) {
           referenceMap.set(result.reference_number, result);
         }

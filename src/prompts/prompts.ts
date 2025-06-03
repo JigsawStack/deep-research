@@ -71,8 +71,8 @@ Sub-Queries and Sources previously generated:
 ${queries
   .map((q) => {
     const sourcesForQuery = sources?.find((s) => s.query === q);
-    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-      return `**${q}**\n${sourcesForQuery.searchResults.results
+    if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
+      return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
           (r) => `   
     [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
@@ -136,8 +136,8 @@ Sub-Queries and Sources previously generated:
 ${queries
   .map((q) => {
     const sourcesForQuery = sources?.find((s) => s.query === q);
-    if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-      return `**${q}**\n${sourcesForQuery.searchResults.results
+    if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
+      return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
           (r) => `   
     [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
@@ -295,8 +295,8 @@ const FINAL_REPORT_PROMPT = ({
     ${queries
       ?.map((q) => {
         const sourcesForQuery = sources?.find((s) => s.query === q);
-        if (sourcesForQuery && sourcesForQuery.searchResults.results.length > 0) {
-          return `**${q}**\n${sourcesForQuery.searchResults.results
+        if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
+          return `**${q}**\n${sourcesForQuery.search_results.results
             .map(
               (r) => `   
         [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      

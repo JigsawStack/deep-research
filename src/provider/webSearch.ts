@@ -83,7 +83,7 @@ export class WebSearchProvider {
 
           return {
             query: query,
-            searchResults: {
+            search_results: {
               results: cleanedResults,
             },
             links: results.links,
@@ -98,7 +98,7 @@ export class WebSearchProvider {
         console.error("Full error details:", error);
         return {
           query: query,
-          searchResults: {
+          search_results: {
             results: [],
           },
         };
@@ -122,7 +122,7 @@ export class WebSearchProvider {
     const searchResults = await this.fireWebSearches(queries);
 
     // Filter out queries with empty search results
-    const nonEmptySearchResults = searchResults.filter((result) => result.searchResults.results && result.searchResults.results.length > 0);
+    const nonEmptySearchResults = searchResults.filter((result) => result.search_results && result.search_results.results.length > 0);
 
     // If all results are empty, return an empty array
     if (nonEmptySearchResults.length === 0) {
@@ -141,7 +141,7 @@ export class WebSearchProvider {
     const resultsWithContext = nonEmptySearchResults
       .map((searchResult, index) => {
         // Filter out sources with empty content and empty snippets
-        const filteredResults = searchResult.searchResults.results.filter(
+        const filteredResults = searchResult.search_results.results.filter(
           (source) => (source.content && source.content.trim() !== "") || (source.snippets && source.snippets.length > 0)
         );
 
@@ -152,7 +152,7 @@ export class WebSearchProvider {
 
         return {
           query: searchResult.query,
-          searchResults: {
+          search_results: {
             results: filteredResults,
           },
           context: contextResults[index] || "",
@@ -183,7 +183,7 @@ export class WebSearchProvider {
       const contextResults = await Promise.all(
         queries.map(async (query) => {
           // Extract content from sources for this query
-          const querySources = sources.find((source) => source.query === query)?.searchResults.results || [];
+          const querySources = sources.find((source) => source.query === query)?.search_results.results || [];
 
           // Process sources to use snippets when content is empty
           const processedSources = querySources
