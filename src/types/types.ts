@@ -1,10 +1,4 @@
 import { LanguageModelV1 } from "@ai-sdk/provider";
-
-export interface ReportConfig {
-  maxOutputTokens: number;
-  targetOutputTokens?: number;
-}
-
 export interface ModelConfig {
   default: LanguageModelV1;
   reasoning: LanguageModelV1;
@@ -32,13 +26,10 @@ export interface WebSearchResult {
 
 export interface DeepResearchConfig {
   models?: ModelConfig;
-  depth: {
-    maxDepth: number;
-  };
-  breadth: {
-    maxBreadth: number;
-  };
-  report: ReportConfig;
+  maxBreadth: number;
+  maxDepth: number;
+  maxOutputTokens: number;
+  targetOutputTokens?: number;
   logging: {
     enabled: boolean;
   };

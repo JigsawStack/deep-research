@@ -1,10 +1,10 @@
 import { DeepResearchConfig, DeepResearchParams, WebSearchResult } from "@/types/types";
 import AIProvider from "@provider/aiProvider";
-import { DEFAULT_BREADTH_CONFIG, DEFAULT_CONFIG, DEFAULT_DEPTH_CONFIG, DEFAULT_REPORT_CONFIG } from "./config/defaults";
+import { DEFAULT_CONFIG } from "./config/defaults";
 import { decisionMaking, generateFinalReport, generateResearchPlan, reasoningSearchResults } from "./process";
 import { WebSearchProvider } from "./provider/webSearch";
 import { Logger, logger } from "./utils/logger";
-import { deduplicateSearchResults, mapSearchResultsToNumbers } from "./utils/utils";
+import { mapSearchResultsToNumbers } from "./utils/utils";
 
 export class DeepResearch {
   public config: DeepResearchConfig;
@@ -54,12 +54,7 @@ export class DeepResearch {
    */
   public validateConfig(config: DeepResearchParams) {
     // maxOutputTokens must be greater than targetOutputLength
-    if (
-      config.report &&
-      config.report.maxOutputTokens &&
-      config.report.targetOutputTokens &&
-      config.report.maxOutputTokens < config.report.targetOutputTokens
-    ) {
+    if (config.maxOutputTokens && config.targetOutputTokens && config.maxOutputTokens < config.targetOutputTokens) {
       throw new Error("maxOutputChars must be greater than targetOutputChars");
     }
 
@@ -68,18 +63,10 @@ export class DeepResearch {
         ...DEFAULT_CONFIG,
         ...(config || {}),
       },
-      depth: {
-        ...DEFAULT_DEPTH_CONFIG,
-        ...(config.depth || {}),
-      },
-      breadth: {
-        ...DEFAULT_BREADTH_CONFIG,
-        ...(config.breadth || {}),
-      },
-      report: {
-        ...DEFAULT_REPORT_CONFIG,
-        ...(config.report || {}),
-      },
+      maxOutputTokens: config.maxOutputTokens || DEFAULT_CONFIG.maxOutputTokens,
+      targetOutputTokens: config.targetOutputTokens,
+      maxDepth: config.maxDepth || DEFAULT_CONFIG.maxDepth,
+      maxBreadth: config.maxBreadth || DEFAULT_CONFIG.maxBreadth,
       JIGSAW_API_KEY:
         config.JIGSAW_API_KEY ||
         process.env.JIGSAW_API_KEY ||
@@ -142,13 +129,13 @@ export class DeepResearch {
 
       this.queries = [...(this.queries || []), ...subQueries];
       this.researchPlan = researchPlan;
-      this.config.depth.maxDepth = depth;
-      this.config.breadth.maxBreadth = breadth;
+      this.config.maxDepth = depth;
+      this.config.maxBreadth = breadth;
       this.tokenUsage.research_tokens = tokenUsage.totalTokens;
 
       logger.log(`Research plan: ${this.researchPlan}`);
       logger.log(`Research queries: ${this.queries.join("\n")}`);
-      logger.log(`Research depth and breadth: ${this.config.depth.maxDepth} ${this.config.breadth.maxBreadth}`);
+      logger.log(`Research depth and breadth: ${this.config.maxDepth} ${this.config.maxBreadth}`);
 
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
@@ -191,7 +178,7 @@ export class DeepResearch {
       this.tokenUsage.decision_tokens = usage.totalTokens;
 
       logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
-    } while (!this.decision.isComplete && iteration < this.config.depth.maxDepth);
+    } while (!this.decision.isComplete && iteration < this.config.maxDepth);
 
     // map the sources to numbers for sources
     this.sources = mapSearchResultsToNumbers({ sources: this.sources });
@@ -206,7 +193,8 @@ export class DeepResearch {
     } = await generateFinalReport({
       sources: this.sources,
       prompt: this.prompt,
-      targetOutputTokens: this.config.report.targetOutputTokens,
+      targetOutputTokens: this.config.targetOutputTokens,
+      maxOutputTokens: this.config.maxOutputTokens,
       aiProvider: this.aiProvider,
       reasoning: this.reasoning,
       researchPlan: this.researchPlan,
