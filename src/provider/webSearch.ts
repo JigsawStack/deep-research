@@ -1,6 +1,6 @@
 import { PROMPTS } from "@/prompts/prompts";
 import { DeepResearchConfig, ResearchSource, WebSearchResult } from "@/types/types";
-import { ContentCleaner } from "@utils/utils";
+import { ContentCleaner, deduplicateSearchResults, mapSearchResultsToNumbers } from "@utils/utils";
 import { generateObject } from "ai";
 import { createExponetialDelay, retryAsync } from "ts-retry";
 import { z } from "zod";
@@ -73,17 +73,10 @@ export class WebSearchProvider {
           const cleanedResults = results.results
             .slice(0, 5)
             .map((result) => {
-              const source: ResearchSource = {
-                url: result.url,
-                title: result.title,
-                content: result.content,
-                snippets: result.snippets,
-                is_safe: result.is_safe,
-              };
-              const cleaned = ContentCleaner.cleanContent(source);
+              const cleaned = ContentCleaner.cleanContent(result);
               return {
                 ...cleaned,
-              } as ResearchSource;
+              };
             })
             // Filter out sources with empty content and empty snippets early
             .filter((source) => (source.content && source.content.length > 0) || (source.snippets && source.snippets.length > 0));
@@ -93,6 +86,9 @@ export class WebSearchProvider {
             searchResults: {
               results: cleanedResults,
             },
+            links: results.links,
+            image_urls: results.image_urls,
+            geo_results: results.geo_results,
           };
         }
 
@@ -120,7 +116,8 @@ export class WebSearchProvider {
     queries,
     prompt,
     aiProvider,
-  }: { queries: string[]; prompt: string; aiProvider: AIProvider }): Promise<WebSearchResult[]> {
+    sources,
+  }: { queries: string[]; prompt: string; aiProvider: AIProvider; sources: WebSearchResult[] }): Promise<WebSearchResult[]> {
     // Step 1: Fire web searches for all queries
     const searchResults = await this.fireWebSearches(queries);
 
@@ -161,11 +158,15 @@ export class WebSearchProvider {
           context: contextResults[index] || "",
           geo_results: searchResult.geo_results,
           image_urls: searchResult.image_urls,
+          links: searchResult.links,
         };
       })
       .filter((result) => result !== null);
 
-    return resultsWithContext;
+    // step 4: deduplicate results
+    const deduplicatedResults = deduplicateSearchResults({ sources: [...sources, ...resultsWithContext] });
+
+    return deduplicatedResults;
   }
 
   /**
