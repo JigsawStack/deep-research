@@ -9,7 +9,7 @@ export interface ResearchSource {
   url: string;
   title?: string;
   content?: string;
-  referenceNumber?: number;
+  reference_number?: number;
   snippets?: string[];
   is_safe?: boolean;
 }

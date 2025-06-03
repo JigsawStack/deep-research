@@ -167,7 +167,7 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
 
           return {
             ...item,
-            referenceNumber: urlMap.get(item.url) || 0,
+            reference_number: urlMap.get(item.url) || 0,
           };
         }),
       },

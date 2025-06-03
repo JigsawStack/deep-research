@@ -22,7 +22,7 @@ ${queries
       return `**${q}**\n${sourcesForQuery
         .map(
           (r) => `   
-    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -75,7 +75,7 @@ ${queries
       return `**${q}**\n${sourcesForQuery.searchResults.results
         .map(
           (r) => `   
-    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -140,7 +140,7 @@ ${queries
       return `**${q}**\n${sourcesForQuery.searchResults.results
         .map(
           (r) => `   
-    [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -299,7 +299,7 @@ const FINAL_REPORT_PROMPT = ({
           return `**${q}**\n${sourcesForQuery.searchResults.results
             .map(
               (r) => `   
-        [${r.referenceNumber}] ${r.title || "No title"} (${r.url})\n      
+        [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
         Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
             )
             .join("\n")}`;

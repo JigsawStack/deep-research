@@ -116,8 +116,8 @@ export const processReportForSources = async ({
   sources.forEach((source) => {
     if (source.searchResults && Array.isArray(source.searchResults.results)) {
       source.searchResults.results.forEach((result) => {
-        if (result.referenceNumber) {
-          referenceMap.set(result.referenceNumber, result);
+        if (result.reference_number) {
+          referenceMap.set(result.reference_number, result);
         }
       });
     }
