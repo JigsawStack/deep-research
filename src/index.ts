@@ -216,18 +216,18 @@ export class DeepResearch {
           research_plan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
-          image_urls: this.sources
-            .map((source) => source.image_urls)
-            .flat()
-            .filter(Boolean),
-          links: this.sources
-            .map((source) => source.links)
-            .flat()
-            .filter(Boolean),
-          geo_results: this.sources
-            .map((source) => source.geo_results)
-            .flat()
-            .filter(Boolean),
+          // image_urls: this.sources
+          //   .map((source) => source.image_urls)
+          //   .flat()
+          //   .filter(Boolean),
+          // links: this.sources
+          //   .map((source) => source.links)
+          //   .flat()
+          //   .filter(Boolean),
+          // geo_results: this.sources
+          //   .map((source) => source.geo_results)
+          //   .flat()
+          //   .filter(Boolean),
         },
       },
       _usage: this.tokenUsage,

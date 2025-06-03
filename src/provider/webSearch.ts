@@ -82,13 +82,10 @@ export class WebSearchProvider {
             .filter((source) => (source.content && source.content.length > 0) || (source.snippets && source.snippets.length > 0));
 
           return {
-            query: query,
+            ...results,
             search_results: {
               results: cleanedResults,
             },
-            links: results.links,
-            image_urls: results.image_urls,
-            geo_results: results.geo_results,
           };
         }
 
@@ -151,14 +148,10 @@ export class WebSearchProvider {
         }
 
         return {
-          query: searchResult.query,
+          ...searchResult,
           search_results: {
             results: filteredResults,
           },
-          context: contextResults[index] || "",
-          geo_results: searchResult.geo_results,
-          image_urls: searchResult.image_urls,
-          links: searchResult.links,
         };
       })
       .filter((result) => result !== null);
