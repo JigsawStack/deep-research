@@ -1,6 +1,6 @@
 import { PROMPTS } from "@/prompts/prompts";
-import { DeepResearchConfig, ResearchSource, WebSearchResult } from "@/types/types";
-import { ContentCleaner, deduplicateSearchResults, mapSearchResultsToNumbers } from "@utils/utils";
+import { DeepResearchConfig, WebSearchResult } from "@/types/types";
+import { ContentCleaner, deduplicateSearchResults } from "@utils/utils";
 import { generateObject } from "ai";
 import { createExponetialDelay, retryAsync } from "ts-retry";
 import { z } from "zod";
