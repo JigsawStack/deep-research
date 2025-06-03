@@ -147,7 +147,9 @@ export class DeepResearch {
         sources: this.sources,
       });
 
+
       this.sources = searchResults;
+      console.log(this.sources);
 
       // step 3: reasoning about the search results
       logger.log(`[Step 3] Reasoning about the search results...`);

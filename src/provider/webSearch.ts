@@ -119,45 +119,37 @@ export class WebSearchProvider {
     const searchResults = await this.fireWebSearches(queries);
 
     // Filter out queries with empty search results
-    const nonEmptySearchResults = searchResults.filter((result) => result.search_results && result.search_results.results.length > 0);
+    const nonEmptySearchResults = searchResults.filter(
+      (result) => result.search_results && result.search_results.results && result.search_results.results.length > 0
+    );
 
     // If all results are empty, return an empty array
     if (nonEmptySearchResults.length === 0) {
+      console.warn("No search results found for any query");
       return [];
     }
 
     // Step 2: Generate context for the search results with non-empty results
+    const contextQueries = nonEmptySearchResults.map((result) => result.query);
     const contextResults = await this.contextGenerator({
-      queries: nonEmptySearchResults.map((result) => result.query),
+      queries: contextQueries,
       sources: nonEmptySearchResults,
       prompt,
       aiProvider,
     });
 
     // Step 3: Combine search results with generated contexts
-    const resultsWithContext = nonEmptySearchResults
-      .map((searchResult, index) => {
-        // Filter out sources with empty content and empty snippets
-        const filteredResults = searchResult.search_results.results.filter(
-          (source) => (source.content && source.content.trim() !== "") || (source.snippets && source.snippets.length > 0)
-        );
-
-        // Skip queries that end up with empty results after filtering
-        if (filteredResults.length === 0) {
-          return null;
-        }
-
-        return {
-          ...searchResult,
-          search_results: {
-            results: filteredResults,
-          },
-        };
-      })
-      .filter((result) => result !== null);
+    const resultsWithContext = nonEmptySearchResults.map((searchResult, index) => {
+      return {
+        ...searchResult,
+        context: contextResults[index],
+      };
+    });
 
     // step 4: deduplicate results
-    const deduplicatedResults = deduplicateSearchResults({ sources: [...sources, ...resultsWithContext] });
+    const deduplicatedResults = deduplicateSearchResults({
+      sources: [...sources, ...resultsWithContext],
+    });
 
     return deduplicatedResults;
   }

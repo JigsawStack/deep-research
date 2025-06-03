@@ -191,7 +191,8 @@ ${queries
       return `**Query: ${q}**\n
     Context: ${sourcesForQuery.context}`;
     } else {
-      throw new Error(`No sources found for query: ${q}`);
+      return `**Query: ${q}**\n
+    Context: No context found`;
     }
   })
   .join("\n")}
