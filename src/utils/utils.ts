@@ -118,28 +118,18 @@ export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult
 
   return sources.map((result) => {
     return {
-      query: result.query,
-      context: result.context,
-      searchResults: {
-        results: result.searchResults.results
-          .filter((item) => {
-            // Skip if we've seen this URL before
-            if (urlMap.has(item.url)) {
-              return false;
-            }
-            // Mark this URL as seen
-            urlMap.set(item.url, true);
-            return true;
-          })
-          .map((item) => {
-            return {
-              ...item,
-            };
-          }),
+      ...result,
+      search_results: {
+        results: result.search_results.results.filter((item) => {
+          // Skip if we've seen this URL before
+          if (urlMap.has(item.url)) {
+            return false;
+          }
+          // Mark this URL as seen
+          urlMap.set(item.url, true);
+          return true;
+        }),
       },
-      image_urls: result.image_urls,
-      links: result.links,
-      geo_results: result.geo_results,
     };
   });
 };
@@ -156,10 +146,9 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
 
   return sources.map((result) => {
     return {
-      query: result.query,
-      context: result.context || "",
-      searchResults: {
-        results: result.searchResults.results.map((item) => {
+      ...result,
+      search_results: {
+        results: result.search_results.results.map((item) => {
           // If URL hasn't been seen before, assign it a new number
           if (!urlMap.has(item.url)) {
             urlMap.set(item.url, currentNumber++);
@@ -171,9 +160,6 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
           };
         }),
       },
-      image_urls: result.image_urls,
-      links: result.links,
-      geo_results: result.geo_results,
     };
   });
 };

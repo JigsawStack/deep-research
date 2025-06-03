@@ -15,7 +15,7 @@ export interface ResearchSource {
 }
 export interface WebSearchResult {
   query: string;
-  searchResults: {
+  search_results: {
     results: ResearchSource[];
   };
   context?: string;

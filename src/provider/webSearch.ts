@@ -82,13 +82,10 @@ export class WebSearchProvider {
             .filter((source) => (source.content && source.content.length > 0) || (source.snippets && source.snippets.length > 0));
 
           return {
-            query: query,
-            searchResults: {
+            ...results,
+            search_results: {
               results: cleanedResults,
             },
-            links: results.links,
-            image_urls: results.image_urls,
-            geo_results: results.geo_results,
           };
         }
 
@@ -98,7 +95,7 @@ export class WebSearchProvider {
         console.error("Full error details:", error);
         return {
           query: query,
-          searchResults: {
+          search_results: {
             results: [],
           },
         };
@@ -122,16 +119,20 @@ export class WebSearchProvider {
     const searchResults = await this.fireWebSearches(queries);
 
     // Filter out queries with empty search results
-    const nonEmptySearchResults = searchResults.filter((result) => result.searchResults.results && result.searchResults.results.length > 0);
+    const nonEmptySearchResults = searchResults.filter(
+      (result) => result.search_results && result.search_results.results && result.search_results.results.length > 0
+    );
 
     // If all results are empty, return an empty array
     if (nonEmptySearchResults.length === 0) {
+      console.warn("No search results found for any query");
       return [];
     }
 
     // Step 2: Generate context for the search results with non-empty results
+    const contextQueries = nonEmptySearchResults.map((result) => result.query);
     const contextResults = await this.contextGenerator({
-      queries: nonEmptySearchResults.map((result) => result.query),
+      queries: contextQueries,
       sources: nonEmptySearchResults,
       prompt,
       aiProvider,
@@ -141,7 +142,7 @@ export class WebSearchProvider {
     const resultsWithContext = nonEmptySearchResults
       .map((searchResult, index) => {
         // Filter out sources with empty content and empty snippets
-        const filteredResults = searchResult.searchResults.results.filter(
+        const filteredResults = searchResult.search_results.results.filter(
           (source) => (source.content && source.content.trim() !== "") || (source.snippets && source.snippets.length > 0)
         );
 
@@ -152,7 +153,7 @@ export class WebSearchProvider {
 
         return {
           query: searchResult.query,
-          searchResults: {
+          search_results: {
             results: filteredResults,
           },
           context: contextResults[index] || "",
@@ -164,7 +165,9 @@ export class WebSearchProvider {
       .filter((result) => result !== null);
 
     // step 4: deduplicate results
-    const deduplicatedResults = deduplicateSearchResults({ sources: [...sources, ...resultsWithContext] });
+    const deduplicatedResults = deduplicateSearchResults({
+      sources: [...sources, ...resultsWithContext],
+    });
 
     return deduplicatedResults;
   }
@@ -183,7 +186,7 @@ export class WebSearchProvider {
       const contextResults = await Promise.all(
         queries.map(async (query) => {
           // Extract content from sources for this query
-          const querySources = sources.find((source) => source.query === query)?.searchResults.results || [];
+          const querySources = sources.find((source) => source.query === query)?.search_results.results || [];
 
           // Process sources to use snippets when content is empty
           const processedSources = querySources
