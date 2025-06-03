@@ -26,12 +26,8 @@ export interface WebSearchResult {
 
 export interface DeepResearchConfig {
   models?: ModelConfig;
-  depth: {
-    maxDepth: number;
-  };
-  breadth: {
-    maxBreadth: number;
-  };
+  maxBreadth: number;
+  maxDepth: number;
   maxOutputTokens: number;
   targetOutputTokens?: number;
   logging: {
