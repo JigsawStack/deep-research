@@ -26,7 +26,6 @@ export class DeepResearch {
   public queries: string[] = [];
   public sources: WebSearchResult[] = [];
   public aiProvider: AIProvider;
-  private iterationCount: number = 0;
   private webSearchProvider: WebSearchProvider;
 
   constructor(config: DeepResearchParams) {
@@ -154,23 +153,14 @@ export class DeepResearch {
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
-      const initialSearchResults = await this.webSearchProvider.searchAndGenerateContext({
+      const searchResults = await this.webSearchProvider.searchAndGenerateContext({
         queries: this.queries,
         prompt: this.prompt,
         aiProvider: this.aiProvider,
+        sources: this.sources,
       });
 
-      // step 2.5: deduplicate results
-      logger.log(`Received ${initialSearchResults.length} initial search results`);
-      logger.log(`[Step 2.5] Deduplicating search results...`);
-
-      this.sources = [...this.sources, ...initialSearchResults];
-
-      const deduplicatedResults = deduplicateSearchResults({ sources: this.sources });
-
-      // save it to the class for later use
-      this.sources = deduplicatedResults;
-      logger.log("DEDUPLICATED RESULTS", deduplicatedResults);
+      this.sources = searchResults;
 
       // step 3: reasoning about the search results
       logger.log(`[Step 3] Reasoning about the search results...`);
@@ -234,15 +224,22 @@ export class DeepResearch {
         bibliography,
         metadata: {
           prompt: this.prompt,
-          iterationCount: this.iterationCount,
-          completionStatus: this.decision.isComplete,
           reasoning: this.reasoning,
           researchPlan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
-          image_urls: this.sources.map((source) => source.image_urls).flat(),
-          links: this.sources.map((source) => source.links).flat(),
-          geo_results: this.sources.map((source) => source.geo_results).flat(),
+          image_urls: this.sources
+            .map((source) => source.image_urls)
+            .flat()
+            .filter(Boolean),
+          links: this.sources
+            .map((source) => source.links)
+            .flat()
+            .filter(Boolean),
+          geo_results: this.sources
+            .map((source) => source.geo_results)
+            .flat()
+            .filter(Boolean),
         },
       },
       _usage: this.tokenUsage,

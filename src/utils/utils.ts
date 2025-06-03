@@ -137,6 +137,9 @@ export const deduplicateSearchResults = ({ sources }: { sources: WebSearchResult
             };
           }),
       },
+      image_urls: result.image_urls,
+      links: result.links,
+      geo_results: result.geo_results,
     };
   });
 };
@@ -156,7 +159,6 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
       query: result.query,
       context: result.context || "",
       searchResults: {
-        // ai_overview: result.searchResults.ai_overview,
         results: result.searchResults.results.map((item) => {
           // If URL hasn't been seen before, assign it a new number
           if (!urlMap.has(item.url)) {
@@ -169,6 +171,9 @@ export const mapSearchResultsToNumbers = ({ sources }: { sources: WebSearchResul
           };
         }),
       },
+      image_urls: result.image_urls,
+      links: result.links,
+      geo_results: result.geo_results,
     };
   });
 };
