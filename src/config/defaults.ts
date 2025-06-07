@@ -1,7 +1,7 @@
 export const DEFAULT_CONFIG = {
-  maxDepth: 3,
-  maxBreadth: 3,
-  maxOutputTokens: 32000,
+  max_depth: 3,
+  max_breadth: 3,
+  max_output_tokens: 32000,
   logging: {
     enabled: false,
   },
