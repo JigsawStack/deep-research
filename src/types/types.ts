@@ -26,10 +26,10 @@ export interface WebSearchResult {
 
 export interface DeepResearchConfig {
   models?: ModelConfig;
-  maxBreadth: number;
-  maxDepth: number;
-  maxOutputTokens: number;
-  targetOutputTokens?: number;
+  max_breadth: number;
+  max_depth: number;
+  max_output_tokens: number;
+  target_output_tokens?: number;
   logging: {
     enabled: boolean;
   };
@@ -37,7 +37,7 @@ export interface DeepResearchConfig {
   OPENAI_API_KEY?: string;
   DEEPINFRA_API_KEY?: string;
 
-  webSearch?: (query: string) => Promise<WebSearchResult>;
+  web_search?: (query: string) => Promise<WebSearchResult>;
 }
 
 export type DeepResearchParams = Partial<DeepResearchConfig>;

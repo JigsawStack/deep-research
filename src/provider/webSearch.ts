@@ -14,8 +14,8 @@ export class WebSearchProvider {
 
   private constructor(config: DeepResearchConfig) {
     // If user provided a custom search function, use it
-    if (config.webSearch) {
-      this.customSearchFunction = config.webSearch;
+    if (config.web_search) {
+      this.customSearchFunction = config.web_search;
     }
 
     // If a JIGSAW_API_KEY is provided, initialize JigsawProvider as fallback

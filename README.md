@@ -65,7 +65,7 @@ console.log(result.data.bibliography);
 ### Advanced Usage
 
 ```typescript
-import { createDeepResearch } from "open-deep-research";
+import { createDeepResearch } from "deep-research";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createDeepInfra } from "@ai-sdk/deepinfra";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -90,16 +90,10 @@ const openaiModel = openaiProvider("gpt-4o");
 
 // Create instance with custom configuration
 const deepResearch = createDeepResearch({
-  report: {
-    maxOutputTokens: 30000, // Hard limit on report length
-    targetOutputTokens: 10000, // Target report length
-  },
-  depth: {
-    maxDepth: 4, // How many iterations of research to perform
-  },
-  breadth: {
-    maxBreadth: 3, // How many subqueries to generate
-  },
+  max_output_tokens: 30000, // Hard upper limit of tokens
+  target_output_tokens: 10000, // Target report length
+  max_depth: 4, // specify how many iterations of research to perform
+  max_breadth: 3, // specify how many subqueries to generate
   models: {
     default: openaiModel, // Custom models from AI SDK
     reasoning: deepseekModel,
@@ -124,13 +118,13 @@ console.log(result.data.bibliography);
 
 | Category | Option | Type | Default | Description |
 |----------|--------|------|---------|-------------|
-| **depth** | maxDepth | Number | 3 | Controls how many iterations of research the system will perform. Higher values allow for more thorough, multi-hop research. The system will continue researching until it has a complete answer or reaches this limit. |
-| **breadth** | maxBreadth | Number | 3 | Controls how many subqueries are generated for each research iteration. Higher values enable wider exploration of the topic. Determines how many parallel search paths are pursued. |
-| **report** | maxOutputTokens | Number | 32000 | Hard upper limit on the length of the final report. Must be greater than targetOutputTokens. |
-| | targetOutputTokens | Number | optional | The ideal length for the generated report. The system will try to produce a report of approximately this length. |
-| **models** | default | LanguageModelV1 | GPT-4.1 | The primary model used for most operations. |
+| **max_depth** | - | Number | 3 | Controls how many iterations of research the system will perform. Higher values allow for more thorough, multi-hop research. The system will continue researching until it has a complete answer or reaches this limit. |
+| **max_breadth** | - | Number | 3 | Controls how many subqueries are generated for each research iteration. Higher values enable wider exploration of the topic. Determines how many parallel search paths are pursued. |
+| **max_output_tokens** | - | Number | 32000 | Hard upper limit on the length of the final report. Must be greater than target_output_tokens. |
+| **target_output_tokens** | - | Number | optional | The ideal length for the generated report. The system will try to produce a report of approximately this length. |
+| **models** | default | LanguageModelV1 | GPT-4o | The primary model used for most operations. |
 | | reasoning | LanguageModelV1 | DeepSeek-R1 | Model used for reasoning about search results. |
-| | output | LanguageModelV1 | GPT-4.1 | Model used for generating the final report. |
+| | output | LanguageModelV1 | GPT-4o | Model used for generating the final report. |
 | **logging** | enabled | Boolean | false | When set to true, enables detailed console logging. Helpful for debugging and understanding the research process. |
 | **API Keys** | JIGSAW_API_KEY | String | required | For accessing the JigsawStack API for web searches. |
 | | OPENAI_API_KEY | String | required | For OpenAI model access. |
