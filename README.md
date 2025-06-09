@@ -127,9 +127,8 @@ console.log(result.data.bibliography);
 | | output | LanguageModelV1 | GPT-4o | Model used for generating the final report. |
 | **logging** | enabled | Boolean | false | When set to true, enables detailed console logging. Helpful for debugging and understanding the research process. |
 | **API Keys** | JIGSAW_API_KEY | String | required | For accessing the JigsawStack API for web searches. |
-| | OPENAI_API_KEY | String | required | For OpenAI model access. |
-| | GEMINI_API_KEY | String | required | For Google Gemini model access. |
-| | DEEPINFRA_API_KEY | String | required | For DeepInfra model access. |
+| | OPENAI_API_KEY | String | optional if custom models provided | For OpenAI model access. |
+| | DEEPINFRA_API_KEY | String | optional if custom models provided | For DeepInfra model access. |
 
 ## 🧩 How It Works
 
