@@ -270,7 +270,7 @@ export const generateFinalReport = async ({
       if (targetChars && draft.length >= targetChars) {
         phase = "done";
       }
-      if (maxOutputTokens && draft.length >= maxOutputTokens) {
+      if (maxOutputTokens && draft.length >= maxOutputTokens / 3 - 2000) {
         phase = "done";
       }
     }
