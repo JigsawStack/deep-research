@@ -90,7 +90,7 @@ User Prompt: ${prompt}
 `.trim();
 
   const schema = z.object({
-    subQueries: z.array(z.string()).min(1).max(config.max_breadth).describe("A list of search queries to thoroughly research the prompt"),
+    subQueries: z.array(z.string()).min(1).max(config.max_breadth).describe("An array of high-quality, non-redundant search queries (min 1, max N) that together provide comprehensive research coverage for the user prompt"),
     researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
     depth: z.number().min(1).max(config.max_depth).describe("A number representing the depth of the research"),
     breadth: z.number().min(1).max(config.max_breadth).describe("A number representing the breadth of the research"),
