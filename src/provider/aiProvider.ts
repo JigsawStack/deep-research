@@ -38,7 +38,7 @@ export class AIProvider {
     // Set default models
     this.models = {
       default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-4.1"),
-      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY! }).languageModel("deepseek-ai/DeepSeek-R1"),
+      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY! }).languageModel("deepseek-ai/DeepSeek-R1-0528"),
       output: outputModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-4.1"),
     };
   }
