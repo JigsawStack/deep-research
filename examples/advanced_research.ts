@@ -25,10 +25,10 @@ async function advancedResearch() {
   const openaiModel = openaiProvider("gpt-4o");
 
   const advancedResearch = createDeepResearch({
-    maxOutputTokens: 30000, // Hard upper limit of tokens
-    targetOutputTokens: 10000,
-    maxDepth: 4, // specify how many iterations of research to perform (how deep the research should be)
-    maxBreadth: 3, // specify how many subqueries to generate (how broad the research should be)
+    max_output_tokens: 30000, // Hard upper limit of tokens
+    target_output_tokens: 10000,
+    max_depth: 4, // specify how many iterations of research to perform (how deep the research should be)
+    max_breadth: 3, // specify how many subqueries to generate (how broad the research should be)
     models: {
       output: geminiModel, // pass in specific models
       reasoning: deepseekModel,
