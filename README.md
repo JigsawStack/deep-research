@@ -2,7 +2,7 @@
 
 Deep Research is an open source library for conducting deep, multi-hop research with reasoning capabilities. It performs focused web searches with recursive exploration to provide comprehensive, evidence-backed answers to complex questions.
 
-[Perplexity](https://www.perplexity.ai/hub/blog/introducing-perplexity-deep-research) and [OpenAI](https://openai.com/index/introducing-deep-research/)'s Deep Research is gatekeeped and close sourced. We built something opposite. Truly open, fully customizable, deep research framework.
+[Perplexity](https://www.perplexity.ai/hub/blog/introducing-perplexity-deep-research) and [OpenAI](https://openai.com/index/introducing-deep-research/)'s Deep Research is gatekeeped and close sourced, So we decided to built the opposite—an open, fully customizable deep research framework.
 
 ![Deep Research Architecture](/public/open_deep_research_diagram.png)
 
