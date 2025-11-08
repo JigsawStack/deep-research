@@ -37,9 +37,9 @@ export class AIProvider {
   }) {
     // Set default models
     this.models = {
-      default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-4.1"),
-      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY! }).languageModel("deepseek-ai/DeepSeek-R1-0528"),
-      output: outputModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-4.1"),
+      default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
+      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY! }).languageModel("zai-org/GLM-4.6"),
+      output: outputModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
     };
   }
 
