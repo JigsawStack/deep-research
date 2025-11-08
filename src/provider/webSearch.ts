@@ -214,6 +214,7 @@ export class WebSearchProvider {
               queries: [query],
               research_sources: processedSources,
             }),
+            maxRetries: 3,
             schema: z.object({
               context: z.string().describe("The context overview"),
             }),

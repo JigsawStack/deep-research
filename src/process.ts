@@ -34,7 +34,7 @@ export const decisionMaking = async ({
     system: decisionMakingPrompt.system,
     prompt: decisionMakingPrompt.user,
     schema: decisionMakingPrompt.schema,
-    temperature: 0,
+    maxRetries: 3,
   });
 
   return { decision: decisionMakingResponse, usage: decisionMakingResponse.usage };
@@ -249,6 +249,7 @@ export const generateFinalReport = async ({
       model: aiProvider.getModel("output"),
       system: reportPrompt.system,
       prompt: reportPrompt.user,
+
       schema: reportPrompt.schema,
       experimental_repairText: async ({ text, error }) => {
         // Simple repair attempt for unclosed JSON strings
@@ -319,6 +320,7 @@ export const generateResearchPlan = async ({
     // Generate the research plan using the AI provider
     const result = await generateObject({
       model: aiProvider.getModel("default"),
+      maxRetries: 3,
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       schema: researchPlanPrompt.schema,
