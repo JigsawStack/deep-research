@@ -126,7 +126,6 @@ export class DeepResearch {
         sources: this.sources,
         config: this.config,
       });
-
       this.queries = [...(this.queries || []), ...subQueries];
       this.researchPlan = researchPlan;
       this.config.max_depth = depth;
@@ -146,7 +145,6 @@ export class DeepResearch {
         aiProvider: this.aiProvider,
         sources: this.sources,
       });
-
       this.sources = searchResults;
 
       // step 3: reasoning about the search results
@@ -160,7 +158,6 @@ export class DeepResearch {
       });
       this.reasoning = reasoning.reasoning;
       this.tokenUsage.reasoning_tokens = reasoning.usage.totalTokens;
-
       logger.log(`Reasoning: ${reasoning}`);
 
       // step 4: decision making
@@ -176,7 +173,6 @@ export class DeepResearch {
 
       this.decision = decision.object;
       this.tokenUsage.decision_tokens = usage.totalTokens;
-
       logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
     } while (!this.decision.isComplete && iteration < this.config.max_depth);
 
@@ -200,11 +196,9 @@ export class DeepResearch {
       researchPlan: this.researchPlan,
       queries: this.queries,
     });
-
     this.tokenUsage.report_tokens = reportTokenUsage;
     this.tokenUsage.total_tokens =
       this.tokenUsage.research_tokens + this.tokenUsage.reasoning_tokens + this.tokenUsage.decision_tokens + this.tokenUsage.report_tokens;
-
     return {
       status: "success",
       data: {
@@ -216,18 +210,6 @@ export class DeepResearch {
           research_plan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
-          // image_urls: this.sources
-          //   .map((source) => source.image_urls)
-          //   .flat()
-          //   .filter(Boolean),
-          // links: this.sources
-          //   .map((source) => source.links)
-          //   .flat()
-          //   .filter(Boolean),
-          // geo_results: this.sources
-          //   .map((source) => source.geo_results)
-          //   .flat()
-          //   .filter(Boolean),
         },
       },
       _usage: this.tokenUsage,
