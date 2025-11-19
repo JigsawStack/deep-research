@@ -113,11 +113,29 @@ export class DeepResearch {
     this.prompt = prompt;
     let iteration = 0;
 
+    // Initialize timing variables for cumulative totals
+    let researchPlanDuration = 0;
+    let searchResultsDuration = 0;
+    let reasoningDuration = 0;
+    let decisionDuration = 0;
+
+    // Track detailed timing for each iteration
+    const iterationTimings: Array<{
+      iteration: number;
+      researchPlan: number;
+      searchResults: number;
+      reasoning: number;
+      decision: number;
+      total: number;
+    }> = [];
+
     do {
       iteration++;
 
+      const iterationStartTime = performance.now();
       logger.log(`[Step 1] Generating research plan... at ${iteration}`);
 
+      let researchPlanStartTime = performance.now();
       const { subQueries, researchPlan, depth, breadth, tokenUsage } = await generateResearchPlan({
         aiProvider: this.aiProvider,
         prompt: this.prompt,
@@ -126,7 +144,10 @@ export class DeepResearch {
         sources: this.sources,
         config: this.config,
       });
-
+      let researchPlanEndTime = performance.now();
+      const currentResearchPlanDuration = researchPlanEndTime - researchPlanStartTime;
+      researchPlanDuration += currentResearchPlanDuration;
+      logger.log(`Research plan generated in ${currentResearchPlanDuration} milliseconds`);
       this.queries = [...(this.queries || []), ...subQueries];
       this.researchPlan = researchPlan;
       this.config.max_depth = depth;
@@ -140,17 +161,22 @@ export class DeepResearch {
       // step 2: fire web searches
       logger.log(`[Step 2] Running initial web searches with ${this.queries.length} queries...`);
 
+      let searchResultsStartTime = performance.now();
       const searchResults = await this.webSearchProvider.searchAndGenerateContext({
         queries: this.queries,
         prompt: this.prompt,
         aiProvider: this.aiProvider,
         sources: this.sources,
       });
-
+      let searchResultsEndTime = performance.now();
+      const currentSearchResultsDuration = searchResultsEndTime - searchResultsStartTime;
+      searchResultsDuration += currentSearchResultsDuration;
+      logger.log(`Search results generated in ${currentSearchResultsDuration} milliseconds`);
       this.sources = searchResults;
 
       // step 3: reasoning about the search results
       logger.log(`[Step 3] Reasoning about the search results...`);
+      let reasoningStartTime = performance.now();
       const reasoning = await reasoningSearchResults({
         prompt: this.prompt,
         researchPlan: this.researchPlan,
@@ -160,11 +186,15 @@ export class DeepResearch {
       });
       this.reasoning = reasoning.reasoning;
       this.tokenUsage.reasoning_tokens = reasoning.usage.totalTokens;
-
       logger.log(`Reasoning: ${reasoning}`);
+      let reasoningEndTime = performance.now();
+      const currentReasoningDuration = reasoningEndTime - reasoningStartTime;
+      reasoningDuration += currentReasoningDuration;
+      logger.log(`Reasoning generated in ${currentReasoningDuration} milliseconds`);
 
       // step 4: decision making
       logger.log(`[Step 4] Decision making...`);
+      let decisionStartTime = performance.now();
       const { decision, usage } = await decisionMaking({
         reasoning: this.reasoning,
         prompt: this.prompt,
@@ -176,8 +206,22 @@ export class DeepResearch {
 
       this.decision = decision.object;
       this.tokenUsage.decision_tokens = usage.totalTokens;
-
+      let decisionEndTime = performance.now();
+      const currentDecisionDuration = decisionEndTime - decisionStartTime;
+      decisionDuration += currentDecisionDuration;
+      logger.log(`Decision making generated in ${currentDecisionDuration} milliseconds`);
       logger.log(`Decision making: ${this.decision.isComplete} ${this.decision.reason}`);
+
+      // Record this iteration's timing
+      const iterationEndTime = performance.now();
+      iterationTimings.push({
+        iteration,
+        researchPlan: currentResearchPlanDuration,
+        searchResults: currentSearchResultsDuration,
+        reasoning: currentReasoningDuration,
+        decision: currentDecisionDuration,
+        total: iterationEndTime - iterationStartTime,
+      });
     } while (!this.decision.isComplete && iteration < this.config.max_depth);
 
     // map the sources to numbers for sources
@@ -186,6 +230,7 @@ export class DeepResearch {
     // step 5: generating report
     logger.log(`[Step 5] Generating report...`);
 
+    let generateReportStartTime = performance.now();
     const {
       report,
       bibliography,
@@ -200,11 +245,14 @@ export class DeepResearch {
       researchPlan: this.researchPlan,
       queries: this.queries,
     });
-
+    let generateReportEndTime = performance.now();
+    let generateReportDuration = generateReportEndTime - generateReportStartTime;
+    logger.log(`Report generated in ${generateReportDuration} milliseconds`);
     this.tokenUsage.report_tokens = reportTokenUsage;
     this.tokenUsage.total_tokens =
       this.tokenUsage.research_tokens + this.tokenUsage.reasoning_tokens + this.tokenUsage.decision_tokens + this.tokenUsage.report_tokens;
 
+    logger.log(`Total research time: ${generateReportDuration} milliseconds`);
     return {
       status: "success",
       data: {
@@ -216,20 +264,17 @@ export class DeepResearch {
           research_plan: this.researchPlan,
           queries: this.queries,
           sources: this.sources,
-          // image_urls: this.sources
-          //   .map((source) => source.image_urls)
-          //   .flat()
-          //   .filter(Boolean),
-          // links: this.sources
-          //   .map((source) => source.links)
-          //   .flat()
-          //   .filter(Boolean),
-          // geo_results: this.sources
-          //   .map((source) => source.geo_results)
-          //   .flat()
-          //   .filter(Boolean),
         },
       },
+      duration: {
+        researchPlan: researchPlanDuration,
+        searchResults: searchResultsDuration,
+        reasoning: reasoningDuration,
+        decision: decisionDuration,
+        generateReport: generateReportDuration,
+        total: researchPlanDuration + searchResultsDuration + reasoningDuration + decisionDuration + generateReportDuration,
+      },
+      iterationTimings,
       _usage: this.tokenUsage,
     };
   }

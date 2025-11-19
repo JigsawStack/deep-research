@@ -6,7 +6,13 @@
     "node": ">=18"
   },
   "homepage": "https://github.com/JigsawStack/deep-research",
-  "keywords": ["ai", "framework", "deep-research", "web-search", "reasoning"],
+  "keywords": [
+    "ai",
+    "framework",
+    "deep-research",
+    "web-search",
+    "reasoning"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -20,7 +26,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
-  "files": ["dist/**"],
+  "files": [
+    "dist/**"
+  ],
   "exports": {
     "require": {
       "types": "./dist/index.d.cts",
@@ -44,7 +52,7 @@
     "@ai-sdk/groq": "^1.1.2",
     "@ai-sdk/openai": "^1.1.9",
     "ai": "^4.3.16",
-    "jigsawstack": "^0.2.7",
+    "jigsawstack": "^0.3.7",
     "json-schema": "^0.4.0",
     "ts-retry": "^6.0.0",
     "zod": "^3.24.1"

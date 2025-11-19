@@ -1,9 +1,8 @@
 import { PROMPTS } from "@/prompts/prompts";
 import { DeepResearchConfig, WebSearchResult } from "@/types/types";
 import { ContentCleaner, deduplicateSearchResults } from "@utils/utils";
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { createExponetialDelay, retryAsync } from "ts-retry";
-import { z } from "zod";
 import AIProvider from "./aiProvider";
 import { JigsawProvider } from "./jigsaw";
 
@@ -51,6 +50,7 @@ export class WebSearchProvider {
               return await this.jigsaw!.jigsawInstance.web.search({
                 query,
                 ai_overview: false,
+                max_results: 3,
               });
             },
             {
@@ -69,11 +69,16 @@ export class WebSearchProvider {
             throw new Error("Invalid search response structure");
           }
 
+          console.log(`${query} Results: ${results.results.length} results`);
           // Clean and process each search result
           const cleanedResults = results.results
-            .slice(0, 5)
+            .slice(0, 3)
             .map((result) => {
-              const cleaned = ContentCleaner.cleanContent(result);
+              const normalizedResult = {
+                ...result,
+                content: typeof result.content === "string" ? result.content : result.content?.text || "",
+              };
+              const cleaned = ContentCleaner.cleanContent(normalizedResult);
               return {
                 ...cleaned,
               };
@@ -81,6 +86,9 @@ export class WebSearchProvider {
             // Filter out sources with empty content and empty snippets early
             .filter((source) => (source.content && source.content.length > 0) || (source.snippets && source.snippets.length > 0));
 
+          console.log(
+            `${query} Cleaned Results: ${cleanedResults.length} results, ${cleanedResults.reduce((acc, result) => acc + (result.content?.length || 0), 0)} characters`
+          );
           return {
             ...results,
             search_results: {
@@ -131,13 +139,17 @@ export class WebSearchProvider {
 
     // Step 2: Generate context for the search results with non-empty results
     const contextQueries = nonEmptySearchResults.map((result) => result.query);
+    console.log("contextQueries", contextQueries);
+    let contextGenerationStartTime = performance.now();
+    console.log("Starting context generation", contextGenerationStartTime);
     const contextResults = await this.contextGenerator({
       queries: contextQueries,
       sources: nonEmptySearchResults,
       prompt,
       aiProvider,
     });
-
+    let contextGenerationEndTime = performance.now();
+    console.log("Context generation complete", contextGenerationEndTime - contextGenerationStartTime);
     // Step 3: Combine search results with generated contexts
     const resultsWithContext = nonEmptySearchResults
       .map((searchResult, index) => {
@@ -207,20 +219,24 @@ export class WebSearchProvider {
             })
             .filter((source) => source !== null);
 
-          const response = await generateObject({
+          let PromptToModel = PROMPTS.contextGeneration({
+            prompt: prompt,
+            queries: [query],
+            research_sources: processedSources,
+          });
+          console.log(`${query} Prompt to Model: ${PromptToModel.length} characters`);
+          const response = await generateText({
             model: aiProvider.getModel("default"),
-            prompt: PROMPTS.contextGeneration({
-              prompt: prompt,
-              queries: [query],
-              research_sources: processedSources,
-            }),
+            providerOptions: {
+              openai: {
+                reasoning_effort: "minimal",
+              },
+            },
+            prompt: PrompttoModel,
             maxRetries: 3,
-            schema: z.object({
-              context: z.string().describe("The context overview"),
-            }),
           });
 
-          return response.object.context;
+          return response.text;
         })
       );
 
