@@ -232,7 +232,7 @@ export class WebSearchProvider {
                 reasoning_effort: "minimal",
               },
             },
-            prompt: PrompttoModel,
+            prompt: PromptToModel,
             maxRetries: 3,
           });
 
