@@ -69,7 +69,6 @@ export class WebSearchProvider {
             throw new Error("Invalid search response structure");
           }
 
-          console.log(`${query} Results: ${results.results.length} results`);
           // Clean and process each search result
           const cleanedResults = results.results
             .slice(0, 3)
@@ -86,9 +85,6 @@ export class WebSearchProvider {
             // Filter out sources with empty content and empty snippets early
             .filter((source) => (source.content && source.content.length > 0) || (source.snippets && source.snippets.length > 0));
 
-          console.log(
-            `${query} Cleaned Results: ${cleanedResults.length} results, ${cleanedResults.reduce((acc, result) => acc + (result.content?.length || 0), 0)} characters`
-          );
           return {
             ...results,
             search_results: {
@@ -139,17 +135,12 @@ export class WebSearchProvider {
 
     // Step 2: Generate context for the search results with non-empty results
     const contextQueries = nonEmptySearchResults.map((result) => result.query);
-    console.log("contextQueries", contextQueries);
-    let contextGenerationStartTime = performance.now();
-    console.log("Starting context generation", contextGenerationStartTime);
     const contextResults = await this.contextGenerator({
       queries: contextQueries,
       sources: nonEmptySearchResults,
       prompt,
       aiProvider,
     });
-    let contextGenerationEndTime = performance.now();
-    console.log("Context generation complete", contextGenerationEndTime - contextGenerationStartTime);
     // Step 3: Combine search results with generated contexts
     const resultsWithContext = nonEmptySearchResults
       .map((searchResult, index) => {
