@@ -77,10 +77,6 @@ const gemini = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-const deepinfra = createDeepInfra({
-  apiKey: process.env.DEEPINFRA_API_KEY,
-});
-
 const openaiProvider = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
