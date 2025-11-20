@@ -35,8 +35,7 @@ export interface DeepResearchConfig {
   };
   JIGSAW_API_KEY?: string;
   OPENAI_API_KEY?: string;
-  DEEPINFRA_API_KEY?: string;
-
+  OPENROUTER_API_KEY?: string;
   web_search?: (query: string) => Promise<WebSearchResult>;
 }
 

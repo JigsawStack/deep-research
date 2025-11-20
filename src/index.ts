@@ -39,7 +39,7 @@ export class DeepResearch {
 
     this.aiProvider = AIProvider.getInstance({
       OPENAI_API_KEY: this.config.OPENAI_API_KEY,
-      DEEPINFRA_API_KEY: this.config.DEEPINFRA_API_KEY,
+      OPENROUTER_API_KEY: this.config.OPENROUTER_API_KEY,
       defaultModel: this.config.models?.default,
       reasoningModel: this.config.models?.reasoning,
       outputModel: this.config.models?.output,
@@ -83,13 +83,13 @@ export class DeepResearch {
           : (() => {
               throw new Error("Either OPENAI_API_KEY or models.default and models.output must be provided in config");
             })()),
-      DEEPINFRA_API_KEY:
-        config.DEEPINFRA_API_KEY ||
-        process.env.DEEPINFRA_API_KEY ||
+      OPENROUTER_API_KEY:
+        config.OPENROUTER_API_KEY ||
+        process.env.OPENROUTER_API_KEY ||
         (config.models?.reasoning
           ? null
           : (() => {
-              throw new Error("DeepInfra API key must be provided in config");
+              throw new Error("OpenRouter API key must be provided in config");
             })()),
       logging: {
         ...DEFAULT_CONFIG.logging,
