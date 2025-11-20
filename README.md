@@ -50,7 +50,7 @@ import { createDeepResearch } from "deep-research";
 const deepResearch = createDeepResearch({
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  DEEPINFRA_API_KEY: process.env.DEEPINFRA_API_KEY,
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   JIGSAW_API_KEY: process.env.JIGSAW_API_KEY,
 });
 
@@ -69,7 +69,7 @@ console.log(result.data.bibliography);
 ```typescript
 import { createDeepResearch } from "deep-research";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 
 // Initialize AI providers
@@ -85,9 +85,13 @@ const openaiProvider = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const openRouterProvider = createOpenRouter({ 
+  apiKey: OPENROUTER_API_KEY! 
+})
+
 // Get model instances
 const geminiModel = gemini("gemini-2.0-flash");
-const deepseekModel = deepinfra("deepseek-ai/DeepSeek-R1");
+const deepseekModel = openRouterProvider("deepseek-ai/DeepSeek-R1");
 const openaiModel = openaiProvider("gpt-4o");
 
 // Create instance with custom configuration

@@ -1,6 +1,5 @@
-import { createDeepInfra } from "@ai-sdk/deepinfra";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { LanguageModelV1, ProviderV1 } from "@ai-sdk/provider";
 
 /**
@@ -28,17 +27,19 @@ export class AIProvider {
     defaultModel,
     reasoningModel,
     outputModel,
+    OPENROUTER_API_KEY,
   }: {
     OPENAI_API_KEY?: string;
     DEEPINFRA_API_KEY?: string;
     defaultModel?: LanguageModelV1;
     reasoningModel?: LanguageModelV1;
     outputModel?: LanguageModelV1;
+    OPENROUTER_API_KEY?: string;
   }) {
     // Set default models
     this.models = {
       default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
-      reasoning: reasoningModel || createDeepInfra({ apiKey: DEEPINFRA_API_KEY! }).languageModel("zai-org/GLM-4.6"),
+      reasoning: reasoningModel || createOpenRouter({ apiKey: OPENROUTER_API_KEY! }).languageModel("z-ai/glm-4.6"),
       output: outputModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
     };
   }
@@ -49,12 +50,14 @@ export class AIProvider {
   public static getInstance({
     OPENAI_API_KEY,
     DEEPINFRA_API_KEY,
+    OPENROUTER_API_KEY,
     defaultModel,
     reasoningModel,
     outputModel,
   }: {
     OPENAI_API_KEY?: string;
     DEEPINFRA_API_KEY?: string;
+    OPENROUTER_API_KEY?: string;
     defaultModel?: LanguageModelV1;
     reasoningModel?: LanguageModelV1;
     outputModel?: LanguageModelV1;
@@ -63,6 +66,7 @@ export class AIProvider {
       AIProvider.instance = new AIProvider({
         OPENAI_API_KEY,
         DEEPINFRA_API_KEY,
+        OPENROUTER_API_KEY,
         defaultModel,
         reasoningModel,
         outputModel,
