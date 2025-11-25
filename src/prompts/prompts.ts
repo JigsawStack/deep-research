@@ -1,11 +1,19 @@
-import { DeepResearchConfig, ResearchSource, WebSearchResult } from "@/types/types";
+import {
+  DeepResearchConfig,
+  ResearchSource,
+  WebSearchResult,
+} from "@/types/types";
 import { z } from "zod";
 
 const CONTEXT_GENERATION_PROMPT = ({
   prompt,
   queries,
   research_sources,
-}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) =>
+}: {
+  prompt: string;
+  queries: string[];
+  research_sources: ResearchSource[];
+}) =>
   `
 You are a world-class context generator.
 Your task is to generate a context overview for the following queries and sources that relates to the main prompt:
@@ -17,13 +25,15 @@ ${prompt}
 Sub-Queries and Sources:
 ${queries
   ?.map((q) => {
-    const sourcesForQuery = research_sources?.filter((s) => s.url && s.url.length > 0);
+    const sourcesForQuery = research_sources?.filter(
+      (s) => s.url && s.url.length > 0,
+    );
     if (sourcesForQuery && sourcesForQuery.length > 0) {
       return `**${q}**\n${sourcesForQuery
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
         )
         .join("\n")}`;
     }
@@ -38,7 +48,13 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   queries,
   sources,
   config,
-}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[]; config: DeepResearchConfig }) => {
+}: {
+  prompt: string;
+  reasoning?: string;
+  queries?: string[];
+  sources?: WebSearchResult[];
+  config: DeepResearchConfig;
+}) => {
   const systemPrompt =
     `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
@@ -74,9 +90,9 @@ ${queries
     if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
       return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
         )
         .join("\n")}`;
     }
@@ -85,7 +101,7 @@ ${queries
   .join("\n")}`
     : ""
 }
-  
+
 User Prompt: ${prompt}
 `.trim();
 
@@ -95,11 +111,23 @@ User Prompt: ${prompt}
       .min(1)
       .max(config.max_breadth)
       .describe(
-        "An array of high-quality, non-redundant search queries (min 1, max N) that together provide comprehensive research coverage for the user prompt"
+        "An array of high-quality, non-redundant search queries (min 1, max N) that together provide comprehensive research coverage for the user prompt",
       ),
-    researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
-    depth: z.number().min(1).max(config.max_depth).describe("A number representing the depth of the research"),
-    breadth: z.number().min(1).max(config.max_breadth).describe("A number representing the breadth of the research"),
+    researchPlan: z
+      .string()
+      .describe(
+        "A detailed plan explaining the research approach and methodology",
+      ),
+    depth: z
+      .number()
+      .min(1)
+      .max(config.max_depth)
+      .describe("A number representing the depth of the research"),
+    breadth: z
+      .number()
+      .min(1)
+      .max(config.max_breadth)
+      .describe("A number representing the breadth of the research"),
   });
 
   return {
@@ -145,9 +173,9 @@ ${queries
     if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
       return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
         )
         .join("\n")}`;
     }
@@ -161,7 +189,11 @@ Prompt: "${prompt}"
 `.trim();
 
   const schema = z.object({
-    isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
+    isComplete: z
+      .boolean()
+      .describe(
+        "If the reasoning is sufficient to answer the main prompt set to true.",
+      ),
     reason: z.string().describe("The reason for the decision"),
   });
 
@@ -186,7 +218,7 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   const systemPrompt = ``.trim();
 
   const userPrompt = `
-Proposed research plan: 
+Proposed research plan:
 "${researchPlan}"
 
 Context for each query:
@@ -232,19 +264,23 @@ const FINAL_REPORT_PROMPT = ({
   phase: "initial" | "continuation";
 }) => {
   const targetChars = targetOutputTokens ? targetOutputTokens * 3 : undefined;
-  const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
-  const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
+  const remaining = targetChars
+    ? Math.max(targetChars - currentReport.length, 0)
+    : undefined;
+  const atTarget = targetChars
+    ? currentReport.length >= targetChars
+    : undefined;
 
   const systemPrompt = `
   You are a world-class analyst.
-  Your primary purpose is to help users answer their prompt. 
+  Your primary purpose is to help users answer their prompt.
 
   GENERAL GUIDELINES:
     - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.
     - Only use the sources provided in the context.
     - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").
     - **Never repeat a heading that is already present in the Existing Draft.**
-    - When writing mathematical equations, always use single dollar sign syntax ($...$) for inline equations 
+    - When writing mathematical equations, always use single dollar sign syntax ($...$) for inline equations
       and double dollar signs ($$...$$) for block equations. Do not use \(...\) or \[...\] delimiters.
 
   INSTRUCTIONS:
@@ -302,12 +338,15 @@ const FINAL_REPORT_PROMPT = ({
     ${queries
       ?.map((q) => {
         const sourcesForQuery = sources?.find((s) => s.query === q);
-        if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
+        if (
+          sourcesForQuery &&
+          sourcesForQuery.search_results.results.length > 0
+        ) {
           return `**${q}**\n${sourcesForQuery.search_results.results
             .map(
-              (r) => `   
-        [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
-        Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
+              (r) => `
+        [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
+        Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
             )
             .join("\n")}`;
         }
@@ -325,7 +364,9 @@ const FINAL_REPORT_PROMPT = ({
 
   const schema = z.object({
     text: z.string().describe("The final report"),
-    phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
+    phase: z
+      .enum(["initial", "continuation", "done"])
+      .describe("The phase of the report"),
   });
 
   return {
