@@ -97,9 +97,7 @@ export const reasoningSearchResults = async ({
     }
 
     // Option 2: Extract content between <think> or <thinking> tags (deepseek-r1 uses this)
-    const thinkingMatch = reasoningResponse.text.match(
-      /<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/,
-    );
+    const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
     if (thinkingMatch) {
       return {
         reasoning: thinkingMatch[1] || thinkingMatch[2],
@@ -113,16 +111,11 @@ export const reasoningSearchResults = async ({
       usage: reasoningResponse.usage,
     };
   } catch (error: any) {
-    logger.error(
-      "Fatal error in reasoningSearchResults:",
-      error.message || error,
-    );
+    logger.error("Fatal error in reasoningSearchResults:", error.message || error);
     logger.error(`  Error details:`, error);
 
     // Throw the error to terminate program execution
-    throw new Error(
-      `reasoning evaluation failed: ${error.message || "Unknown error"}`,
-    );
+    throw new Error(`reasoning evaluation failed: ${error.message || "Unknown error"}`);
   }
 };
 
@@ -164,57 +157,50 @@ export const processReportForSources = async ({
   const sourceRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
   // Replace each citation with markdown links
-  const reportWithSources = report.replace(
-    sourceRegex,
-    (match, referenceString) => {
-      // Split the reference string by commas if it contains multiple references
-      const referenceNumbers = referenceString
-        .split(",")
-        .map((ref) => parseInt(ref.trim(), 10));
+  const reportWithSources = report.replace(sourceRegex, (match, referenceString) => {
+    // Split the reference string by commas if it contains multiple references
+    const referenceNumbers = referenceString.split(",").map((ref) => parseInt(ref.trim(), 10));
 
-      // If it's a single reference number
-      if (referenceNumbers.length === 1) {
-        const refNum = referenceNumbers[0];
+    // If it's a single reference number
+    if (referenceNumbers.length === 1) {
+      const refNum = referenceNumbers[0];
+      const source = referenceMap.get(refNum);
+
+      if (source) {
+        // Create markdown link with the citation number pointing to the source URL
+        return `[[${refNum}](${source.url})]`;
+      }
+
+      // If no matching source found, keep the original citation
+      logger.log(`No source found for citation [${refNum}]`);
+      return match;
+    }
+    // If it's multiple reference numbers
+    else {
+      // Create an array to hold the links
+      const links = referenceNumbers.map((refNum) => {
         const source = referenceMap.get(refNum);
 
         if (source) {
           // Create markdown link with the citation number pointing to the source URL
-          return `[[${refNum}](${source.url})]`;
+          return `[${refNum}](${source.url})`;
         }
 
-        // If no matching source found, keep the original citation
-        logger.log(`No source found for citation [${refNum}]`);
-        return match;
-      }
-      // If it's multiple reference numbers
-      else {
-        // Create an array to hold the links
-        const links = referenceNumbers.map((refNum) => {
-          const source = referenceMap.get(refNum);
+        // If no matching source found, just return the number
+        logger.log(`No source found for citation part ${refNum}`);
+        return `${refNum}`;
+      });
 
-          if (source) {
-            // Create markdown link with the citation number pointing to the source URL
-            return `[${refNum}](${source.url})`;
-          }
-
-          // If no matching source found, just return the number
-          logger.log(`No source found for citation part ${refNum}`);
-          return `${refNum}`;
-        });
-
-        // Join the links with commas
-        return `[${links.join(", ")}]`;
-      }
-    },
-  );
+      // Join the links with commas
+      return `[${links.join(", ")}]`;
+    }
+  });
 
   // Generate bibliography section
   let bibliography = "\n\n## References\n\n";
 
   // Sort by reference number for a well-ordered bibliography
-  const sortedReferences = Array.from(referenceMap.entries()).sort(
-    (a, b) => a[0] - b[0],
-  );
+  const sortedReferences = Array.from(referenceMap.entries()).sort((a, b) => a[0] - b[0]);
 
   logger.log(`Generating bibliography with ${sortedReferences.length} entries`);
 
@@ -292,11 +278,7 @@ export const generateFinalReport = async ({
       schema: reportPrompt.schema,
       experimental_repairText: async ({ text, error }) => {
         // Simple repair attempt for unclosed JSON strings
-        if (
-          error &&
-          error.message &&
-          error.message.includes("Unterminated string")
-        ) {
+        if (error && error.message && error.message.includes("Unterminated string")) {
           return text + '"}';
         }
         return text;
@@ -306,15 +288,11 @@ export const generateFinalReport = async ({
     phase = response.object.phase;
     draft += response.object.text;
 
-    logger.log(
-      "PHASE==============================:\n" + response.object.phase,
-    );
+    logger.log("PHASE==============================:\n" + response.object.phase);
     logger.log("MODEL OUTPUT:\n" + response.object.text);
 
     if (phase === "continuation") {
-      const targetChars = targetOutputTokens
-        ? targetOutputTokens * 4
-        : undefined;
+      const targetChars = targetOutputTokens ? targetOutputTokens * 4 : undefined;
       if (targetChars && draft.length >= targetChars) {
         phase = "done";
       }
@@ -377,10 +355,7 @@ export const generateResearchPlan = async ({
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
       experimental_repairText: async ({ text, error }) => {
-        console.log(
-          "Error with structured output while generating research plan",
-          error,
-        );
+        console.log("Error with structured output while generating research plan", error);
         const response = await generateObject({
           model: aiProvider.getModel("default"),
           schema: researchPlanPrompt.schema,
@@ -405,7 +380,7 @@ export const generateResearchPlan = async ({
         queries: queries,
         sources: sources,
         config,
-      }),
+      })
     );
 
     return {
@@ -418,8 +393,6 @@ export const generateResearchPlan = async ({
   } catch (error: any) {
     logger.error(`Error generating research plan: ${error.message || error}`);
 
-    throw new Error(
-      `Research evaluation failed: ${error.message || "Unknown error"}`,
-    );
+    throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
 };

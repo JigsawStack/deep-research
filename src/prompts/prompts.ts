@@ -1,8 +1,4 @@
-import {
-  DeepResearchConfig,
-  ResearchSource,
-  WebSearchResult,
-} from "@/types/types";
+import { DeepResearchConfig, ResearchSource, WebSearchResult } from "@/types/types";
 import { z } from "zod";
 
 const CONTEXT_GENERATION_PROMPT = ({
@@ -25,15 +21,13 @@ ${prompt}
 Sub-Queries and Sources:
 ${queries
   ?.map((q) => {
-    const sourcesForQuery = research_sources?.filter(
-      (s) => s.url && s.url.length > 0,
-    );
+    const sourcesForQuery = research_sources?.filter((s) => s.url && s.url.length > 0);
     if (sourcesForQuery && sourcesForQuery.length > 0) {
       return `**${q}**\n${sourcesForQuery
         .map(
           (r) => `
     [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
     }
@@ -92,7 +86,7 @@ ${queries
         .map(
           (r) => `
     [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
     }
@@ -111,23 +105,11 @@ User Prompt: ${prompt}
       .min(1)
       .max(config.max_breadth)
       .describe(
-        "An array of high-quality, non-redundant search queries (min 1, max N) that together provide comprehensive research coverage for the user prompt",
+        "An array of high-quality, non-redundant search queries (min 1, max N) that together provide comprehensive research coverage for the user prompt"
       ),
-    researchPlan: z
-      .string()
-      .describe(
-        "A detailed plan explaining the research approach and methodology",
-      ),
-    depth: z
-      .number()
-      .min(1)
-      .max(config.max_depth)
-      .describe("A number representing the depth of the research"),
-    breadth: z
-      .number()
-      .min(1)
-      .max(config.max_breadth)
-      .describe("A number representing the breadth of the research"),
+    researchPlan: z.string().describe("A detailed plan explaining the research approach and methodology"),
+    depth: z.number().min(1).max(config.max_depth).describe("A number representing the depth of the research"),
+    breadth: z.number().min(1).max(config.max_breadth).describe("A number representing the breadth of the research"),
   });
 
   return {
@@ -175,7 +157,7 @@ ${queries
         .map(
           (r) => `
     [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
-    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
+    Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
     }
@@ -189,11 +171,7 @@ Prompt: "${prompt}"
 `.trim();
 
   const schema = z.object({
-    isComplete: z
-      .boolean()
-      .describe(
-        "If the reasoning is sufficient to answer the main prompt set to true.",
-      ),
+    isComplete: z.boolean().describe("If the reasoning is sufficient to answer the main prompt set to true."),
     reason: z.string().describe("The reason for the decision"),
   });
 
@@ -264,12 +242,8 @@ const FINAL_REPORT_PROMPT = ({
   phase: "initial" | "continuation";
 }) => {
   const targetChars = targetOutputTokens ? targetOutputTokens * 3 : undefined;
-  const remaining = targetChars
-    ? Math.max(targetChars - currentReport.length, 0)
-    : undefined;
-  const atTarget = targetChars
-    ? currentReport.length >= targetChars
-    : undefined;
+  const remaining = targetChars ? Math.max(targetChars - currentReport.length, 0) : undefined;
+  const atTarget = targetChars ? currentReport.length >= targetChars : undefined;
 
   const systemPrompt = `
   You are a world-class analyst.
@@ -338,15 +312,12 @@ const FINAL_REPORT_PROMPT = ({
     ${queries
       ?.map((q) => {
         const sourcesForQuery = sources?.find((s) => s.query === q);
-        if (
-          sourcesForQuery &&
-          sourcesForQuery.search_results.results.length > 0
-        ) {
+        if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
           return `**${q}**\n${sourcesForQuery.search_results.results
             .map(
               (r) => `
         [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
-        Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`,
+        Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
             )
             .join("\n")}`;
         }
@@ -364,9 +335,7 @@ const FINAL_REPORT_PROMPT = ({
 
   const schema = z.object({
     text: z.string().describe("The final report"),
-    phase: z
-      .enum(["initial", "continuation", "done"])
-      .describe("The phase of the report"),
+    phase: z.enum(["initial", "continuation", "done"]).describe("The phase of the report"),
   });
 
   return {
