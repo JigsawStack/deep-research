@@ -5,7 +5,11 @@ const CONTEXT_GENERATION_PROMPT = ({
   prompt,
   queries,
   research_sources,
-}: { prompt: string; queries: string[]; research_sources: ResearchSource[] }) =>
+}: {
+  prompt: string;
+  queries: string[];
+  research_sources: ResearchSource[];
+}) =>
   `
 You are a world-class context generator.
 Your task is to generate a context overview for the following queries and sources that relates to the main prompt:
@@ -21,8 +25,8 @@ ${queries
     if (sourcesForQuery && sourcesForQuery.length > 0) {
       return `**${q}**\n${sourcesForQuery
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -38,7 +42,13 @@ const RESEARCH_PROMPT_TEMPLATE = ({
   queries,
   sources,
   config,
-}: { prompt: string; reasoning?: string; queries?: string[]; sources?: WebSearchResult[]; config: DeepResearchConfig }) => {
+}: {
+  prompt: string;
+  reasoning?: string;
+  queries?: string[];
+  sources?: WebSearchResult[];
+  config: DeepResearchConfig;
+}) => {
   const systemPrompt =
     `You are a world-class research planner. Your primary goal is to construct a comprehensive research plan and a set of effective search queries to thoroughly investigate the given prompt.
 
@@ -74,8 +84,8 @@ ${queries
     if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
       return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -85,7 +95,7 @@ ${queries
   .join("\n")}`
     : ""
 }
-  
+
 User Prompt: ${prompt}
 `.trim();
 
@@ -145,8 +155,8 @@ ${queries
     if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
       return `**${q}**\n${sourcesForQuery.search_results.results
         .map(
-          (r) => `   
-    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
+          (r) => `
+    [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
     Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
         )
         .join("\n")}`;
@@ -186,7 +196,7 @@ const REASONING_SEARCH_RESULTS_PROMPT = ({
   const systemPrompt = ``.trim();
 
   const userPrompt = `
-Proposed research plan: 
+Proposed research plan:
 "${researchPlan}"
 
 Context for each query:
@@ -237,14 +247,14 @@ const FINAL_REPORT_PROMPT = ({
 
   const systemPrompt = `
   You are a world-class analyst.
-  Your primary purpose is to help users answer their prompt. 
+  Your primary purpose is to help users answer their prompt.
 
   GENERAL GUIDELINES:
     - If you are about to reach your output token limit, ensure you properly close all JSON objects and strings to prevent parsing errors.
     - Only use the sources provided in the context.
     - Cite every factual claim or statistic with in-text references using the reference numbers by the sources provided (e.g. "[1]").
     - **Never repeat a heading that is already present in the Existing Draft.**
-    - When writing mathematical equations, always use single dollar sign syntax ($...$) for inline equations 
+    - When writing mathematical equations, always use single dollar sign syntax ($...$) for inline equations
       and double dollar signs ($$...$$) for block equations. Do not use \(...\) or \[...\] delimiters.
 
   INSTRUCTIONS:
@@ -305,8 +315,8 @@ const FINAL_REPORT_PROMPT = ({
         if (sourcesForQuery && sourcesForQuery.search_results.results.length > 0) {
           return `**${q}**\n${sourcesForQuery.search_results.results
             .map(
-              (r) => `   
-        [${r.reference_number}] ${r.title || "No title"} (${r.url})\n      
+              (r) => `
+        [${r.reference_number}] ${r.title || "No title"} (${r.url})\n
         Content and Snippets: ${r.content ? r.content : r.snippets?.join("\n")}`
             )
             .join("\n")}`;

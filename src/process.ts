@@ -19,7 +19,14 @@ export const decisionMaking = async ({
   queries,
   sources,
   researchPlan,
-}: { reasoning: string; prompt: string; aiProvider: AIProvider; queries: string[]; sources: WebSearchResult[]; researchPlan: string }) => {
+}: {
+  reasoning: string;
+  prompt: string;
+  aiProvider: AIProvider;
+  queries: string[];
+  sources: WebSearchResult[];
+  researchPlan: string;
+}) => {
   const decisionMakingPrompt = PROMPTS.decisionMaking({
     reasoning: reasoning,
     prompt: prompt,
@@ -37,7 +44,10 @@ export const decisionMaking = async ({
     maxRetries: 3,
   });
 
-  return { decision: decisionMakingResponse, usage: decisionMakingResponse.usage };
+  return {
+    decision: decisionMakingResponse,
+    usage: decisionMakingResponse.usage,
+  };
 };
 
 /**
@@ -56,7 +66,13 @@ export const reasoningSearchResults = async ({
   sources,
   queries,
   aiProvider,
-}: { prompt: string; researchPlan: string; sources: WebSearchResult[]; queries: string[]; aiProvider: AIProvider }) => {
+}: {
+  prompt: string;
+  researchPlan: string;
+  sources: WebSearchResult[];
+  queries: string[];
+  aiProvider: AIProvider;
+}) => {
   try {
     const reasoningPrompt = PROMPTS.reasoningSearchResults({
       prompt: prompt,
@@ -74,17 +90,26 @@ export const reasoningSearchResults = async ({
 
     // Option 1: Return reasoning property if available
     if (reasoningResponse.reasoning) {
-      return { reasoning: reasoningResponse.reasoning, usage: reasoningResponse.usage };
+      return {
+        reasoning: reasoningResponse.reasoning,
+        usage: reasoningResponse.usage,
+      };
     }
 
     // Option 2: Extract content between <think> or <thinking> tags (deepseek-r1 uses this)
     const thinkingMatch = reasoningResponse.text.match(/<think>([\s\S]*?)<\/think>|<thinking>([\s\S]*?)<\/thinking>/);
     if (thinkingMatch) {
-      return { reasoning: thinkingMatch[1] || thinkingMatch[2], usage: reasoningResponse.usage }; // Return the content of whichever group matched
+      return {
+        reasoning: thinkingMatch[1] || thinkingMatch[2],
+        usage: reasoningResponse.usage,
+      }; // Return the content of whichever group matched
     }
 
     // Option 3: If no structured reasoning available, return the full text
-    return { reasoning: reasoningResponse.text, usage: reasoningResponse.usage };
+    return {
+      reasoning: reasoningResponse.text,
+      usage: reasoningResponse.usage,
+    };
   } catch (error: any) {
     logger.error("Fatal error in reasoningSearchResults:", error.message || error);
     logger.error(`  Error details:`, error);
@@ -307,7 +332,14 @@ export const generateResearchPlan = async ({
   queries,
   sources,
   config,
-}: { aiProvider: AIProvider; prompt: string; reasoning: string; queries: string[]; sources: WebSearchResult[]; config: DeepResearchConfig }) => {
+}: {
+  aiProvider: AIProvider;
+  prompt: string;
+  reasoning: string;
+  queries: string[];
+  sources: WebSearchResult[];
+  config: DeepResearchConfig;
+}) => {
   try {
     const researchPlanPrompt = PROMPTS.research({
       prompt,
@@ -317,12 +349,25 @@ export const generateResearchPlan = async ({
       config,
     });
 
-    // Generate the research plan using the AI provider
     const result = await generateObject({
       model: aiProvider.getModel("default"),
       maxRetries: 3,
       system: researchPlanPrompt.system,
       prompt: researchPlanPrompt.user,
+      experimental_repairText: async ({ text, error }) => {
+        console.log("Error with structured output while generating research plan", error);
+        const response = await generateObject({
+          model: aiProvider.getModel("default"),
+          schema: researchPlanPrompt.schema,
+          system: "Fix the json error and dont change anything else",
+          prompt: text,
+        });
+
+        if (response) {
+          return JSON.stringify(response.object);
+        }
+        return null;
+      },
       schema: researchPlanPrompt.schema,
       mode: "json",
     });
@@ -347,6 +392,7 @@ export const generateResearchPlan = async ({
     };
   } catch (error: any) {
     logger.error(`Error generating research plan: ${error.message || error}`);
+
     throw new Error(`Research evaluation failed: ${error.message || "Unknown error"}`);
   }
 };
