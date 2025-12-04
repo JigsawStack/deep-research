@@ -1,6 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { LanguageModelV1, ProviderV1 } from "@ai-sdk/provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 /**
  * AIProvider acts as an abstract factory for different AI model providers
