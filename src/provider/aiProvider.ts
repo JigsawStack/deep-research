@@ -1,6 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { LanguageModelV1, ProviderV1 } from "@ai-sdk/provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 /**
  * AIProvider acts as an abstract factory for different AI model providers
@@ -38,9 +38,13 @@ export class AIProvider {
   }) {
     // Set default models
     this.models = {
-      default: defaultModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
-      reasoning: reasoningModel || createOpenRouter({ apiKey: OPENROUTER_API_KEY! }).languageModel("z-ai/glm-4.6"),
-      output: outputModel || createOpenAI({ apiKey: OPENAI_API_KEY! }).languageModel("gpt-5-mini"),
+      default: defaultModel || createOpenRouter({ apiKey: OPENROUTER_API_KEY! }).languageModel("moonshotai/kimi-k2-0905"),
+      reasoning:
+        reasoningModel ||
+        createOpenRouter({ apiKey: OPENROUTER_API_KEY! }).languageModel("x-ai/grok-4.1-fast", {
+          reasoning: { effort: "medium" },
+        }),
+      output: outputModel || createOpenRouter({ apiKey: OPENROUTER_API_KEY! }).languageModel("moonshotai/kimi-k2-0905"),
     };
   }
 
