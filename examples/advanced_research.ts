@@ -27,6 +27,16 @@ async function advancedResearch() {
     // logging: {
     //   enabled: true, // enabled to true for console logging
     // },
+    /**
+     * uncomment to use custom models
+     */
+    // models: {
+    //   default: openaiProvider("gpt-4o"),
+    //   reasoning: openRouterProvider("x-ai/grok-4.1-fast", {
+    //     reasoning: { effort: "medium" },
+    //   }),
+    //   output: gemini("gemini-2.0-flash"),
+    // },
   });
 
   // the prompt to research
