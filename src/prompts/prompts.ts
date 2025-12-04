@@ -264,6 +264,14 @@ const FINAL_REPORT_PROMPT = ({
     - Make sure your report is well-researched and well-cited.
     - Make sure your report is well-written and well-structured.
     - Make sure your report is well-organized and well-formatted.
+
+  OUTPUT FORMAT:
+   Always respond in valid JSON:  
+    {  
+      "phase": "initial" | "continuation" | "done",  
+      "text": "<content>"  
+    }
+
   `;
 
   // Determine instructions based on phase
